@@ -247,6 +247,65 @@ checkout and no `$HOME` to read them from; `garage-rebuild-plugins` re-publishes
 that copy whenever the tracked one changes, so bumping a plugin stays a one-file
 edit.
 
+## Day two: taking a new version of Garage
+
+```sh
+garage update            # pull, relink, converge, reload
+garage update --dry-run  # print all of that and do none of it
+```
+
+`garage update` is the whole lifecycle in one command, and it is deliberately
+**bootstrap plus two things bootstrap cannot do**:
+
+1. **Pull the checkout.** Fast-forward only, skipped with a note when the branch
+   has no upstream — which is every install today, because Garage's repositories
+   are local-only — and skipped when the working tree has local changes, because
+   merging across those is the one operation that loses work.
+2. **Sweep links to files the new version deleted.** `stow --restow` can only
+   unlink what the package still contains, and bootstrap's pre-stow scan walks
+   the paths the checkout manages *now*, so a file deleted between two versions
+   leaves a live symlink that neither of them will ever look at. Update finds it
+   from the other end: every symlink under `~/.config`, `~/.local/bin`,
+   `~/.local/share` and `~/Wallpaper` that points into this checkout and no longer
+   resolves. Scoped to those four directories on purpose — `$HOME` is full of
+   symlinks that dangle legitimately, and a broader sweep would eventually delete
+   one.
+3. **Re-run `bootstrap.sh`.** Which is what installs packages the list has gained,
+   enables units it has gained, writes new per-user files, backs up anything in
+   the way, and restows. Re-running it is a supported operation: the freshness
+   gate recognises an existing install, `pacman` runs with `--needed`, and the
+   generated files are only written when absent. This is also why update asks for
+   `sudo` and can upgrade the system — installing a newly listed package on Arch
+   without a full upgrade first is a partial upgrade, which is unsupported.
+4. **Render and reload.** The render runs any preference-schema migration the new
+   version added, then `hyprctl reload` picks it all up. With no compositor
+   reachable — a TTY, an SSH shell — the reload is skipped with a note and the new
+   configuration lands at the next login.
+
+The plugins are the one thing update decides for itself rather than leaving to
+bootstrap: it compares the running Hyprland ABI against what is deployed and
+rebuilds only when they disagree or a pin moved in the pull. So the common update
+does not rebuild anything and does not need `sudo` for the plugins.
+
+## Checking an install: `garage doctor`
+
+```sh
+garage doctor
+```
+
+Read-only, and safe to run at any time from anywhere, including a TTY after a
+login that did not come up. It prints one line per check and exits 1 if anything
+is actually wrong: the Hyprland version against the support floor, the key
+packages, the IBM Plex families as fontconfig sees them, every path this checkout
+manages resolving from `$HOME` into it, dangling links left by a deleted file,
+the per-user units, the plugin ABI, the generated Lua fragments (each run through
+`luac -p`), and the preferences file.
+
+Three things are reported as `note` rather than a failure, because they are true
+and not problems: a machine with no plugins deployed, a home that has never
+rendered, and a shell with no compositor to reach. A health check that fails on a
+TTY is a health check nobody runs.
+
 ## Docker
 
 Garage installs and enables Docker but deliberately does **not** add you to the
@@ -298,6 +357,9 @@ Honest state of the installer today:
 - **Re-running is intended to be safe** — the installs are `--needed`, the link
   step is `--restow`, and the generated files are only written when absent — but
   it has not been exercised from every possible starting state.
+- **`garage update` cannot pull yet.** With no upstream configured it says so and
+  goes on to converge the machine on whatever the local checkout holds, which is
+  the only thing it can honestly do until the repositories are published.
 
 If a `stow` conflict stops the run, each line names a path that already exists
 and is not a Garage link. Move it aside and re-run `./bootstrap.sh`. More

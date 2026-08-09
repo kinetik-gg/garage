@@ -519,10 +519,10 @@ def migrate_preferences(stored: dict) -> dict:
     return stored
 
 
-def load_preferences() -> dict:
+def load_preferences(sink: list[str] | None = None) -> dict:
     defaults = load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
     stored = migrate_preferences(load_toml(PREFERENCES_PATH))
-    return validate_preferences(deep_merge(defaults, stored))
+    return validate_preferences(deep_merge(defaults, stored), sink)
 
 
 def toml_value(value: object) -> str:
@@ -641,7 +641,7 @@ def is_hex_color(value: object) -> bool:
     return isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) is not None
 
 
-def validate_preferences(config: dict) -> dict:
+def validate_preferences(config: dict, sink: list[str] | None = None) -> dict:
     """Put every preference at a value this build can render.
 
     Nothing here refuses the file. A single bad value used to raise, and that one
@@ -658,6 +658,11 @@ def validate_preferences(config: dict) -> dict:
     The coerced value reaches preferences.toml on the next save, so a bad value
     is corrected once rather than carried forever. wallpaper_fit, corner_radius
     and the locale already worked this way; the rest of the schema now does too.
+
+    `sink`, when given, takes the notes instead of stderr. `garage doctor` has to
+    count the coercions to report them, and reading its own stderr back is not
+    something a process can do honestly -- it would also swallow the journal line
+    every other caller depends on.
     """
     notes: list[str] = []
 
@@ -776,8 +781,11 @@ def validate_preferences(config: dict) -> dict:
     # report a working desktop as a broken one. Nothing in the QML reads a
     # warnings field, so there is nothing to fill in, and the journal is where
     # the render units' output is looked for anyway.
-    for note in notes:
-        print(f"garage: preferences.toml: {note}", file=sys.stderr)
+    if sink is None:
+        for note in notes:
+            print(f"garage: preferences.toml: {note}", file=sys.stderr)
+    else:
+        sink.extend(notes)
     return config
 
 
@@ -3484,11 +3492,851 @@ def action(name: str, value: object | None) -> None:
         raise SettingsError(f"Unknown action: {name}")
 
 
+# ---------------------------------------------------------------------------
+# Lifecycle: `garage doctor` and `garage update`
+#
+# Plumbing, deliberately unlike everything above it. Every other command answers
+# the QML client and prints one JSON object; these two answer a person at a
+# terminal and print lines, so nothing here reaches make_snapshot() and nothing
+# here goes through response(). main() dispatches them before the JSON path for
+# that reason.
+# ---------------------------------------------------------------------------
+
+# The support floor. Hyprland's config language and option names move between
+# releases, and the tracked hyprland.lua is written against this one; below it
+# the desktop fails in ways that read as Garage bugs rather than as an old
+# compositor. Compared numerically -- see version_parts() -- because the day
+# 0.56.10 ships, a string comparison puts it below 0.56.9.
+MINIMUM_HYPRLAND = "0.56.0"
+
+# Named because losing one of these is a broken desktop rather than a missing
+# extra: the shell, the bar, the terminal, the idle and wallpaper daemons, the
+# linker that puts the configuration in place, and the two theme assets that
+# every toolkit config names by string. The full package set lives in
+# bootstrap.sh and is not duplicated here -- `garage update` re-runs that list
+# through pacman anyway, which is a better check than repeating it.
+DOCTOR_PACKAGES = ("quickshell", "waybar", "hypridle", "hyprpaper", "kitty",
+                   "fish", "stow", "ttf-ibm-plex", "adw-gtk-theme")
+
+# fc-list family names, not package names: a font can be installed and still not
+# be found by fontconfig, and every toolkit config asks for these two by family.
+DOCTOR_FONTS = ("IBM Plex Sans", "IBM Plex Mono")
+
+# The per-user units this checkout owns, plus the three it extends with a
+# drop-in, each with whether a live session should show it running.
+# garage-plugins-check.service is Type=oneshot: it runs at login, says its piece
+# and exits, so "inactive" is its healthy steady state and only "enabled"
+# means anything. The .service halves of the two timers are the same story.
+DOCTOR_UNITS = (
+    ("waybar.service", True),
+    ("hypridle.service", True),
+    ("hyprpaper.service", True),
+    ("garage-shell.service", True),
+    ("garage-theme.timer", True),
+    ("garage-night-shift.timer", True),
+    ("garage-plugins-check.service", False),
+)
+
+# Where garage-rebuild-plugins deploys, and the two stable symlinks hyprland.lua
+# loads. Duplicated from that script rather than parsed out of it: they are a
+# published layout that the pacman hook also hardcodes, not a private detail.
+PLUGIN_ROOT = Path("/usr/lib/kinetik/plugins")
+PLUGIN_NAMES = ("kinetik-glass", "hyprexpo")
+
+# Where a stow link from this checkout can legitimately be. Everything under
+# desktop/ lands in one of these four, so a dangling repo-pointing link cannot
+# be anywhere else -- and scoping the sweep this tightly is what keeps it from
+# ever considering the many links elsewhere in $HOME that dangle on purpose
+# (Chrome's SingletonLock, Discord's IPC sockets, editor session files).
+SCAN_ROOTS = (CONFIG_HOME, HOME / ".local/bin", HOME / ".local/share", HOME / "Wallpaper")
+
+
+def tilde(path: Path) -> str:
+    """A path as the user would type it, for report lines."""
+    try:
+        return f"~/{path.relative_to(HOME)}"
+    except ValueError:
+        return str(path)
+
+
+def version_parts(text: str) -> tuple[int, ...]:
+    """The first three integers in a version string, for numeric comparison."""
+    numbers = [int(part) for part in re.findall(r"\d+", text)[:3]]
+    return tuple(numbers + [0] * (3 - len(numbers)))
+
+
+def link_hop(path: Path) -> Path | None:
+    """Where a symlink points after exactly one hop, absolute, unresolved.
+
+    The same rule bootstrap.sh's link_hop() follows, and for the same reason:
+    full resolution is wrong for judging a stow link, because a tracked file may
+    itself be a symlink and resolving it lands outside the checkout. None when
+    the path is not a symlink.
+    """
+    try:
+        target = os.readlink(path)
+    except OSError:
+        return None
+    if not os.path.isabs(target):
+        target = os.path.join(os.path.dirname(str(path)), target)
+    return Path(os.path.normpath(target))
+
+
+def points_into(path: Path, tree: Path) -> bool:
+    """True when a symlink is one of ours in this checkout.
+
+    Lexically first, then through full resolution, so it holds whether or not
+    the checkout's own path contains symlinked components.
+    """
+    hop = link_hop(path)
+    if hop is not None and hop.is_relative_to(tree):
+        return True
+    return Path(os.path.realpath(path)).is_relative_to(tree)
+
+
+def checkout_root() -> Path:
+    """The dotfiles checkout this script is part of.
+
+    __file__ is reached through the stow link at ~/.local/bin/garage, so
+    resolving it and walking up out of desktop/.local/bin names the checkout the
+    running session is actually linked to -- which is the only definition that
+    lets `update` restow the same tree it just pulled.
+    """
+    root = Path(__file__).resolve().parents[3]
+    if not (root / "desktop/.stow-local-ignore").is_file():
+        raise SettingsError(f"{Path(__file__).resolve()} is not inside a Garage checkout")
+    return root
+
+
+def stow_ignores(root: Path) -> list[re.Pattern[str]]:
+    """The path-anchored patterns from desktop/.stow-local-ignore.
+
+    Only those: the rest of that file repeats stow's name-based defaults, which
+    managed_paths() applies by name. Anchored patterns are what excludes the
+    toolkit configs garage rewrites at runtime, and a manifest that included
+    them would report every theme switch as a broken link.
+    """
+    patterns = []
+    for line in (root / "desktop/.stow-local-ignore").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("^/"):
+            try:
+                patterns.append(re.compile(line))
+            except re.error:
+                continue
+    return patterns
+
+
+def managed_paths(root: Path) -> list[str]:
+    """Everything stow will place, as paths relative to $HOME.
+
+    The Python side of bootstrap.sh's managed_paths() plus stow_ignores(): with
+    --no-folding every leaf becomes its own symlink, so the managed set is
+    exactly this file list.
+    """
+    tree = root / "desktop"
+    patterns = stow_ignores(root)
+    paths: list[str] = []
+    for parent, directories, files in os.walk(tree):
+        here = Path(parent)
+        # A symlinked directory is a leaf stow would place as one link, not a
+        # directory to descend into. .git is never inside desktop/, and is
+        # skipped for the same reason bootstrap skips it.
+        leaves = [name for name in directories if (here / name).is_symlink()]
+        directories[:] = [name for name in directories
+                          if name not in leaves and name != ".git"]
+        for name in files + leaves:
+            relative = str((here / name).relative_to(tree))
+            if name in {".stow-local-ignore", ".gitignore"} or name.endswith("~"):
+                continue
+            if any(pattern.search(f"/{relative}") for pattern in patterns):
+                continue
+            paths.append(relative)
+    return sorted(paths)
+
+
+def stow_state(root: Path) -> dict:
+    """How each managed path currently resolves from $HOME.
+
+    Five outcomes, because they have five different answers:
+
+      linked  -- a symlink into this checkout that resolves. The healthy case.
+      other   -- a stow link at the right relative path inside a *different*
+                 checkout. The desktop works; it is just being served from
+                 somewhere else, which is what a moved or duplicated clone looks
+                 like, and what a restow corrects.
+      broken  -- a link into this checkout whose target is gone, or a link to
+                 something else entirely.
+      plain   -- a real file sitting where a link belongs; bootstrap backs it up.
+      missing -- nothing there at all, which is what a file added to the
+                 checkout since the last stow looks like.
+    """
+    tree = root / "desktop"
+    state: dict = {"linked": 0, "other": [], "broken": [], "plain": [],
+                   "missing": [], "others": set(), "total": 0}
+    for relative in managed_paths(root):
+        state["total"] += 1
+        target = HOME / relative
+        if target.is_symlink():
+            if points_into(target, tree):
+                if target.exists():
+                    state["linked"] += 1
+                else:
+                    state["broken"].append(relative)
+                continue
+            hop = link_hop(target)
+            suffix = f"/desktop/{relative}"
+            if hop is not None and str(hop).endswith(suffix) and target.exists():
+                state["other"].append(relative)
+                state["others"].add(str(hop)[: -len(suffix)])
+            else:
+                state["broken"].append(relative)
+        elif target.exists():
+            state["plain"].append(relative)
+        else:
+            state["missing"].append(relative)
+    return state
+
+
+def dangling_repo_links(root: Path) -> list[Path]:
+    """Symlinks into this checkout whose target no longer exists.
+
+    The gap no restow can close, and the reason this function exists at all:
+    bootstrap's pre-stow scan walks the paths the checkout manages *now*, so a
+    file deleted from the repository between two versions is not in the set
+    being scanned, and `stow --restow` only unlinks what the package still
+    contains. The link is left behind pointing at nothing, and it will outlive
+    every later update.
+
+    Found from the other direction instead -- walk $HOME, keep the links that
+    point into this checkout and no longer resolve -- which needs no record of
+    what the previous version shipped.
+
+    Two properties matter and are load-bearing:
+
+      * The search is scoped to SCAN_ROOTS. $HOME is full of symlinks that
+        dangle legitimately (Chrome's SingletonLock, Discord's IPC sockets), and
+        a sweep that considered them would eventually delete one.
+      * The target must resolve into *this* checkout. A dangling link into
+        another Garage clone is that clone's business, and the restow re-points
+        it anyway.
+
+    os.walk does not follow symlinked directories, so a dangling directory link
+    is reported rather than descended into.
+    """
+    tree = root / "desktop"
+    found: list[Path] = []
+    seen: set[Path] = set()
+    for scan_root in SCAN_ROOTS:
+        if not scan_root.is_dir():
+            continue
+        for parent, directories, files in os.walk(scan_root):
+            here = Path(parent)
+            for name in directories + files:
+                path = here / name
+                if path in seen or not path.is_symlink():
+                    continue
+                seen.add(path)
+                # exists() follows the link: False on a symlink is precisely
+                # "the target is not there".
+                if path.exists():
+                    continue
+                if points_into(path, tree):
+                    found.append(path)
+    return sorted(found)
+
+
+def hyprland_report() -> str:
+    """`Hyprland --version` output, or "" when the binary is not installed.
+
+    Read from the binary rather than from `hyprctl`, so it answers on a TTY with
+    no compositor running -- which is where a `garage doctor` after a failed
+    login is run.
+    """
+    probe = run(["Hyprland", "--version"], timeout=10)
+    return probe.stdout if probe.returncode == 0 else ""
+
+
+def hyprland_version(report: str) -> str:
+    for pattern in (r"^Hyprland\s+v?(\d+\.\d+(?:\.\d+)?)", r"^Tag:\s*v?(\d+\.\d+(?:\.\d+)?)"):
+        match = re.search(pattern, report, re.M)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def hyprland_abi(report: str) -> str:
+    match = re.search(r"^Version ABI string:\s*(\S+)", report, re.M)
+    return match.group(1) if match else ""
+
+
+def deployed_plugin_abi(name: str) -> str:
+    """Which ABI directory a stable plugin symlink resolves into, or "".
+
+    One hop only, like garage-rebuild-plugins' own deployed_abi(): the link is
+    absolute and resolving further would follow the .so out of the tree.
+    """
+    hop = link_hop(PLUGIN_ROOT / f"{name}.so")
+    if hop is None or hop.suffix != ".so" or hop.parent.parent != PLUGIN_ROOT:
+        return ""
+    return hop.parent.name
+
+
+def plugin_state(report: str) -> dict:
+    """The live ABI comparison garage-rebuild-plugins --check makes.
+
+    Reimplemented here rather than shelled out to, which is a deliberate choice
+    and not a duplication for its own sake. --check is built to be run
+    unattended from a login unit: it exits 0 whether or not the plugins are
+    stale (a red unit in the session is worse than a quiet one), and when they
+    are stale it raises a sticky desktop notification. Neither behaviour belongs
+    in a read-only health check or in update's skip decision -- one gives no
+    answer to interpret, the other has a side effect on the user's screen. What
+    it actually does is four readlinks and a string compare, all of which are
+    read-only and none of which are worth a subprocess.
+
+    "Never deployed here" is kept apart from "stale" for the reason that script
+    documents: Glass's source is not published, so most machines have no plugins
+    at all and are not behind on anything.
+    """
+    abi = hyprland_abi(report)
+    deployed = {name: deployed_plugin_abi(name) for name in PLUGIN_NAMES}
+    ever = any(PLUGIN_ROOT.glob("*/*.so"))
+    stale = [name for name, where in deployed.items()
+             if where != abi or not (PLUGIN_ROOT / f"{name}.so").exists()]
+    return {"abi": abi, "deployed": deployed, "ever": ever,
+            "stale": [] if not abi else stale}
+
+
+def session_is_up() -> bool:
+    """Whether a graphical session is running for this user.
+
+    graphical-session.target rather than a hyprctl probe: hyprctl needs
+    HYPRLAND_INSTANCE_SIGNATURE, which is exported into the session's own
+    processes and is absent from an SSH login or a TTY shell on the same
+    machine. Asking systemd is the question that does not depend on where the
+    command was typed.
+    """
+    return run(["systemctl", "--user", "is-active",
+                "graphical-session.target"]).stdout.strip() == "active"
+
+
+# ---------------------------------------------------------------------------
+# doctor
+#
+# A check is (label, probe), where probe() returns (status, detail, hint):
+#
+#   ok    -- healthy.
+#   note  -- true, reported, and not a problem: a machine with no plugins
+#            deployed, a home that has never rendered, a session that is not
+#            running because this is a TTY. Exit status ignores these, because
+#            a health check that fails on a TTY is a health check nobody runs.
+#   fail  -- a real problem. The hint says what to do about it.
+#
+# The probes return their verdict rather than printing it so that Phase 5's
+# `doctor --report` can serialize this same list.
+# ---------------------------------------------------------------------------
+
+
+def check_hyprland() -> tuple[str, str, str]:
+    version = hyprland_version(hyprland_report())
+    if not version:
+        return ("fail", "Hyprland is not installed, or does not report a version",
+                "sudo pacman -S --needed hyprland")
+    if version_parts(version) < version_parts(MINIMUM_HYPRLAND):
+        return ("fail", f"{version} is below the {MINIMUM_HYPRLAND} support floor",
+                "sudo pacman -Syu hyprland")
+    return "ok", f"{version} (floor {MINIMUM_HYPRLAND})", ""
+
+
+def check_packages() -> tuple[str, str, str]:
+    probe = run(["pacman", "-Q", *DOCTOR_PACKAGES], timeout=15)
+    present = {line.split(" ", 1)[0] for line in probe.stdout.splitlines() if line}
+    missing = [name for name in DOCTOR_PACKAGES if name not in present]
+    if missing:
+        return ("fail", f"not installed: {', '.join(missing)}",
+                f"sudo pacman -S --needed {' '.join(missing)}")
+    return "ok", f"all {len(DOCTOR_PACKAGES)} key packages installed", ""
+
+
+def check_fonts() -> tuple[str, str, str]:
+    if not shutil.which("fc-list"):
+        return "note", "fontconfig is not installed, so nothing can be checked", ""
+    probe = run(["fc-list", ":", "family"], timeout=15)
+    families = {name.strip() for line in probe.stdout.splitlines()
+                for name in line.split(",")}
+    missing = [name for name in DOCTOR_FONTS if name not in families]
+    if missing:
+        return ("fail", f"fontconfig cannot find: {', '.join(missing)}",
+                "sudo pacman -S --needed ttf-ibm-plex && fc-cache -f")
+    return "ok", f"{', '.join(DOCTOR_FONTS)} present", ""
+
+
+def check_stow(root: Path) -> tuple[str, str, str]:
+    state = stow_state(root)
+    problems = ([f"broken ~/{name}" for name in state["broken"]]
+                + [f"not a link ~/{name}" for name in state["plain"]]
+                + [f"missing ~/{name}" for name in state["missing"]])
+    if problems:
+        shown = ", ".join(problems[:10])
+        if len(problems) > 10:
+            shown += f", and {len(problems) - 10} more"
+        return ("fail",
+                f"{state['linked']}/{state['total']} paths link here; "
+                f"{len(problems)} problem(s): {shown}",
+                "garage update  (or ./bootstrap.sh, which backs up anything in the way)")
+    if state["other"]:
+        # Not a failure: the desktop is fully linked and working, just from
+        # another clone of the same tree. Worth saying out loud, because
+        # editing this checkout would then change nothing on screen.
+        return ("note",
+                f"{len(state['other'])}/{state['total']} paths link into another checkout "
+                f"({', '.join(sorted(state['others']))}) rather than this one",
+                "garage update  (restows from this checkout)")
+    return "ok", f"{state['total']} managed paths resolve into this checkout", ""
+
+
+def check_dangling(root: Path) -> tuple[str, str, str]:
+    stale = dangling_repo_links(root)
+    if not stale:
+        return "ok", "no links point at files this checkout no longer has", ""
+    shown = ", ".join(tilde(path) for path in stale[:10])
+    if len(stale) > 10:
+        shown += f", and {len(stale) - 10} more"
+    return ("fail", f"{len(stale)} link(s) point at deleted files: {shown}",
+            "garage update  (sweeps them; a restow cannot)")
+
+
+def check_units() -> tuple[str, str, str]:
+    session = session_is_up()
+    disabled, stopped = [], []
+    for unit, expect_active in DOCTOR_UNITS:
+        if run(["systemctl", "--user", "is-enabled", unit]).stdout.strip() not in {
+                "enabled", "enabled-runtime"}:
+            disabled.append(unit)
+            continue
+        if session and expect_active and run(
+                ["systemctl", "--user", "is-active", unit]).stdout.strip() != "active":
+            stopped.append(unit)
+    if disabled:
+        return ("fail", f"not enabled: {', '.join(disabled)}",
+                f"systemctl --user enable {' '.join(disabled)}")
+    if stopped:
+        return ("fail", f"enabled but not running: {', '.join(stopped)}",
+                f"systemctl --user status {stopped[0]}")
+    if not session:
+        return ("note", f"all {len(DOCTOR_UNITS)} units enabled; "
+                "no graphical session here, so nothing is expected to be running", "")
+    return "ok", f"all {len(DOCTOR_UNITS)} units enabled and running", ""
+
+
+def check_plugins() -> tuple[str, str, str]:
+    state = plugin_state(hyprland_report())
+    if not state["abi"]:
+        return "note", "Hyprland reports no ABI string, so nothing can be compared", ""
+    build = state["abi"].split("_")[0][:12]
+    if not state["ever"]:
+        return ("note", f"no plugins have ever been deployed here "
+                f"(running build {build}); the desktop runs without them", "")
+    if state["stale"]:
+        return ("fail",
+                f"{', '.join(state['stale'])} not built for the running build {build}",
+                "~/.config/hypr/scripts/garage-rebuild-plugins")
+    return "ok", f"{', '.join(PLUGIN_NAMES)} built for the running build {build}", ""
+
+
+def check_fragments() -> tuple[str, str, str]:
+    if not GENERATED.is_dir():
+        return ("note", f"{tilde(GENERATED)} does not exist yet; "
+                "nothing has rendered on this machine", "")
+    fragments = sorted(GENERATED.glob("*.lua"))
+    if not fragments:
+        return "note", "no Lua fragments have been rendered yet", ""
+    if not shutil.which("luac"):
+        return "note", f"{len(fragments)} fragment(s) present; luac is not installed to check them", ""
+    broken = [path.name for path in fragments
+              if run(["luac", "-p", str(path)]).returncode != 0]
+    if broken:
+        return ("fail", f"will not parse: {', '.join(broken)}",
+                "garage render  (rewrites every fragment from your preferences)")
+    return "ok", f"{len(fragments)} Lua fragment(s) parse", ""
+
+
+def check_preferences() -> tuple[str, str, str]:
+    notes: list[str] = []
+    try:
+        load_preferences(sink=notes)
+    except (SettingsError, OSError) as error:
+        return ("fail", f"cannot be loaded: {error}",
+                f"fix or move aside {tilde(PREFERENCES_PATH)}, then run garage render")
+    if notes:
+        shown = "; ".join(notes[:3])
+        if len(notes) > 3:
+            shown += f"; and {len(notes) - 3} more"
+        # Not a failure by design: validate_preferences() puts the shipped
+        # default over anything it cannot render and says so, and the corrected
+        # value reaches the file on the next save. Nothing is broken now.
+        return "note", f"loads, with {len(notes)} value(s) coerced: {shown}", ""
+    return "ok", "loads with every value in range", ""
+
+
+def check_compositor() -> tuple[str, str, str]:
+    probe = run(["hyprctl", "version"])
+    if probe.returncode != 0:
+        # Informational on purpose. `doctor` is most useful from a TTY after a
+        # login that did not come up, and there is no compositor to reach from
+        # there -- reporting that as a fault would make the report useless in
+        # exactly the situation it exists for.
+        return ("note", "no compositor answers here "
+                "(a TTY or SSH shell has no HYPRLAND_INSTANCE_SIGNATURE)", "")
+    return "ok", "hyprctl reaches the running compositor", ""
+
+
+def doctor_checks(root: Path) -> list[tuple[str, object]]:
+    return [
+        ("hyprland", check_hyprland),
+        ("packages", check_packages),
+        ("fonts", check_fonts),
+        ("stow links", lambda: check_stow(root)),
+        ("dead links", lambda: check_dangling(root)),
+        ("units", check_units),
+        ("plugins", check_plugins),
+        ("fragments", check_fragments),
+        ("preferences", check_preferences),
+        ("compositor", check_compositor),
+    ]
+
+
+def doctor(argv: list[str]) -> int:
+    """Read-only health report. 0 when healthy, 1 when something is wrong."""
+    if argv:
+        raise SettingsError(f"Usage: garage doctor  (unexpected argument: {argv[0]})")
+    root = checkout_root()
+    print(f"Garage doctor\n  checkout  {root}\n  home      {HOME}\n")
+    checks = doctor_checks(root)
+    width = max(len(name) for name, _ in checks)
+    failures = 0
+    for name, probe in checks:
+        status, detail, hint = probe()
+        if status == "fail":
+            failures += 1
+        label = {"ok": "ok  ", "note": "note", "fail": "FAIL"}[status]
+        print(f"  {label}  {name.ljust(width)}  {detail}")
+        if status == "fail" and hint:
+            print(f"        {' ' * width}  -> {hint}")
+    if failures:
+        print(f"\n{failures} problem(s) found.")
+        return 1
+    print("\nNo problems found.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# update
+#
+# Design: pull, sweep, then delegate to bootstrap.sh. Not a native Python
+# reimplementation, and the choice is not close.
+#
+# What an update has to do on rolling Arch is make this machine match the
+# checkout again: install packages the list has gained, enable units it has
+# gained, write per-user files that are new, put every link back, and leave the
+# user's own files alone. bootstrap.sh already does all of that, idempotently
+# and by design -- the freshness gate short-circuits on an install it can see
+# (garage_already_installed), packages go in with --needed, `systemctl enable`
+# is bookkeeping, the generated files are written only when absent, and every
+# mutating call goes through one run() chokepoint that --dry-run turns off. It
+# is also the only path exercised by the clean-install rehearsal.
+#
+# A native implementation would have to duplicate the part that is genuinely
+# hard: the pre-stow scan that classifies every managed path, moves real files
+# into a timestamped backup and deletes links from a moved checkout. Without it,
+# `stow --restow` aborts on the first tracked file that has become a real file
+# and leaves a half-linked home. With it, two implementations of the same
+# careful logic drift apart, and the one this file would carry is the one no
+# rehearsal covers. The failure surface argument runs the same way: bootstrap
+# fails loudly at a step boundary, and a second implementation doubles the
+# number of places that can be wrong.
+#
+# What delegation costs, honestly:
+#
+#   * bootstrap prints for a TTY -- steps, warnings, a summary. Acceptable here
+#     precisely because `garage update` is a TTY command too; its output is not
+#     parsed by anything and the QML client never calls it.
+#   * a re-run includes `sudo pacman -Syu`, so update asks for sudo and can
+#     upgrade the whole system. That is not a wart to design around: installing
+#     newly listed packages on Arch without a full upgrade first is a partial
+#     upgrade, which is unsupported. It is stated up front instead.
+#
+# Two things update keeps for itself, because bootstrap cannot answer them:
+#
+#   1. The dead-link sweep (see dangling_repo_links), which needs to know what
+#      the checkout no longer ships -- the one thing a scan of the current
+#      manifest cannot see.
+#   2. The plugin decision. bootstrap deploys unconditionally, which is right
+#      for an install and wrong for an update: the deploy needs sudo and rebuilds
+#      pointlessly when the ABI has not moved. update compares the running ABI
+#      against what is deployed itself and passes GARAGE_SKIP_PLUGIN_DEPLOY=1 so
+#      bootstrap does not do it twice.
+# ---------------------------------------------------------------------------
+
+
+def git_output(root: Path, *arguments: str, timeout: float = 30) -> tuple[int, str]:
+    probe = run(["git", "-C", str(root), *arguments], timeout=timeout)
+    return probe.returncode, probe.stdout.strip()
+
+
+def pull_checkout(root: Path, dry_run: bool) -> tuple[list[str], list[str]]:
+    """Fast-forward the checkout onto its upstream, and say what happened.
+
+    Returns (report lines, problems). Separated from update() so it can be
+    exercised against a scratch repository with a real upstream: every install
+    today is local-only, so nothing on this machine can reach the branch below.
+
+    Never raises, and treats every reason it cannot pull as a note rather than a
+    failure. An update that refused to relink because a remote is missing or
+    unreachable would be useless on the machines Garage actually runs on.
+    """
+    lines: list[str] = []
+    problems: list[str] = []
+    prefix = "[dry-run] " if dry_run else ""
+    if not (root / ".git").exists():
+        return ["not a git checkout, so there is nothing to pull."], problems
+    code, upstream = git_output(root, "rev-parse", "--abbrev-ref",
+                               "--symbolic-full-name", "@{upstream}")
+    if code != 0 or not upstream:
+        # The normal case today: Garage's repositories are local-only, so there
+        # is no origin to pull from.
+        return (["no upstream configured, skipping pull; continuing with the local tree."],
+                problems)
+    lines.append(f"upstream  {upstream}")
+    # Allowed in a dry run: fetch writes only to .git's own object store and
+    # remote refs, never to the working tree or to $HOME, and without it there is
+    # no honest answer to "what would this pull in".
+    if run(["git", "-C", str(root), "fetch", "--quiet"], timeout=120).returncode != 0:
+        lines.append(f"could not fetch from {upstream.split('/')[0]}; "
+                     "continuing with the local tree.")
+        return lines, problems
+    incoming = git_output(root, "log", "--oneline", f"HEAD..{upstream}")[1]
+    if not incoming:
+        lines.append(f"already up to date with {upstream}.")
+        return lines, problems
+    commits = incoming.splitlines()
+    if dry_run:
+        lines.append(f"{prefix}would fast-forward {len(commits)} commit(s):")
+        lines += [f"      {line}" for line in commits[:20]]
+        if len(commits) > 20:
+            lines.append(f"      and {len(commits) - 20} more")
+        return lines, problems
+    if git_output(root, "status", "--porcelain")[1]:
+        # The working tree belongs to whoever is editing it. A merge across local
+        # changes is exactly the operation that loses work, so it is refused
+        # rather than forced.
+        lines.append(f"{len(commits)} commit(s) waiting, but the checkout has local changes;")
+        lines.append("skipping the merge. Commit or stash them and re-run.")
+        problems.append("pull skipped: the checkout has local changes")
+        return lines, problems
+    merged = run(["git", "-C", str(root), "merge", "--ff-only", upstream], timeout=60)
+    if merged.returncode != 0:
+        lines.append(f"could not fast-forward onto {upstream}:")
+        lines.append(f"      {merged.stderr.strip() or merged.stdout.strip()}")
+        problems.append(f"pull failed: cannot fast-forward onto {upstream}")
+        return lines, problems
+    head = git_output(root, "rev-parse", "--short", "HEAD")[1]
+    lines.append(f"fast-forwarded {len(commits)} commit(s) to {head}.")
+    return lines, problems
+
+
+def update(argv: list[str]) -> int:
+    dry_run = False
+    for argument in argv:
+        if argument == "--dry-run":
+            dry_run = True
+        else:
+            raise SettingsError(f"Usage: garage update [--dry-run]  (unexpected: {argument})")
+
+    def step(text: str) -> None:
+        print(f"\n==> {text}")
+
+    def info(text: str) -> None:
+        print(f"    {'[dry-run] ' if dry_run else ''}{text}")
+
+    def note(text: str) -> None:
+        print(f"    {text}")
+
+    root = checkout_root()
+    problems: list[str] = []
+    print(f"Garage update{' (dry run: nothing will be changed)' if dry_run else ''}")
+    note(f"checkout  {root}")
+    note(f"home      {HOME}")
+
+    # ---- 1. the checkout itself -------------------------------------------
+    step("Updating the checkout")
+    before = git_output(root, "rev-parse", "HEAD")[1]
+    lines, pull_problems = pull_checkout(root, dry_run)
+    for line in lines:
+        note(line)
+    problems += pull_problems
+    after = git_output(root, "rev-parse", "HEAD")[1]
+
+    # ---- 2. links to files the update deleted ------------------------------
+    step("Sweeping links to files this checkout no longer ships")
+    stale = dangling_repo_links(root)
+    if not stale:
+        note("none found.")
+    for path in stale:
+        info(f"remove {tilde(path)} -> {os.readlink(path)}")
+        if not dry_run:
+            try:
+                path.unlink()
+            except OSError as error:
+                note(f"could not remove {tilde(path)}: {error}")
+                problems.append(f"could not remove {tilde(path)}")
+    if stale and not dry_run:
+        note(f"removed {len(stale)} dangling link(s).")
+
+    # ---- 3. bootstrap ------------------------------------------------------
+    step("Converging this machine on the checkout")
+    script = root / "bootstrap.sh"
+    if not script.is_file():
+        raise SettingsError(f"{script} is missing; this checkout cannot converge itself")
+    environment = os.environ.copy()
+    # update owns the plugin decision; see the plugin step below.
+    environment["GARAGE_SKIP_PLUGIN_DEPLOY"] = "1"
+    if stow_state(root)["other"]:
+        # Garage is demonstrably installed here, just from another clone, so the
+        # freshness gate would refuse for the wrong reason: it looks for a link
+        # into *this* checkout. Forcing is safe because the evidence of an
+        # existing install is in hand; it is not forced when nothing is linked,
+        # which is a first install and the gate's actual job.
+        environment["GARAGE_FORCE"] = "1"
+        note("this home is linked to another checkout; re-pointing it here.")
+    command = [str(script)] + (["--dry-run"] if dry_run else [])
+    note(f"running {' '.join(shlex.quote(part) for part in command)}")
+    if not dry_run:
+        note("it will ask for sudo: a re-run upgrades the system and installs any")
+        note("package the list has gained since this machine was set up.")
+    # Not through run(): this streams to the terminal, both because the output
+    # is a progress report and because pacman's sudo prompt needs the tty. Our
+    # own stdout is flushed first -- redirected to a file it is block-buffered,
+    # and the child writes straight to the descriptor, so without this the whole
+    # report lands after the bootstrap output it introduces.
+    sys.stdout.flush()
+    bootstrap = subprocess.run(command, cwd=str(root), env=environment, check=False)
+    if bootstrap.returncode != 0:
+        print(f"\ngarage update: bootstrap.sh exited {bootstrap.returncode}; "
+              "stopping here rather than reloading a half-converged desktop.")
+        return 1
+
+    # ---- 4. migrations and the generated state -----------------------------
+    step("Rendering the generated state")
+    if dry_run:
+        info("would load the preferences (running any schema migration) and render")
+    else:
+        # The load is the migration: migrate_preferences() is version-gated and
+        # runs inside load_preferences(), so a pull that bumped the schema is
+        # applied here. The corrected file itself is written on the next save,
+        # which is the same contract every other command works under.
+        render_all(load_preferences())
+        note(f"rewrote the fragments under {tilde(GENERATED)}.")
+
+    # ---- 5. plugins --------------------------------------------------------
+    step("Checking the Hyprland plugin ABI")
+    state = plugin_state(hyprland_report())
+    pins_changed = False
+    if before and after and before != after:
+        pins_changed = bool(git_output(root, "diff", "--name-only", f"{before}..{after}",
+                                       "--", "system/plugin-pins")[1])
+    if not state["abi"]:
+        note("Hyprland reports no ABI string; skipping.")
+    elif not state["ever"]:
+        note("no plugins have ever been deployed here; skipping.")
+    elif not state["stale"] and not pins_changed:
+        note(f"{', '.join(PLUGIN_NAMES)} are in step with the running build "
+             f"{state['abi'].split('_')[0][:12]}; skipping the rebuild.")
+    else:
+        reason = ("a pin moved in this update" if pins_changed
+                  else f"not built for the running build: {', '.join(state['stale'])}")
+        note(f"redeploy needed ({reason}).")
+        rebuild = HOME / ".config/hypr/scripts/garage-rebuild-plugins"
+        if not rebuild.is_file():
+            rebuild = root / "desktop/.config/hypr/scripts/garage-rebuild-plugins"
+        info(f"run {rebuild}")
+        if not dry_run:
+            # Streamed and interactive for the same reasons as bootstrap: it
+            # installs into /usr/lib and asks for sudo once.
+            sys.stdout.flush()
+            if subprocess.run([str(rebuild)], check=False).returncode != 0:
+                note("the plugin rebuild failed; the desktop runs without them.")
+                problems.append("plugin rebuild failed")
+
+    # ---- 6. reload ---------------------------------------------------------
+    step("Reloading Hyprland")
+    if dry_run:
+        info("would run hyprctl reload")
+    elif run(["hyprctl", "version"]).returncode != 0:
+        note("no compositor answers here; skipping the reload.")
+        note("the new configuration is picked up at your next login.")
+    elif run(["hyprctl", "reload"]).returncode != 0:
+        note("hyprctl reload failed; the new configuration lands at your next login.")
+        problems.append("hyprctl reload failed")
+    else:
+        note("reloaded.")
+
+    print()
+    if problems:
+        print("Update finished with problems:")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 1
+    print("Dry run complete. Nothing above was changed." if dry_run
+          else "Update complete.")
+    return 0
+
+
 def response(data: object = None, error: str = "") -> None:
     print(json.dumps({"ok": not error, "data": data, "error": error}, separators=(",", ":")))
 
 
+USAGE = """Usage: garage [COMMAND [ARGUMENTS]]
+
+Human commands:
+  doctor                  check this install and report what is wrong (exit 1 if any)
+  update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload
+  help                    print this
+
+Settings backend (each prints one JSON object: {"ok","data","error"}):
+  snapshot                the whole live state, and the default with no command
+  render                  rewrite every generated fragment
+  render-bar              rewrite the bar's fragments only (waybar's ExecStartPre)
+  render-wallpaper        rewrite hyprpaper.conf only (hyprpaper's ExecStartPre)
+  apply                   render, then push everything into the running session
+  set KEY JSON_VALUE      write one preference and apply just that change
+  action NAME [JSON]      run a one-shot action (volume, dnd, keybind.*, defaults.*)
+  display-test JSON       apply a display layout for 15s, pending confirmation
+  display-confirm TOKEN   keep the layout under test
+  display-revert TOKEN    put the previous layout back
+  theme-sync              switch light/dark if the schedule says so (timer)
+  night-shift-sync        re-evaluate the night shift window (timer)
+"""
+
+# The two commands that answer a person rather than the QML client, so their
+# output is lines and their failures are stderr -- never the JSON envelope
+# response() prints, which nothing at a terminal would want to read.
+PLAIN_COMMANDS = {"doctor": doctor, "update": update}
+
+
 def main(argv: list[str]) -> int:
+    command = argv[1] if len(argv) > 1 else "snapshot"
+    if command in {"help", "-h", "--help"}:
+        print(USAGE, end="")
+        return 0
+    if command in PLAIN_COMMANDS:
+        try:
+            migrate_config_root()
+            return PLAIN_COMMANDS[command](argv[2:])
+        except (SettingsError, OSError, ValueError) as error:
+            print(f"garage {command}: {error}", file=sys.stderr)
+            return 1
     try:
         # Once per process, ahead of the dispatch rather than inside a loader:
         # `action keybind.rebind` and `display-test` reach keybindings.toml and
@@ -3496,7 +4344,6 @@ def main(argv: list[str]) -> int:
         # arriving first would write a fresh file at the new path while the
         # user's own was still sitting at the old one.
         migrate_config_root()
-        command = argv[1] if len(argv) > 1 else "snapshot"
         if command == "snapshot":
             response(make_snapshot())
         elif command == "render":

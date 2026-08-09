@@ -20,7 +20,9 @@ case "${1-}" in
     -h | --help)
         printf 'Usage: %s [--dry-run]\n' "${0##*/}"
         printf '\n  --dry-run   print every mutating action without executing it\n'
-        printf '\nEnvironment:\n  GARAGE_FORCE=1   skip the freshness gate\n'
+        printf '\nEnvironment:\n  GARAGE_FORCE=1                 skip the freshness gate\n'
+        printf '  GARAGE_SKIP_PLUGIN_DEPLOY=1    do not deploy the Hyprland plugins\n'
+        printf '                                 (set by `garage update`, which decides that itself)\n'
         exit 0
         ;;
     "") ;;
@@ -892,7 +894,16 @@ for candidate in "$HOME/repositories/glass" "$HOME/repositories/hyprliquid"; do
     }
 done
 
-if [[ -z $glass_repo ]]; then
+if [[ ${GARAGE_SKIP_PLUGIN_DEPLOY:-0} == 1 ]]; then
+    # `garage update` sets this. It makes the plugin decision itself -- comparing
+    # the running ABI against what is deployed, and rebuilding only when they
+    # disagree or a pin moved in the pull -- because a deploy needs sudo and
+    # rebuilds nothing useful when the ABI has not moved. Deploying here as well
+    # would do it twice on every update. An install never sets it: a fresh
+    # machine has nothing deployed, so the deploy always has work to do.
+    info "skipped: GARAGE_SKIP_PLUGIN_DEPLOY=1 (the caller owns the plugin decision)."
+    summary+=("left the plugin deploy to the caller")
+elif [[ -z $glass_repo ]]; then
     warn "no Glass plugin source at ~/repositories/glass -- skipping the plugin build."
     warn "  Garage's repositories are not published yet, so this is expected."
     warn "  The desktop runs without plugins; hyprland.lua treats both as optional."
