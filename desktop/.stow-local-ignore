@@ -33,4 +33,4 @@ _darcs
 ^/\.config/btop/themes/vanta\.theme$
 ^/\.config/swayosd/config\.toml$
 ^/\.config/gtk-3\.0/bookmarks$
-^/\.local/bin/__pycache__$
+^/\.local/bin/__pycache__(/.*)?$

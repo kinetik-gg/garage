@@ -4453,8 +4453,13 @@ def managed_paths(root: Path) -> list[str]:
         # directory to descend into. .git is never inside desktop/, and is
         # skipped for the same reason bootstrap skips it.
         leaves = [name for name in directories if (here / name).is_symlink()]
+        # An ignored directory prunes its whole subtree, matching stow: the
+        # pattern names the directory, so nothing under it is ever placed.
         directories[:] = [name for name in directories
-                          if name not in leaves and name != ".git"]
+                          if name not in leaves and name != ".git"
+                          and not any(pattern.search(
+                              f"/{(here / name).relative_to(tree)}")
+                              for pattern in patterns)]
         for name in files + leaves:
             relative = str((here / name).relative_to(tree))
             if name in {".stow-local-ignore", ".gitignore"} or name.endswith("~"):
