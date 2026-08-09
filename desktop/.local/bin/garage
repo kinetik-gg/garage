@@ -615,137 +615,169 @@ def write_marker(path: Path, text: str) -> None:
         os.fsync(handle.fileno())
 
 
-def require_number(value: object, minimum: float, maximum: float, name: str) -> float:
+def in_number_range(value: object, minimum: float, maximum: float) -> bool:
+    """Whether a stored number is one the renderers can actually use.
+
+    Non-finite floats fail here rather than being range-checked. NaN compares
+    False against both bounds, so the two-sided rejection this replaced let nan
+    and inf straight through, and the int() conversions in the renderers then
+    raised OverflowError -- which main() does not catch, so it reached the user as
+    a traceback instead of a message.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise SettingsError(f"{name} must be a number")
-    if value < minimum or value > maximum:
-        raise SettingsError(f"{name} must be between {minimum} and {maximum}")
-    return value
+        return False
+    if isinstance(value, float) and not math.isfinite(value):
+        return False
+    return minimum <= value <= maximum
 
 
-def validate_time(value: object, name: str) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
-        raise SettingsError(f"{name} must use HH:MM")
-    return value
+def is_clock_time(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value) is not None
+
+
+def is_hex_color(value: object) -> bool:
+    # Stored as a literal colour rather than a swatch name so the swatch set
+    # lives in one place -- the UI -- and magick can be handed the value as is.
+    return isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) is not None
 
 
 def validate_preferences(config: dict) -> dict:
+    """Put every preference at a value this build can render.
+
+    Nothing here refuses the file. A single bad value used to raise, and that one
+    raise took the whole product down with it: every render failed, so the bar,
+    the wallpaper and the theme stopped updating, and the settings pane went
+    read-only besides -- `set` loads before it writes, so the one screen that
+    could have corrected the value would not open either. The value arrives from
+    a hand edit, a restored backup, or a release that narrowed a range, and none
+    of those are something to hand back to the user as a text-editor errand.
+
+    So every key is coerced to what the product ships for it -- FALLBACK_DEFAULTS,
+    which is preferences.defaults.toml -- and each substitution is reported on
+    stderr, which is the journal under the units that render at session start.
+    The coerced value reaches preferences.toml on the next save, so a bad value
+    is corrected once rather than carried forever. wallpaper_fit, corner_radius
+    and the locale already worked this way; the rest of the schema now does too.
+    """
+    notes: list[str] = []
+
+    def keep(section: str, key: str, valid: bool) -> None:
+        """Leave a usable value alone; put the shipped default over anything else."""
+        if valid:
+            return
+        default = FALLBACK_DEFAULTS[section][key]
+        notes.append(f"{section}.{key} {config[section].get(key)!r} is not valid, "
+                     f"using {default!r}")
+        config[section][key] = default
+
     appearance = config.setdefault("appearance", {})
     # "stretch" was offered before anyone checked it against hyprpaper, which
-    # only knows the four below. Coerce instead of raising: a preferences.toml
-    # still carrying it would otherwise fail every load and leave the whole UI
-    # read-only with no way to correct the value from inside it.
+    # only knows the four in WALLPAPER_FITS. A withdrawn name rather than a bad
+    # value, so it is carried across to its replacement without a warning.
     if appearance.get("wallpaper_fit") == "stretch":
         appearance["wallpaper_fit"] = "cover"
-    if appearance.get("wallpaper_fit") not in WALLPAPER_FITS:
-        raise SettingsError("appearance.wallpaper_fit is invalid")
+    keep("appearance", "wallpaper_fit", appearance.get("wallpaper_fit") in WALLPAPER_FITS)
     # The pre-v3 singles. Dropped here as well as in the migration so a file
     # that somehow carries both a stamp and an old key cannot write it back out
     # on every save, the same way highlight_color is handled below.
     for legacy in WALLPAPER_SPLIT:
         appearance.pop(legacy, None)
     for scheme in SCHEMES:
-        if appearance.get(f"wallpaper_{scheme}_source") not in {"image", "color"}:
-            raise SettingsError(f"appearance.wallpaper_{scheme}_source is invalid")
-        # Stored as a literal colour rather than a swatch name so the swatch set
-        # lives in one place -- the UI -- and magick can be handed the value as is.
-        if not re.fullmatch(r"#[0-9a-fA-F]{6}",
-                            str(appearance.get(f"wallpaper_{scheme}_color", ""))):
-            raise SettingsError(f"appearance.wallpaper_{scheme}_color must be #RRGGBB")
-    if appearance.get("accent_color") not in {
-        "blue", "teal", "green", "yellow", "orange", "red", "pink", "purple", "slate"
-    }:
-        raise SettingsError("appearance.accent_color is invalid")
+        keep("appearance", f"wallpaper_{scheme}_source",
+             appearance.get(f"wallpaper_{scheme}_source") in {"image", "color"})
+        keep("appearance", f"wallpaper_{scheme}_color",
+             is_hex_color(appearance.get(f"wallpaper_{scheme}_color")))
+    keep("appearance", "accent_color", appearance.get("accent_color") in {
+        "blue", "teal", "green", "yellow", "orange", "red", "pink", "purple", "slate"})
     appearance.pop("highlight_color", None)
-    validate_time(appearance.get("night_shift_start"), "appearance.night_shift_start")
-    validate_time(appearance.get("night_shift_end"), "appearance.night_shift_end")
-    require_number(appearance.get("night_shift_temperature"), 1000, 10000, "night shift temperature")
-    if appearance.get("theme_mode") not in {"light", "dark", "auto"}:
-        raise SettingsError("appearance.theme_mode is invalid")
-    validate_time(appearance.get("theme_light_at"), "appearance.theme_light_at")
-    validate_time(appearance.get("theme_dark_at"), "appearance.theme_dark_at")
-    # Same reasoning as wallpaper_fit above: a file that escaped the version
-    # stamp -- restored from a backup, or hand-edited -- still carries a name
-    # from the old scale, and refusing it would lock the UI with no way back.
+    keep("appearance", "night_shift_start", is_clock_time(appearance.get("night_shift_start")))
+    keep("appearance", "night_shift_end", is_clock_time(appearance.get("night_shift_end")))
+    keep("appearance", "night_shift_temperature",
+         in_number_range(appearance.get("night_shift_temperature"), 1000, 10000))
+    keep("appearance", "theme_mode", appearance.get("theme_mode") in {"light", "dark", "auto"})
+    keep("appearance", "theme_light_at", is_clock_time(appearance.get("theme_light_at")))
+    keep("appearance", "theme_dark_at", is_clock_time(appearance.get("theme_dark_at")))
+    # The same withdrawn-name case as wallpaper_fit: a file that escaped the
+    # version stamp -- restored from a backup, or hand-edited -- still carries a
+    # name from the old corner radius scale, and it means what the new name says.
     if appearance.get("corner_radius") in CORNER_RADIUS_STALE:
         appearance["corner_radius"] = CORNER_RADIUS_STALE[appearance["corner_radius"]]
-    if appearance.get("corner_radius") not in CORNER_RADII:
-        raise SettingsError("appearance.corner_radius is invalid")
-    require_number(appearance.get("border_size"), 0, 10, "window border size")
-    if not isinstance(appearance.get("reduce_motion"), bool):
-        raise SettingsError("appearance.reduce_motion must be true or false")
-    require_number(appearance.get("animation_speed"), MOTION_SPEED_RANGE[0],
-                   MOTION_SPEED_RANGE[1], "animation speed")
-    if appearance.get("search_engine") not in SEARCH_ENGINES:
-        raise SettingsError("appearance.search_engine is invalid")
-    if appearance["search_engine"] == "custom":
-        custom = appearance.get("search_custom_url")
-        if not isinstance(custom, str) or "%s" not in custom:
-            raise SettingsError("appearance.search_custom_url must contain %s")
-    if appearance.get("glass_mode") not in {"liquid", "frosted", "off"}:
-        raise SettingsError("appearance.glass_mode is invalid")
-    if appearance.get("glass_blur") not in GLASS_BLUR_LEVELS:
-        raise SettingsError("appearance.glass_blur is invalid")
-    require_number(appearance.get("glass_transparency"), 0, GLASS_TRANSPARENCY_MAX,
-                   "window transparency")
-    require_number(appearance.get("glass_edge_width"), 4, 128, "glass bevel width")
-    require_number(appearance.get("glass_refraction"), 0, 1, "glass bend strength")
-    require_number(appearance.get("glass_clarity"), 0, 1, "glass edge clarity")
-    require_number(appearance.get("glass_highlight"), 0, 1, "glass rim light")
+    keep("appearance", "corner_radius", appearance.get("corner_radius") in CORNER_RADII)
+    keep("appearance", "border_size", in_number_range(appearance.get("border_size"), 0, 10))
+    keep("appearance", "reduce_motion", isinstance(appearance.get("reduce_motion"), bool))
+    keep("appearance", "animation_speed", in_number_range(
+        appearance.get("animation_speed"), MOTION_SPEED_RANGE[0], MOTION_SPEED_RANGE[1]))
+    keep("appearance", "search_engine", appearance.get("search_engine") in SEARCH_ENGINES)
+    # Only a template a query cannot be put into is dropped. An empty one is the
+    # state the pane is in for as long as it takes to fill the field in after
+    # choosing "custom", and apply_search_engine() already falls back for it --
+    # so clearing search_engine here too would make custom impossible to select.
+    custom = appearance.get("search_custom_url")
+    keep("appearance", "search_custom_url", isinstance(custom, str) and (
+        not custom or "%s" in custom or appearance["search_engine"] != "custom"))
+    keep("appearance", "glass_mode", appearance.get("glass_mode") in {"liquid", "frosted", "off"})
+    keep("appearance", "glass_blur", appearance.get("glass_blur") in GLASS_BLUR_LEVELS)
+    keep("appearance", "glass_transparency",
+         in_number_range(appearance.get("glass_transparency"), 0, GLASS_TRANSPARENCY_MAX))
+    keep("appearance", "glass_edge_width",
+         in_number_range(appearance.get("glass_edge_width"), 4, 128))
+    keep("appearance", "glass_refraction", in_number_range(appearance.get("glass_refraction"), 0, 1))
+    keep("appearance", "glass_clarity", in_number_range(appearance.get("glass_clarity"), 0, 1))
+    keep("appearance", "glass_highlight", in_number_range(appearance.get("glass_highlight"), 0, 1))
 
     general = config.setdefault("general", {})
     # Held as a desktop id rather than a command so the pane can show the name
-    # and icon the application ships. An id that is no longer installed is not
-    # an error: resolve_terminal() falls back, and refusing the whole file would
-    # leave the UI read-only after an uninstall.
-    if not isinstance(general.get("terminal"), str):
-        raise SettingsError("general.terminal must be a desktop id")
-    if not isinstance(general.get("builtin_launcher"), bool):
-        raise SettingsError("general.builtin_launcher must be true or false")
+    # and icon the application ships. An id that is no longer installed is left
+    # alone: resolve_terminal() falls back on its own, and the choice is worth
+    # keeping in case the application comes back.
+    keep("general", "terminal", isinstance(general.get("terminal"), str))
+    keep("general", "builtin_launcher", isinstance(general.get("builtin_launcher"), bool))
 
     inputs = config.setdefault("input", {})
-    require_number(inputs.get("pointer_sensitivity"), -1, 1, "pointer sensitivity")
-    if inputs.get("accel_profile") not in {"flat", "adaptive"}:
-        raise SettingsError("input.accel_profile is invalid")
-    require_number(inputs.get("repeat_rate"), 1, 100, "repeat rate")
-    require_number(inputs.get("repeat_delay"), 100, 2000, "repeat delay")
-    if not isinstance(inputs.get("keyboard_layout"), str) or not inputs["keyboard_layout"]:
-        raise SettingsError("input.keyboard_layout is required")
+    keep("input", "pointer_sensitivity",
+         in_number_range(inputs.get("pointer_sensitivity"), -1, 1))
+    keep("input", "accel_profile", inputs.get("accel_profile") in {"flat", "adaptive"})
+    keep("input", "repeat_rate", in_number_range(inputs.get("repeat_rate"), 1, 100))
+    keep("input", "repeat_delay", in_number_range(inputs.get("repeat_delay"), 100, 2000))
+    keep("input", "keyboard_layout",
+         isinstance(inputs.get("keyboard_layout"), str) and bool(inputs["keyboard_layout"]))
 
     lock = config.setdefault("lock", {})
     for key in ("lock_timeout", "display_off_timeout", "suspend_timeout"):
-        require_number(lock.get(key), 0, 86400, f"lock.{key}")
+        keep("lock", key, in_number_range(lock.get(key), 0, 86400))
 
     region = config.setdefault("region", {})
-    # Coerced, not refused: the set of locales is whatever locale-gen last
-    # produced, so a name that was valid when it was chosen can disappear from
-    # under the file. Raising would leave the whole UI read-only over a locale
-    # the pane can no longer offer, with no way to pick another one from inside
-    # it. Falling back to "" is the no-override state, which always works.
-    if region.get("locale") and region["locale"] not in installed_locales():
-        region["locale"] = ""
-    if region.get("time_format") not in TIME_FORMATS:
-        raise SettingsError("region.time_format is invalid")
-    if region.get("date_format") not in DATE_FORMATS:
-        raise SettingsError("region.date_format is invalid")
-    if region.get("first_day_of_week") not in FIRST_WEEKDAYS:
-        raise SettingsError("region.first_day_of_week is invalid")
+    # The set of locales is whatever locale-gen last produced, so a name that was
+    # valid when it was chosen can disappear from under the file. "" is the
+    # no-override state, which always works. Short-circuited on the empty value
+    # so the common case never shells out to locale -a.
+    locale = region.get("locale")
+    keep("region", "locale",
+         isinstance(locale, str) and (not locale or locale in installed_locales()))
+    keep("region", "time_format", region.get("time_format") in TIME_FORMATS)
+    keep("region", "date_format", region.get("date_format") in DATE_FORMATS)
+    keep("region", "first_day_of_week", region.get("first_day_of_week") in FIRST_WEEKDAYS)
 
     workspaces = config.setdefault("workspaces", {})
-    if workspaces.get("mode") not in WORKSPACE_MODES:
-        raise SettingsError("workspaces.mode is invalid")
-    require_number(workspaces.get("default_count"), 1, WORKSPACE_COUNT_MAX,
-                   "workspaces per display")
-    require_number(workspaces.get("shared_count"), 1, WORKSPACE_COUNT_MAX,
-                   "shared workspaces")
-    if not isinstance(workspaces.get("indicator"), bool):
-        raise SettingsError("workspaces.indicator must be true or false")
+    keep("workspaces", "mode", workspaces.get("mode") in WORKSPACE_MODES)
+    keep("workspaces", "default_count",
+         in_number_range(workspaces.get("default_count"), 1, WORKSPACE_COUNT_MAX))
+    keep("workspaces", "shared_count",
+         in_number_range(workspaces.get("shared_count"), 1, WORKSPACE_COUNT_MAX))
+    keep("workspaces", "indicator", isinstance(workspaces.get("indicator"), bool))
     # Written back as whatever parsing understood rather than checked in place.
     # The pane sends the whole map on every edit, so normalising here means a
     # hand-typed stray comma is dropped once instead of being carried back out
     # to the file on every later save.
     workspaces["counts"] = format_workspace_counts(
         parse_workspace_counts(workspaces.get("counts")))
+    # stderr rather than the snapshot: the pane has one channel for this, .error,
+    # and it means "the command did nothing" -- putting a coercion there would
+    # report a working desktop as a broken one. Nothing in the QML reads a
+    # warnings field, so there is nothing to fill in, and the journal is where
+    # the render units' output is looked for anyway.
+    for note in notes:
+        print(f"garage: preferences.toml: {note}", file=sys.stderr)
     return config
 
 
