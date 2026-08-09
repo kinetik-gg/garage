@@ -31,3 +31,5 @@ _darcs
 ^/\.config/kitty/theme\.conf$
 ^/\.config/micro/settings\.json$
 ^/\.config/btop/themes/vanta\.theme$
+^/\.config/swayosd/config\.toml$
+^/\.config/gtk-3\.0/bookmarks$

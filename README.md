@@ -1,31 +1,41 @@
 # Garage
 
-Garage is an opinionated Arch + Hyprland desktop layer from
-[Kinetik](https://github.com/kinetik-gg). The promise is simple: install a
-barebone Arch + Hyprland system, run Garage's bootstrap, and end up with a
-fully set up workstation with minimal tinkering afterward.
+Garage is an opinionated Arch + Hyprland desktop from
+[Kinetik](https://github.com/kinetik-gg). The promise is simple: install minimal
+Arch, run Garage's bootstrap from the TTY, reboot into a fully set up
+workstation with minimal tinkering afterward.
 
 Where dotfiles frameworks hand you a menu of choices to assemble yourself,
 Garage ships the decisions already made — one settings schema, one shell, one
 baseline configuration per tool — and gives you a lifecycle (bootstrap,
 update, migrate) to keep that opinionated setup current instead of drifting.
 Its sibling project, [Glass](https://github.com/kinetik-gg), is a Hyprland
-plugin that renders a refractive glass material; it's independently usable,
-and Garage installs and pins it as part of the desktop.
+plugin that renders a refractive glass material; it's independently usable, and
+Garage pins and deploys it as an optional part of the desktop when its source is
+available.
 
 Garage is **not**:
 
 - A dotfiles framework with a choice matrix to configure — the opinions are
   the product.
-- A Linux distribution or ISO — a working Arch + Hyprland install stays a
-  prerequisite.
+- A Linux distribution or ISO — installing Arch stays your job.
 - A Hyprland fork.
 - A plugin suite (Glass is its own project; Garage consumes it).
 
 ## Install
 
-On a bootable vanilla Arch base with Hyprland as a target and a normal user
-with `sudo`:
+Prerequisites: a freshly installed **minimal Arch system with no desktop
+environment**, a network connection, and a normal user with `sudo`. You do not
+need Hyprland, a display manager, or any graphical software — Garage installs
+those. The bootstrap runs from a bare TTY login.
+
+```sh
+sh -c "$(curl -fsSL https://get.kinetik.gg/garage)"
+```
+
+**The one-liner is not live yet** — `get.kinetik.gg` is a placeholder while
+Garage's repositories are local-only. The clone path below is equally supported
+and is exactly what the one-liner does for you:
 
 ```sh
 git clone https://github.com/kinetik-gg/garage.git ~/repositories/garage
@@ -33,8 +43,20 @@ cd ~/repositories/garage
 ./bootstrap.sh
 ```
 
-See [`docs/INSTALL.md`](docs/INSTALL.md) for prerequisites, what bootstrap
-does today, and known gaps in the installer.
+Then reboot and pick **Hyprland (UWSM)** at the login screen.
+
+`./bootstrap.sh --dry-run` prints every change it would make and makes none of
+them.
+
+**Garage expects a fresh system; it will refuse a used one.** An enabled display
+manager, another desktop's session files, a populated `~/.config`, or an AUR
+helper on `PATH` each stop the installer, because Garage claims `~/.config`
+wholesale and installs its own display manager, session, and notification
+daemon. `GARAGE_FORCE=1 ./bootstrap.sh` overrides the check; displaced files go
+to `~/.garage-backup/<timestamp>/`.
+
+See [`docs/INSTALL.md`](docs/INSTALL.md) for the full prerequisites, what
+bootstrap does step by step, the Docker group note, and the known gaps.
 
 For config-only deployment, run
 `stow --target="$HOME" --no-folding desktop`. Using `--no-folding` keeps runtime
@@ -59,10 +81,15 @@ relate, and where a given change belongs.
 - SwayOSD volume and brightness feedback
 - ABI-pinned Hyprland plugins (Glass and `hyprexpo`)
 - Spotify, Discord, and Zed
-- Docker with Compose and Buildx
+- Docker with Compose and Buildx (you are *not* added to the `docker` group —
+  see [`docs/INSTALL.md`](docs/INSTALL.md))
 - Node.js/TypeScript, Rust, and C/C++ development toolchains
 
 ## Hyprland plugins
+
+Both plugins are optional: Hyprland's configuration guards each load, so the
+desktop comes up without them. Glass is not published yet, so on a fresh install
+the bootstrap warns and skips the plugin deploy rather than failing.
 
 Glass is developed in place at `~/repositories/glass` (with a transition
 fallback to `~/repositories/hyprliquid`); the deploy script only ever reads it
