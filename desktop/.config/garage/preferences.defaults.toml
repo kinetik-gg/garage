@@ -3,7 +3,7 @@
 # new set reuses an old name -- corner_radius normal, which used to mean what
 # large means now -- would re-fire on every load and walk the setting away.
 [schema]
-preferences_version = 4
+preferences_version = 5
 
 [appearance]
 # The desktop picture belongs to the appearance, so light and dark each keep

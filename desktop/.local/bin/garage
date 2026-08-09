@@ -118,8 +118,9 @@ PREFERENCES_LOCK = STATE_ROOT / "preferences.lock"
 
 # Stamp carried in preferences.toml, read by migrate_preferences(). Bump it, and
 # add the coercion there, whenever a stored value changes meaning rather than
-# just changing range.
-PREFERENCES_VERSION = 4
+# just changing range -- or, as v5 did, whenever the file's own shape changes and
+# an existing one has to be rewritten to match.
+PREFERENCES_VERSION = 5
 
 # Where layer 2 was kept before the rename, and the files that belong to the
 # user rather than to the machine -- the whole of what v4 has to carry across.
@@ -426,6 +427,20 @@ def load_toml(path: Path, fallback: dict | None = None) -> dict:
         raise SettingsError(f"{path.name}: {error}") from error
 
 
+def shipped_defaults() -> dict:
+    """Layer 1 as this process sees it: the shipped file, or the compiled-in copy.
+
+    A function rather than two `load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)` calls
+    because the load and the save have to agree on it exactly. It is the base a
+    load merges the stored file on top of, so it is also the base a save
+    subtracts to get the stored file back down to departures. Subtract a
+    different base -- FALLBACK_DEFAULTS while the load merged the TOML, say --
+    and any key where the two disagree comes out of the save as a delta the load
+    never saw, which is the fossil this is here to prevent.
+    """
+    return load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
+
+
 def schema_version(stored: dict) -> int:
     """The stamp a stored preferences.toml carries, or 1 if it carries none.
 
@@ -492,13 +507,13 @@ def migrate_config_root() -> None:
             pass
 
 
-def migrate_preferences(stored: dict) -> dict:
-    """Bring a stored preferences.toml up to PREFERENCES_VERSION.
+def migrate_preference_values(stored: dict) -> dict:
+    """The value steps of the migration, in memory, on the raw stored file.
 
-    Runs on the raw file rather than the merged config on purpose. The corner
-    radius rename reuses "normal" for what used to be called "small", so the
-    value alone cannot say which scale wrote it -- only the absence of the
-    version stamp can, and merging the defaults in first would supply one.
+    Raw rather than merged on purpose. The corner radius rename reuses "normal"
+    for what used to be called "small", so the value alone cannot say which scale
+    wrote it -- only the absence of the version stamp can, and merging the
+    defaults in first would supply one.
 
     Each step is gated on the version that introduced it rather than on "older
     than current". A single "not current yet" gate replays every step whenever
@@ -506,7 +521,9 @@ def migrate_preferences(stored: dict) -> dict:
     normal to large the first time a later version was added.
 
     v4 is not here: it moves files rather than values, so it has to run before
-    the read. See migrate_config_root().
+    the read. See migrate_config_root(). v5 is not here either: it changes the
+    shape of the whole file rather than any value in it, and it rewrites the file
+    to do so. See compact_preferences_file().
     """
     version = schema_version(stored)
     if version >= PREFERENCES_VERSION:
@@ -530,9 +547,95 @@ def migrate_preferences(stored: dict) -> dict:
     return stored
 
 
+def compact_preferences_file(defaults: dict, sink: list[str] | None = None) -> dict | None:
+    """v5: shrink a stored full document down to the departures it always meant.
+
+    Every version up to 4 wrote preferences.toml as the whole merged
+    configuration, so an install that ever changed one setting carries a frozen
+    copy of all ~50 shipped defaults -- and that copy outranks layer 1 forever,
+    which means no later change to any shipped default could ever reach the
+    machine again, and a key withdrawn from the schema could never leave it.
+    Rewriting the file the first time this build reads it is what un-fossilizes
+    them. The effective configuration is untouched by the rewrite: a stored value
+    that still differs from today's default is a departure and stays, and one
+    that equals it is dropped only because the merge puts it straight back.
+
+    Done here, at migration time, rather than being left to the next `set`: one
+    atomic rewrite is a thing that can be tested and reasoned about, where "the
+    file is wrong until the user happens to change a setting" is a second state
+    the whole product would have to keep working in.
+
+    Under PREFERENCES_LOCK, and re-reading the file inside it, because this runs
+    on the *load* path: `set` and `glass.reset` hold that lock across their own
+    read-modify-write, and a rewrite computed from a read taken before one of
+    them ran would land after it and undo the setting it just wrote. Taken
+    non-blocking, and skipped when it is held, because the load path may never
+    wait on that lock -- `set lock.*` restarts hypridle while holding it, and
+    hypridle's ExecStartPre re-enters this binary to render, so a blocking
+    acquire here would deadlock that restart. Skipping is safe: whoever holds the
+    lock is a writer, and every writer now emits departures only.
+
+    Returns the compacted stored document so the caller's load continues from
+    what was written rather than from what was read -- which is also what keeps a
+    dropped unknown key from being reported a second time by a save later in the
+    same process. None means nothing was rewritten and the caller should keep the
+    document it already has.
+    """
+    # Nothing to shrink, and nothing to create: a fresh install has no layer 2
+    # at all, and writing a stamp-only file here would both invent a user-owned
+    # file from a read path and take the bootstrap's GPU gate -- which writes
+    # preferences.toml only when it does not already exist -- out of play.
+    if not PREFERENCES_PATH.exists():
+        return None
+    try:
+        PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
+        with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return None
+            stored = migrate_preference_values(load_toml(PREFERENCES_PATH))
+            document = preference_document(stored, defaults, sink)
+            # Only when the rewrite would actually change something. A file that
+            # is already departures-only -- the two keys the bootstrap's GPU gate
+            # writes, or a hand-written file -- is left exactly as it is,
+            # comments and all, because dump_toml() cannot carry a comment and
+            # rewriting it would cost the user the explanation of why the value
+            # is there. Its stamp then stays behind, and this step re-runs on
+            # every load: a dict diff over ~50 keys, and no write.
+            if preference_sections(document) != preference_sections(stored):
+                atomic_write(PREFERENCES_PATH, dump_toml(document))
+                return document
+            return None
+    except OSError:
+        # A read-only config directory, or a lock file that cannot be opened. The
+        # load has to survive it: the effective configuration is correct either
+        # way, and the file keeps its old shape until a write can happen.
+        return None
+
+
+def migrate_preferences(stored: dict, defaults: dict,
+                        sink: list[str] | None = None) -> dict:
+    """Bring a stored preferences.toml up to PREFERENCES_VERSION.
+
+    Two kinds of step, gated on the same stamp: the value renames, which happen
+    in memory and reach the file whenever it is next written, and v5, which
+    rewrites the file itself.
+    """
+    version = schema_version(stored)
+    if version >= PREFERENCES_VERSION:
+        return stored
+    stored = migrate_preference_values(stored)
+    if version < 5:
+        compacted = compact_preferences_file(defaults, sink)
+        if compacted is not None:
+            return compacted
+    return stored
+
+
 def load_preferences(sink: list[str] | None = None) -> dict:
-    defaults = load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
-    stored = migrate_preferences(load_toml(PREFERENCES_PATH))
+    defaults = shipped_defaults()
+    stored = migrate_preferences(load_toml(PREFERENCES_PATH), defaults, sink)
     return validate_preferences(deep_merge(defaults, stored), sink)
 
 
@@ -562,6 +665,122 @@ def dump_toml(data: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def preference_sections(document: dict) -> dict:
+    """A preferences document without its [schema] stamp.
+
+    The stamp is bookkeeping, not a preference: it is written unconditionally and
+    compared separately, so every comparison of "what does this file actually
+    say" leaves it out.
+    """
+    return {name: values for name, values in document.items() if name != "schema"}
+
+
+def same_default(value: object, default: object) -> bool:
+    """Whether a stored value is the shipped default rather than a departure.
+
+    `==` alone would be wrong in one direction and right in the other, so the two
+    cases are split:
+
+      * bool is a subclass of int, so True == 1 and False == 0. A stored `true`
+        against a default of `1` is a different kind of value, not the same one,
+        and dropping it would hand the renderers an int where the file said bool.
+        So the bool-ness has to match.
+      * 1 == 1.0, and there the numbers really are the same value. The schema
+        ships pointer_sensitivity as 0.0 and a UI that sends JSON `0` stores an
+        int; treating that as a departure would pin a copy of the default in
+        layer 2 forever over nothing but a decimal point. Layer 1 owns the type
+        as well as the value, so the int is dropped and the float comes back.
+    """
+    if isinstance(value, bool) != isinstance(default, bool):
+        return False
+    return value == default
+
+
+def preference_deltas(stored: dict, defaults: dict,
+                      dropped: list[str] | None = None, prefix: str = "") -> dict:
+    """The parts of `stored` that depart from `defaults`, and nothing else.
+
+    Recursive, and driven by `defaults` rather than by `stored`, which gives two
+    things at once: the result comes out in the shipped file's own key order, and
+    a key the schema does not have cannot reach the result at all. Those keys are
+    appended to `dropped` instead -- a withdrawn setting, a typo in a hand edit,
+    or a downgrade to a build that no longer has it. validate_preferences()
+    already ignores them, so all they do is sit in the file looking meaningful.
+    """
+    deltas: dict = {}
+    for key, default in defaults.items():
+        if key not in stored:
+            continue
+        value = stored[key]
+        if isinstance(default, dict) or isinstance(value, dict):
+            if not (isinstance(default, dict) and isinstance(value, dict)):
+                # A section where a value belongs, or the reverse. Nothing can be
+                # done with it and merging it would corrupt the shape.
+                if dropped is not None:
+                    dropped.append(f"{prefix}{key}")
+                continue
+            nested = preference_deltas(value, default, dropped, f"{prefix}{key}.")
+            if nested:
+                deltas[key] = nested
+        elif not same_default(value, default):
+            deltas[key] = value
+    if dropped is not None:
+        dropped.extend(f"{prefix}{key}" for key in stored if key not in defaults)
+    return deltas
+
+
+def report_preference_notes(notes: list[str], sink: list[str] | None) -> None:
+    """Where a note about the stored file goes.
+
+    stderr, which is the journal under the units that render at session start, or
+    `sink` when a caller needs to count the notes instead -- `garage doctor` has
+    to report them, and reading its own stderr back is not something a process can
+    do honestly.
+    """
+    if sink is None:
+        for note in notes:
+            print(f"garage: preferences.toml: {note}", file=sys.stderr)
+    else:
+        sink.extend(notes)
+
+
+def preference_document(config: dict, defaults: dict,
+                        sink: list[str] | None = None) -> dict:
+    """Layer 2 as a document: the version stamp, then the departures from layer 1.
+
+    Nothing else. The whole merged configuration used to be written here, and that
+    is what put a frozen copy of all ~50 shipped defaults into the first file a
+    fresh install ever wrote. From then on the shipped defaults were dead to that
+    machine: every one of them was overridden by a copy of its own old value, so
+    changing a default in a release could never reach an install that had ever
+    touched a setting, and a key removed from the schema stayed in the file
+    forever.
+
+    The consequence to be deliberate about: a key whose value equals the shipped
+    default is *absent* from the file, so setting a value back to the default
+    erases the delta rather than pinning it. That is the intended meaning --
+    "follow the shipped default again" -- under a schema whose defaults are
+    expected to move. There is deliberately no way to pin today's default against
+    a future change to it: layer 2 records what the user chose *differently*, and
+    "the same as what shipped" is not a choice that outlives the shipping
+    changing.
+
+    The stamp is written rather than diffed. It equals the default by
+    construction, so a diff would drop it, and a file with no [schema] section
+    reads as version 1 -- which would replay every migration over it on the next
+    load. Nothing else in [schema] is carried: it is this program's bookkeeping,
+    not a place to keep settings.
+    """
+    dropped: list[str] = []
+    document: dict = {"schema": {"preferences_version": PREFERENCES_VERSION}}
+    document.update(preference_deltas(preference_sections(config),
+                                      preference_sections(defaults), dropped))
+    report_preference_notes(
+        [f"{name} is not a preference this build has; dropping it" for name in dropped],
+        sink)
+    return document
+
+
 def atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
@@ -576,6 +795,24 @@ def atomic_write(path: Path, text: str) -> None:
             os.unlink(temporary)
         except FileNotFoundError:
             pass
+
+
+def save_preferences(config: dict, sink: list[str] | None = None) -> None:
+    """Write layer 2 from an effective configuration.
+
+    The one writer of preferences.toml, so the departures-only rule cannot be
+    forgotten by a second one. `config` is what a load produced and a caller
+    changed -- the merged, validated whole -- and what lands on disk is the
+    difference between that and layer 1. Every caller holds PREFERENCES_LOCK
+    across its own read-modify-write; nothing is locked here, because the read
+    this is the write half of happened before the call.
+
+    The merge base is read again rather than taken as an argument: the callers
+    all loaded it a moment ago, but passing it through would make it possible for
+    a future one to subtract something other than what it merged.
+    """
+    atomic_write(PREFERENCES_PATH, dump_toml(preference_document(
+        config, shipped_defaults(), sink)))
 
 
 def write_lua(path: Path, text: str) -> None:
@@ -792,11 +1029,7 @@ def validate_preferences(config: dict, sink: list[str] | None = None) -> dict:
     # report a working desktop as a broken one. Nothing in the QML reads a
     # warnings field, so there is nothing to fill in, and the journal is where
     # the render units' output is looked for anyway.
-    if sink is None:
-        for note in notes:
-            print(f"garage: preferences.toml: {note}", file=sys.stderr)
-    else:
-        sink.extend(notes)
+    report_preference_notes(notes, sink)
     return config
 
 
@@ -3659,21 +3892,22 @@ def action(name: str, value: object | None) -> None:
         # Under PREFERENCES_LOCK, exactly like `set`: this is another whole-file
         # read-modify-write, and the pane can fire it while a slider elsewhere in
         # the same pane is still writing. Unserialised, the loser's copy predates
-        # the winner's keys and the last writer restores them. Safe to lock here
-        # -- unlike anything on the render path -- because nothing below restarts
-        # a service whose ExecStartPre re-enters this binary.
+        # the winner's keys and the last writer restores them. Safe to *block* on
+        # the lock here -- unlike the load path, which only ever tries it, see
+        # compact_preferences_file() -- because nothing below restarts a service
+        # whose ExecStartPre re-enters this binary.
         PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
         with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             config = load_preferences()
-            defaults = load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
+            defaults = shipped_defaults()
             # Every material preference is a glass_ key, so this needs no list of
             # its own to keep in step with the schema.
             for key, fallback in defaults["appearance"].items():
                 if key.startswith("glass_"):
                     config["appearance"][key] = fallback
             validate_preferences(config)
-            atomic_write(PREFERENCES_PATH, dump_toml(config))
+            save_preferences(config)
             render_preferences(config)
             # The same live push a single slider takes, rather than the full
             # reload this used to do: apply_glass now covers the core decoration
@@ -4191,8 +4425,10 @@ def check_preferences() -> tuple[str, str, str]:
             shown += f"; and {len(notes) - 3} more"
         # Not a failure by design: validate_preferences() puts the shipped
         # default over anything it cannot render and says so, and the corrected
-        # value reaches the file on the next save. Nothing is broken now.
-        return "note", f"loads, with {len(notes)} value(s) coerced: {shown}", ""
+        # value reaches the file on the next save. A note may also be a key this
+        # build has no preference for, dropped from the file -- hence "note(s)"
+        # rather than "value(s) coerced". Nothing is broken now either way.
+        return "note", f"loads, with {len(notes)} note(s): {shown}", ""
     return "ok", "loads with every value in range", ""
 
 
@@ -4609,17 +4845,17 @@ def main(argv: list[str]) -> int:
                 raise SettingsError("Usage: garage set KEY JSON_VALUE")
             # One process per wheel tick: the UI's sliders fire a set per notch,
             # so several of these run at once. Each reads the whole file and
-            # writes the whole file back, and unserialised the last writer wins
-            # with a copy that predates its neighbours' keys. Applying under the
-            # same lock keeps the live state in step with the file rather than
-            # letting a stale apply land last.
+            # rewrites it whole, and unserialised the last writer wins with a
+            # copy that predates its neighbours' keys. Applying under the same
+            # lock keeps the live state in step with the file rather than letting
+            # a stale apply land last.
             PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
             with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
                 config = load_preferences()
                 set_nested(config, argv[2], json.loads(argv[3]))
                 validate_preferences(config)
-                atomic_write(PREFERENCES_PATH, dump_toml(config))
+                save_preferences(config)
                 apply_changed_preference(config, argv[2])
             response(config)
         elif command == "action":

@@ -705,20 +705,15 @@ case $gpu_class in
             #   then applies the change, and applying reaches the compositor
             #   through `hyprctl`. From the TTY this bootstrap runs on there is
             #   no compositor, so it exits 1 with a JSON error -- survivable, the
-            #   write lands first. The real problem is what it writes: `set`
-            #   dumps the whole merged configuration, so layer 2 comes out of a
-            #   fresh install holding a frozen copy of all ~50 shipped defaults.
-            #   A later change to any shipped default could then never reach this
-            #   machine again. There is no non-applying write path in the CLI to
-            #   use instead.
+            #   write lands first, and since the deltas-only work `set` writes
+            #   only departures, so the old fossilization objection is gone.
+            #   What remains is the exit-1-on-a-TTY wart and the apply noise.
             #
             # So: write the two keys directly and leave every other default
             # coming from layer 1, which is what the layering is for.
             #
-            # TODO(phase-4): the render/apply split is the real fix. Once
-            # `garage` can write a preference without touching the compositor
-            # and can dump departures rather than the merged whole, this block
-            # becomes one call to it.
+            # TODO: once `garage` grows a non-applying write path (set --no-apply
+            # or similar), this block becomes one call to it.
             # ---------------------------------------------------------------
 
             # Single-sourced from the tracked defaults rather than hardcoded, so
