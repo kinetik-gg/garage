@@ -61,7 +61,6 @@ relate, and where a given change belongs.
 - Spotify, Discord, and Zed
 - Docker with Compose and Buildx
 - Node.js/TypeScript, Rust, and C/C++ development toolchains
-- Checksum-pinned Blender 4.5 LTS installed outside Arch's rolling package
 
 ## Hyprland plugins
 

@@ -107,8 +107,6 @@ if command -v rustup >/dev/null; then
     rustup component add rustfmt clippy
 fi
 
-"$repo_dir/scripts/install-blender-lts"
-
 if ! "$HOME/.config/hypr/scripts/garage-rebuild-plugins"; then
     echo "Plugin build failed; Hyprland will still start without optional plugins." >&2
 fi

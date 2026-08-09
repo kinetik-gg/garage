@@ -40,8 +40,7 @@ At a high level, `bootstrap.sh`:
   SwayOSD, SwayNC, hypridle/hyprsunset, cliphist, the polkit agent, and
   friends), masking `dunst.service` so it doesn't race SwayNC for the
   notification D-Bus name.
-- Installs the Pure Fish prompt via Fisher, sets up the Rust toolchain, and
-  installs the checksum-pinned Blender build.
+- Installs the Pure Fish prompt via Fisher and sets up the Rust toolchain.
 - Builds the ABI-pinned Hyprland plugins for the currently running Hyprland
   version (see the plugin rebuild script under `desktop/.config/hypr/scripts`);
   Hyprland's configuration treats both plugins as optional, so a plugin build
