@@ -67,7 +67,10 @@ managed links with `stow --target="$HOME" --delete desktop`.
 
 See [`docs/OVERVIEW.md`](docs/OVERVIEW.md) for the mental model: how Hyprland,
 Glass, the settings schema, the Quickshell shell, and the baseline configs
-relate, and where a given change belongs.
+relate, and where a given change belongs. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before changing the settings
+backend, the keybind catalog, or the plugin lifecycle — it's a map to the
+comments that already explain why each is shaped the way it is.
 
 ## Core setup
 
@@ -104,6 +107,22 @@ directories named after Hyprland's ABI. After a Hyprland update, run:
 ```
 
 Log out and back in after deploying a build for a new ABI.
+
+## Recovery
+
+If the desktop will not come up, switch to a TTY (**Ctrl+Alt+F3**) and log in
+there — none of the commands below needs a running compositor.
+
+```sh
+garage doctor            # what is wrong, with a hint per problem
+garage doctor --report   # the same checks as JSON, to paste into a bug report
+garage repair --reset    # back up an unreadable preferences.toml, start it fresh
+garage update            # re-converge this machine on the checkout
+```
+
+`garage repair` on its own only reports; `--reset` acts, and keeps your old file
+beside the new one. Configs under `~/.config` are symlinks into the checkout, so
+a damaged tracked file comes back with the restow that `garage update` runs.
 
 ## License
 

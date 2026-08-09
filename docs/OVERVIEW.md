@@ -77,3 +77,7 @@ it's about how that value is shown to the user, it's the shell. If it's an
 opinion that isn't meant to be a setting at all, it's a baseline config. If
 it's about getting the machine into a new state — install, upgrade, migrate —
 it's lifecycle.
+
+See [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) for how the settings system,
+the keybind catalog, and the plugin lifecycle actually work underneath this
+model, with citations into the code.

@@ -21,6 +21,57 @@ import uuid
 from zoneinfo import available_timezones
 
 
+# ---------------------------------------------------------------------------
+# How a setting reaches the running desktop
+#
+# Six classes of consumer, and the one mechanism each of them forces. Which
+# class a preference falls in is decided by the program on the other end -- by
+# how that program reads its own configuration -- and is never a choice made
+# here. PREFERENCE_ROUTES is this table spelled out per key; this is the reason
+# every route in it looks the way it does. render_* writes the file, apply_* and
+# push_* move the world, and the split exists because the mechanisms below
+# separate cleanly into those two halves.
+#
+#   Consumer class        Mechanism                          Example
+#   -------------------------------------------------------------------------
+#   reads live per frame  hyprctl eval + fragment            apply_border()
+#   reads at parse time   fragment + hyprctl reload          apply_workspace_plan()
+#   rereads on a signal   write in place + pkill -USR1/2     reload_bar()
+#   reads once at start   write + restart the unit           render_idle() (+ its route)
+#   watches with inotify  write_marker(), nothing else       render_accent()
+#   sits behind a portal  gsettings set                      push_theme()
+#
+#   1. Reads live, per frame -- Hyprland's own options. `hyprctl eval` moves the
+#      screen on its own, because options are dereferenced per frame and cached
+#      nowhere; the generated fragment is written first so the value survives the
+#      next reload or restart. `hyprctl keyword` is not an option at all -- the
+#      Lua parser refuses it, see eval_config().
+#
+#   2. Reads at parse time -- workspace rules, binds, monitor rules. Collected
+#      as the config is parsed, so no eval reaches them and the whole config has
+#      to come back: fragment, then `hyprctl reload`. The binds and the rules
+#      have to return together, or a key would address a layout that is gone.
+#
+#   3. Rereads on a signal -- waybar, kitty, swaync. Write the file the process
+#      already reads, then signal it: SIGUSR2 is waybar's full reload (config and
+#      every include), SIGUSR1 is kitty's. No restart, so no visible gap.
+#
+#   4. Reads once at startup -- hypridle, hyprpaper's fit_mode, the C library's
+#      LANG. There is no reload to ask for, so the unit is restarted (or, for
+#      LANG, only what starts next can be moved -- see apply_locale()). The
+#      restart is the cost, and it is why these routes are the narrowest ones:
+#      hypridle's ExecStartPre re-enters this binary as `garage render-idle`.
+#
+#   5. Watches the file -- Quickshell, and the wrappers the keybinds run. Nothing
+#      is signalled and nothing is restarted; the write *is* the apply. It has to
+#      be write_marker() rather than atomic_write(), because a rename past an
+#      inotify watch is invisible to the watcher.
+#
+#   6. Sits behind a portal -- GTK4, libadwaita, anything reading
+#      org.gnome.desktop.interface. `gsettings set`, which the portal broadcasts;
+#      no file of ours is involved and no application is signalled.
+# ---------------------------------------------------------------------------
+
 HOME = Path.home()
 CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
 STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state"))
@@ -4303,13 +4354,15 @@ def action(name: str, value: object | None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Lifecycle: `garage doctor` and `garage update`
+# Lifecycle: `garage doctor`, `garage repair` and `garage update`
 #
 # Plumbing, deliberately unlike everything above it. Every other command answers
-# the QML client and prints one JSON object; these two answer a person at a
+# the QML client and prints one JSON object; these three answer a person at a
 # terminal and print lines, so nothing here reaches make_snapshot() and nothing
 # here goes through response(). main() dispatches them before the JSON path for
-# that reason.
+# that reason. `doctor --report` is the one exception and only halfway: it prints
+# JSON because a bug report has to be pasted somewhere, but it is still the
+# person's command and still not the response() envelope.
 # ---------------------------------------------------------------------------
 
 # The support floor. Hyprland's config language and option names move between
@@ -4648,8 +4701,10 @@ def session_is_up() -> bool:
 #            a health check that fails on a TTY is a health check nobody runs.
 #   fail  -- a real problem. The hint says what to do about it.
 #
-# The probes return their verdict rather than printing it so that Phase 5's
-# `doctor --report` can serialize this same list.
+# The probes return their verdict rather than printing it so that
+# `doctor --report` serializes this same list rather than a second copy of it.
+# See doctor_report(): the printed report and the JSON one walk doctor_checks()
+# together, so a check cannot reach one surface and miss the other.
 # ---------------------------------------------------------------------------
 
 
@@ -4664,10 +4719,27 @@ def check_hyprland() -> tuple[str, str, str]:
     return "ok", f"{version} (floor {MINIMUM_HYPRLAND})", ""
 
 
+def package_versions(names: tuple[str, ...]) -> dict[str, str | None]:
+    """What pacman has installed for each name, or None where it has nothing.
+
+    One `pacman -Q` for the whole set, and every name is present in the result --
+    a missing package is None rather than an absent key, so a caller cannot read
+    "not installed" as "not asked about". pacman writes its own line to stderr for
+    each name it does not know and still lists the ones it does, so only stdout is
+    parsed and the exit status is ignored.
+    """
+    probe = run(["pacman", "-Q", *names], timeout=15)
+    found: dict[str, str] = {}
+    for line in probe.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            found[parts[0]] = parts[1]
+    return {name: found.get(name) for name in names}
+
+
 def check_packages() -> tuple[str, str, str]:
-    probe = run(["pacman", "-Q", *DOCTOR_PACKAGES], timeout=15)
-    present = {line.split(" ", 1)[0] for line in probe.stdout.splitlines() if line}
-    missing = [name for name in DOCTOR_PACKAGES if name not in present]
+    missing = [name for name, version in package_versions(DOCTOR_PACKAGES).items()
+               if version is None]
     if missing:
         return ("fail", f"not installed: {', '.join(missing)}",
                 f"sudo pacman -S --needed {' '.join(missing)}")
@@ -4782,8 +4854,13 @@ def check_preferences() -> tuple[str, str, str]:
     try:
         load_preferences(sink=notes)
     except (SettingsError, OSError) as error:
+        # The one hint that names a Garage command rather than a pacman or
+        # systemctl one, because this is the one problem the product can fix
+        # itself: see repair(), which keeps the unreadable file rather than
+        # asking the user to move it aside and hope.
         return ("fail", f"cannot be loaded: {error}",
-                f"fix or move aside {tilde(PREFERENCES_PATH)}, then run garage render")
+                f"garage repair  (reports first; --reset keeps "
+                f"{tilde(PREFERENCES_PATH)} as a backup and writes a fresh one)")
     if notes:
         shown = "; ".join(notes[:3])
         if len(notes) > 3:
@@ -4824,11 +4901,102 @@ def doctor_checks(root: Path) -> list[tuple[str, object]]:
     ]
 
 
+# The three words a status is printed and serialized as. One mapping for both
+# surfaces, minus the padding the aligned transcript needs, so a pasted JSON
+# report and a pasted terminal transcript say the same word about the same check.
+DOCTOR_STATUS = {"ok": "ok", "note": "note", "fail": "FAIL"}
+
+
+def checkout_commit(root: Path) -> str:
+    """The commit the checkout is on, or "" when git cannot answer.
+
+    Tolerant on purpose, and every reason to be: the tree may be a tarball with
+    no .git, git may not be installed, or the repository may have no commit yet.
+    None of that is a fault worth failing a bug report over -- an empty string
+    reads as "unknown" and the rest of the report is still worth having.
+
+    Through git_output(), which is defined with `update` below: it is the same
+    two-line wrapper both lifecycle commands want, and a second copy of it here
+    would only be a second place for the timeout to be wrong.
+    """
+    code, head = git_output(root, "rev-parse", "HEAD")
+    return head if code == 0 else ""
+
+
+def doctor_report(root: Path) -> dict:
+    """The whole of `garage doctor` as one JSON-serializable object.
+
+    This is the bug-reporting pipeline: one blob a user can paste, carrying the
+    same checks the printed report walks -- doctor_checks(), so the two surfaces
+    cannot drift -- plus the three facts a maintainer asks for first and the
+    coercion notes preferences.toml produced on the way past.
+
+    WHAT IS IN IT, AND WHY NONE OF IT IS A SECRET. Everything here is either a
+    version string, a path, a systemd unit name or a preference value, and the
+    preference values are the part that needed checking rather than assuming: the
+    notes carry the offending value verbatim (see validate_preferences()). So the
+    schema was read key by key. All 52 entries -- the version stamp, and 51
+    settings across appearance, general, input, lock, region and workspaces -- are
+    colours, timeouts, enum choices, numbers, two wallpaper paths, a locale, a
+    terminal command and a search URL template. There is no password, token, key
+    or credential of any kind in the schema, because Garage has nothing to
+    authenticate to: no account, no sync, no remote. The closest thing to
+    free-form user text is
+    appearance.search_custom_url, and it is a search template rather than a
+    secret. Nothing outside layer 2 is read into the report at all -- no
+    environment, no journal, no file contents.
+
+    A key that could hold a credential must not be added to PREFERENCE_SCHEMA
+    without revisiting this: the notes are printed with the value in them, and
+    that is the door.
+    """
+    checks = []
+    for name, probe in doctor_checks(root):
+        status, detail, hint = probe()
+        checks.append({"name": name, "status": DOCTOR_STATUS[status],
+                       "detail": detail, "hint": hint})
+    notes: list[str] = []
+    try:
+        load_preferences(sink=notes)
+    except (SettingsError, OSError) as error:
+        # Already a FAIL in `checks` above, with the same message. Kept here too
+        # so the notes list is never silently empty for the one reason that
+        # matters -- an unreadable file produces no notes and no settings either.
+        notes = [f"could not be loaded: {error}"]
+    return {
+        # Local time with its UTC offset, which is ISO 8601 and is what a person
+        # reading their own report expects to see.
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "garage_commit": checkout_commit(root),
+        "hyprland_version": hyprland_version(hyprland_report()),
+        "checks": checks,
+        "preferences_notes": notes,
+        "packages": package_versions(DOCTOR_PACKAGES),
+    }
+
+
 def doctor(argv: list[str]) -> int:
-    """Read-only health report. 0 when healthy, 1 when something is wrong."""
-    if argv:
-        raise SettingsError(f"Usage: garage doctor  (unexpected argument: {argv[0]})")
+    """Read-only health report. 0 when healthy, 1 when something is wrong.
+
+    `--report` prints the same checks as JSON instead of as lines, and keeps the
+    same exit status: a report is still an answer to "is this install healthy",
+    and a script that switched forms should not also have to switch how it reads
+    the result.
+    """
+    report = False
+    for argument in argv:
+        if argument == "--report":
+            report = True
+        else:
+            raise SettingsError(
+                f"Usage: garage doctor [--report]  (unexpected argument: {argument})")
     root = checkout_root()
+    if report:
+        payload = doctor_report(root)
+        # Indented, because the whole point is that a person copies it into an
+        # issue and someone else reads it there.
+        print(json.dumps(payload, indent=2))
+        return 1 if any(check["status"] == "FAIL" for check in payload["checks"]) else 0
     print(f"Garage doctor\n  checkout  {root}\n  home      {HOME}\n")
     checks = doctor_checks(root)
     width = max(len(name) for name, _ in checks)
@@ -4837,14 +5005,218 @@ def doctor(argv: list[str]) -> int:
         status, detail, hint = probe()
         if status == "fail":
             failures += 1
-        label = {"ok": "ok  ", "note": "note", "fail": "FAIL"}[status]
-        print(f"  {label}  {name.ljust(width)}  {detail}")
+        print(f"  {DOCTOR_STATUS[status].ljust(4)}  {name.ljust(width)}  {detail}")
         if status == "fail" and hint:
             print(f"        {' ' * width}  -> {hint}")
     if failures:
         print(f"\n{failures} problem(s) found.")
         return 1
     print("\nNo problems found.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# repair
+#
+# The way back from a preferences.toml this build cannot parse -- the one user
+# file that is deliberately left read-only in that state. Everything else about
+# layer 2 heals itself: a value out of range is coerced with a note, an unknown
+# key is dropped, a withdrawn spelling is carried across. But a file that is not
+# TOML has no values to coerce, so load_toml() raises, and every writer loads
+# before it writes -- which means the settings pane cannot correct the file that
+# is blocking it. That is deliberate (guessing at what a half-typed file meant
+# would be worse) and it is what leaves a gap this command fills.
+#
+# Why only preferences.toml. The other three user files are records rather than
+# settings, and each already has its own way back: an unconfirmed display layout
+# is reverted by the watchdog fifteen seconds later, binds.lua's rescue
+# shortcuts never consult keybindings.toml at all, and a workspace block that
+# cannot be read is simply handed out again. None of them can lock the user out,
+# so none of them needs a command -- and a `repair` that quietly reset all four
+# would take the user's shortcuts away to fix their wallpaper.
+# ---------------------------------------------------------------------------
+
+# Timestamp for a backup name: sorts chronologically, has no characters that
+# need quoting in a shell, and is readable by whoever finds the file months
+# later.
+BACKUP_STAMP = "%Y%m%d-%H%M%S"
+
+
+def preferences_state() -> dict:
+    """What preferences.toml is right now, without changing it in any way.
+
+    tomllib directly rather than load_preferences(): the load path migrates, and
+    v5's migration *rewrites the file*. A command whose whole first mode is "act
+    on nothing and tell me what you see" cannot use a reader that writes.
+    """
+    if not PREFERENCES_PATH.exists():
+        return {"exists": False, "parses": False, "error": "", "size": 0, "modified": ""}
+    try:
+        stat = PREFERENCES_PATH.stat()
+        raw = PREFERENCES_PATH.read_bytes()
+    except OSError as error:
+        return {"exists": True, "parses": False, "error": str(error),
+                "size": 0, "modified": ""}
+    state = {"exists": True, "parses": True, "error": "", "size": len(raw),
+             "modified": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(stat.st_mtime))}
+    try:
+        tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        state["parses"] = False
+        state["error"] = str(error)
+    return state
+
+
+def backup_preferences(data: bytes, mode: int) -> Path:
+    """Copy the current preferences.toml aside, under a name never used before.
+
+    O_EXCL in a loop rather than "does it exist?" then write, and the difference
+    is the whole value of the function: the name carries a whole-second timestamp,
+    so two repairs in the same second collide, and the check-then-write version of
+    this would overwrite the first backup with the second -- destroying the file
+    the user ran the command to preserve. The suffix counts up until the open
+    succeeds, so an existing backup can never be clobbered, by this run or by any
+    other process racing it.
+    """
+    stem = f"{PREFERENCES_PATH.name}.bak-{time.strftime(BACKUP_STAMP)}"
+    candidate = PREFERENCES_PATH.with_name(stem)
+    counter = 2
+    while True:
+        try:
+            handle = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+        except FileExistsError:
+            candidate = PREFERENCES_PATH.with_name(f"{stem}-{counter}")
+            counter += 1
+            continue
+        with os.fdopen(handle, "wb") as sink:
+            sink.write(data)
+            sink.flush()
+            os.fsync(sink.fileno())
+        return candidate
+
+
+def factory_preferences() -> str:
+    """A fresh preferences.toml: the schema stamp, and nothing else.
+
+    Stamp-only *is* factory state under the deltas model -- layer 2 records
+    departures from the shipped defaults, so a file with no departures in it means
+    "follow everything Garage ships". Writing the defaults out here would be the
+    v4 bug on purpose: a frozen copy of today's shipped values, outranking layer 1
+    forever. The stamp has to be there, because a file with no [schema] section
+    reads as version 1 and replays every migration on the next load.
+    """
+    return dump_toml({"schema": {"preferences_version": PREFERENCES_VERSION}})
+
+
+def repair(argv: list[str]) -> int:
+    """Put a broken preferences.toml back. Reports only, unless given --reset."""
+    reset = False
+    for argument in argv:
+        if argument == "--reset":
+            reset = True
+        else:
+            raise SettingsError(
+                f"Usage: garage repair [--reset]  (unexpected argument: {argument})")
+    state = preferences_state()
+    print("Garage repair -- preferences.toml only\n")
+    print(f"  file      {tilde(PREFERENCES_PATH)}")
+    if not state["exists"]:
+        print("  state     does not exist (which is what a fresh install looks like)")
+    elif state["parses"]:
+        print("  state     parses as TOML")
+    else:
+        print(f"  state     does NOT parse: {state['error']}")
+    if state["exists"]:
+        print(f"  size      {state['size']} byte(s)\n  modified  {state['modified']}")
+    print()
+    if not reset:
+        return repair_preview(state)
+    return repair_reset(state)
+
+
+def repair_preview(state: dict) -> int:
+    """The no-argument mode: say what --reset would do, and change nothing.
+
+    A command that resets the user's settings does not get to do it because they
+    typed its name. The first run is the explanation, the second run is the
+    consent.
+    """
+    print("What `garage repair --reset` would do:")
+    if state["exists"]:
+        print(f"  1. copy the file to {tilde(PREFERENCES_PATH)}.bak-<timestamp>, "
+              "a name\n     that is never reused -- an existing backup is never overwritten")
+    else:
+        print("  1. nothing to back up, because there is no file yet")
+    print(f"  2. write a fresh {PREFERENCES_PATH.name} carrying the schema stamp\n"
+          f"     (preferences_version = {PREFERENCES_VERSION}) and nothing else, "
+          "which is factory state: the\n     file holds your departures from the "
+          "shipped defaults, so no departures\n     means every setting follows "
+          "what Garage ships")
+    print("  3. load it back and report whether the result is healthy")
+    print()
+    print("Nothing else is touched. displays.toml, keybindings.toml and\n"
+          "workspace-blocks.toml are records rather than settings and each has its own\n"
+          "way back already: an unconfirmed display layout reverts itself after 15s,\n"
+          "the rescue shortcuts in config/binds.lua never read keybindings.toml, and a\n"
+          "workspace block that cannot be read is handed out again.")
+    print("\nNothing has been changed. Re-run as `garage repair --reset` to act.")
+    return 0
+
+
+def repair_reset(state: dict) -> int:
+    """The acting mode: back the file up, write a fresh one, prove it loads.
+
+    Under PREFERENCES_LOCK across all three, because the swap is a
+    read-modify-write like any other and `set` may be running in the pane at the
+    same time -- reading the old file, then writing its merged result back over
+    the fresh one. Blocking rather than non-blocking: this is a person at a
+    terminal who asked for it, so waiting for a slider to finish is right where
+    the load path's "skip it" would not be.
+
+    The confirming load cannot deadlock on the lock it is inside: the only thing
+    on that path which takes it is compact_preferences_file(), which is reached
+    only below PREFERENCES_VERSION and takes it non-blocking anyway.
+    """
+    PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        backup = None
+        if state["exists"]:
+            try:
+                data = PREFERENCES_PATH.read_bytes()
+                mode = PREFERENCES_PATH.stat().st_mode & 0o777
+            except OSError as error:
+                raise SettingsError(
+                    f"cannot read {tilde(PREFERENCES_PATH)} to back it up: {error}") from error
+            backup = backup_preferences(data, mode or 0o644)
+            print(f"  backup    {tilde(backup)}  ({len(data)} byte(s))")
+        else:
+            print("  backup    none needed; there was no file to keep")
+        atomic_write(PREFERENCES_PATH, factory_preferences())
+        print(f"  written   fresh {PREFERENCES_PATH.name}, schema stamp only "
+              f"(preferences_version = {PREFERENCES_VERSION})")
+        notes: list[str] = []
+        try:
+            load_preferences(sink=notes)
+        except (SettingsError, OSError) as error:
+            # Should be unreachable: the file that was just written is this
+            # build's own output. If it happens, something outside layer 2 is
+            # wrong -- an unreadable preferences.defaults.toml, most likely -- and
+            # saying so beats reporting a repair that did not work.
+            print(f"  after     STILL BROKEN: {error}")
+            print("\nThe fresh file does not load either, so the problem is not "
+                  f"{PREFERENCES_PATH.name}.\nRun `garage doctor` next.")
+            return 1
+        if notes:
+            print(f"  after     loads, with {len(notes)} note(s): {'; '.join(notes[:3])}")
+        else:
+            print("  after     loads with every value in range")
+    print("\nEvery setting is back at the shipped default.")
+    if backup is not None:
+        print(f"Your old file is kept at\n  {tilde(backup)}\n"
+              "Nothing reads it now, so anything worth keeping can be copied out by hand.")
+    print("Run `garage apply` to move this session onto the defaults, "
+          "or log out and back in.")
     return 0
 
 
@@ -5126,7 +5498,10 @@ def response(data: object = None, error: str = "") -> None:
 USAGE = """Usage: garage [COMMAND [ARGUMENTS]]
 
 Human commands:
-  doctor                  check this install and report what is wrong (exit 1 if any)
+  doctor [--report]       check this install and report what is wrong (exit 1 if any)
+                          --report prints the same checks as JSON, to paste into a bug
+  repair [--reset]        recover an unparseable preferences.toml; reports unless
+                          given --reset, which backs the file up and writes a fresh one
   update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload
   help                    print this
 
@@ -5146,10 +5521,12 @@ Settings backend (each prints one JSON object: {"ok","data","error"}):
   night-shift-sync        re-evaluate the night shift window (timer)
 """
 
-# The two commands that answer a person rather than the QML client, so their
+# The three commands that answer a person rather than the QML client, so their
 # output is lines and their failures are stderr -- never the JSON envelope
 # response() prints, which nothing at a terminal would want to read.
-PLAIN_COMMANDS = {"doctor": doctor, "update": update}
+# `doctor --report` prints JSON, but it is still this kind of command: the blob is
+# for a person to paste, and a failure of it is still a message on stderr.
+PLAIN_COMMANDS = {"doctor": doctor, "repair": repair, "update": update}
 
 
 def main(argv: list[str]) -> int:
