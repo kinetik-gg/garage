@@ -18,7 +18,8 @@ window#waybar {
   padding-left: 13px;
   padding-right: 10px;
   color: rgba(255, 255, 255, 1.00);
-  font-family: "IBM Plex Sans", sans-serif;
+  /* The label is a Nerd Font glyph; IBM Plex must not claim the codepoint. */
+  font-family: "CaskaydiaMono Nerd Font", "IBM Plex Sans", sans-serif;
   font-size: 13px;
 }
 
