@@ -3477,9 +3477,14 @@ def main(argv: list[str]) -> int:
                 pass
         elif command == "theme-sync":
             config = load_preferences()
-            apply_theme(config)
-            render_preferences(config)
-            run(["hyprctl", "reload"])
+            # Same gate as the manual theme_* path: an unchanged scheme means
+            # every output would be byte-identical, so rewriting a dozen
+            # toolkit configs and reloading Hyprland would only make the
+            # desktop visibly flicker every five minutes for nothing.
+            if resolve_theme(config) != applied_scheme():
+                apply_theme(config)
+                render_preferences(config)
+                run(["hyprctl", "reload"])
             response(resolve_theme(config))
         elif command == "night-shift-sync":
             apply_night_shift(load_preferences())
