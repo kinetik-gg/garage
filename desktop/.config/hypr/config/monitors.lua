@@ -1,38 +1,27 @@
 -- Monitor wiki https://wiki.hypr.land/Configuring/Basics/Monitors/
--- Example: output can be found with hyprctl monitors. Edit variables.lua for the monitor outputs instead of here directly
--- hl.monitor({
---     output    = "MONITOR1",
---     mode      = "1920x1080@60",
---     position  = "0x0",
---     scale     = "1",
--- })
-
--- Safe fallback for connectors that change after a reinstall or GPU switch.
+--
+-- One catch-all rule, and deliberately nothing else. This file ships with the
+-- product, so it cannot know the machine it lands on: no connector name, no
+-- position, no scale. An empty output is Hyprland's own `monitor = , preferred,
+-- auto, 1` -- every display that connects comes up at its preferred mode, laid
+-- out left to right in the order it is seen, unscaled. That is a usable desktop
+-- on any hardware, which is the whole of what this rule is for.
+--
+-- The per-display rules are generated rather than written here. `garage render`
+-- turns ~/.config/garage/displays.toml into
+-- ~/.local/state/garage/generated/displays.lua, and hyprland.lua loads that
+-- fragment after this file; a later rule naming an output replaces the earlier
+-- one, so the generated rules win over the catch-all outright. The first login
+-- has no displays.toml yet, so that first render writes one from the monitors
+-- Hyprland reports -- the arrangement the rule below produced -- and the
+-- machine's own topology is recorded from then on.
+--
+-- So change a display in the Displays pane, or in displays.toml, rather than
+-- here. A rule added here would be a machine-specific fact in a tracked file,
+-- and the generated fragment would override it anyway.
 hl.monitor({
     output = "",
     mode = "preferred",
     position = "auto",
     scale = "1",
-})
-
-hl.monitor({
-    output    = MONITOR3,
-    mode      = "preferred",
-    position  = "0x0",
-    scale     = "1",
-})
-
-hl.monitor({
-    output    = MONITOR1,
-    mode      = "preferred",
-    position  = "1920x0",
-    -- 5/3 is the closest integer-logical-size match to the panel's 1.76 DPI ratio.
-    scale     = "1.666667",
-})
-
-hl.monitor({
-    output    = MONITOR2,
-    mode      = "preferred",
-    position  = "4224x0",
-    scale     = "1",
 })

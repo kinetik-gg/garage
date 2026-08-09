@@ -1182,10 +1182,10 @@ def workspace_outputs() -> list[str]:
     seen still gets a range, and are the sole source if the layout cannot be
     read at all.
 
-    The primary comes first and the rest sort by connector name, so the ranges
-    follow the MONITOR1/2/3 convention the tracked config has always used. Not
-    by position: dragging a display around in the Displays pane would otherwise
-    renumber every workspace on the desktop.
+    The primary comes first and the rest sort by connector name, which is stable
+    across sessions and needs nothing remembered to reproduce. Not by position:
+    dragging a display around in the Displays pane would otherwise renumber every
+    workspace on the desktop.
     """
     names: list[str] = []
     try:
@@ -1931,6 +1931,10 @@ def keybindings_snapshot(document: dict) -> dict:
 
 
 def render_all(config: dict) -> None:
+    # First, so that on a machine which has never had a saved layout the
+    # workspace plan and the display fragment below are both rendered from one --
+    # the same one, describing the monitors actually attached.
+    initialize_display_config()
     render_preferences(config)
     render_keybinds(load_keybindings())
     render_general(config)
@@ -3308,6 +3312,51 @@ def layout_toml(layout: dict) -> str:
             lines.append(f'mirror = {toml_value(str(item["mirror"]))}')
         lines.append("")
     return "\n".join(lines)
+
+
+def initialize_display_config() -> None:
+    """Record the machine's own display arrangement, once, on the first render.
+
+    The tracked config names no connector: config.monitors ships a single
+    catch-all rule and every named monitor rule reaches Hyprland through the
+    generated fragment, which is rendered from displays.toml. Nothing writes that
+    file but a confirmed layout from the Displays pane, though, so until this the
+    machine of an owner who never opened the pane stayed on the catch-all for
+    good -- preferred mode, auto position, scale 1 -- and workspace_outputs() had
+    no saved layout to lead with, which is what loses a sleeping display its
+    block.
+
+    So the first render seeds it from what Hyprland currently reports, which is
+    the arrangement the catch-all rule produced: a faithful description of this
+    machine, and the baseline the user then edits. Normalized and serialized
+    through the same two helpers the pane's own save path uses, so both write the
+    same file.
+
+    Never an overwrite -- the file belongs to the user from the moment it exists.
+    And silent when there is nothing to record: `garage render` also runs where no
+    compositor is answering, and a missing hyprctl or an empty monitor list is a
+    render with no displays to snapshot rather than a failure.
+    """
+    if DISPLAYS_PATH.exists():
+        return
+    displays = display_snapshot()
+    if not displays:
+        return
+    # Under the lock display_finish() writes displays.toml with, and re-checked
+    # inside it: session start runs this while the pane is coming up, and a
+    # layout confirmed in between must not be replaced by a snapshot of the
+    # arrangement it was confirmed away from.
+    DISPLAY_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with DISPLAY_LOCK.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if DISPLAYS_PATH.exists():
+            return
+        # display_snapshot() always marks one display primary -- the focused one
+        # when nothing has been chosen yet -- so this only misses if the list is
+        # empty, which is already handled above.
+        primary = next((item["output"] for item in displays if item["primary"]), "")
+        layout = normalize_display_layout({"primary": primary, "displays": displays})
+        atomic_write(DISPLAYS_PATH, layout_toml(layout))
 
 
 def display_test(payload: dict) -> str:

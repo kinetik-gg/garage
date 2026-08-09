@@ -7,29 +7,49 @@ EDITOR       = os.getenv("HYPR_EDITOR") or "gnome-text-editor --new-window"
 CALCULATOR   = os.getenv("HYPR_CALCULATOR") or "gnome-calculator"
 
 -- Monitors
-MONITOR1 = os.getenv("HYPR_MONITOR1") or "DP-1"
-MONITOR2 = os.getenv("HYPR_MONITOR2") or "DP-2"
-MONITOR3 = os.getenv("HYPR_MONITOR3") or "DP-3"
-PRIMARY_MONITOR = os.getenv("HYPR_PRIMARY_MONITOR") or MONITOR1
+-- No connector is named here, and none is named in config.monitors either.
+-- Which outputs a machine has is a fact about that machine, not about this
+-- configuration, so it is discovered rather than shipped: the Displays pane
+-- records it in ~/.config/garage/displays.toml, `garage render` turns that into
+-- the generated displays.lua, and that fragment sets PRIMARY_MONITOR along with
+-- every named monitor rule. hyprland.lua loads it before config.windowrules and
+-- config.workspaces, which are the only two readers of this name.
+--
+-- Left nil until then, on purpose. `monitor` is an optional field on both a
+-- window rule and a workspace rule, so nil drops it from the table and the rule
+-- carries no display constraint at all -- which is the only honest answer before
+-- anything knows what the displays are. A guessed connector name would instead
+-- match nothing on most machines, silently, and an empty string would still be
+-- asserting that a display is called something.
+PRIMARY_MONITOR = os.getenv("HYPR_PRIMARY_MONITOR")
 
 -- Workspaces
 -- Which display owns which workspace IDs, and whether they are pinned at all.
 -- config.workspaces turns this into rules and config.binds into the number
 -- keys, so the two cannot drift apart.
 --
--- This is the portable baseline for a session that has never run System
--- Preferences. The real plan is generated from the displays actually attached
--- and loaded below -- here, and not from hyprland.lua's override block, because
+-- This is the hardware-neutral baseline for a session that has never rendered:
+-- ten workspaces, one per number key, pinned to nothing. Shared mode writes no
+-- numeric workspace rule at all, so a workspace opens on whichever display asks
+-- for it and stays there -- Hyprland with no rules, its own default -- and that
+-- is the only plan that can be stated before the displays are known. Pinning to
+-- a guessed connector instead is what the DP-named baseline used to do, and on
+-- any other machine it created a screenful of persistent workspaces belonging to
+-- outputs that did not exist and left every number key addressing a display the
+-- plan had never heard of. `monitor = ""` is how a group spells "no display",
+-- the same spelling garage's own shared mode emits; ten is the whole of the
+-- number row, so no key is dead before the first render.
+--
+-- The real plan is generated from the displays actually attached and loaded
+-- below -- here, and not from hyprland.lua's override block, because
 -- config.binds is required before that block runs and needs the same plan.
--- Each display owns a block of ten ids and keeps `count` of them, so the blocks
--- do not move when a count changes. Ten is the whole of the number row, which is
--- also the most workspaces a display can be given, so a block is never too small.
+-- There each display owns a block of ten ids and keeps `count` of them, so the
+-- blocks do not move when a count changes. Ten is also the most workspaces a
+-- display can be given, so a block is never too small.
 WORKSPACE_PLAN = {
-    mode = "per-display",
+    mode = "shared",
     groups = {
-        { monitor = MONITOR1, first = 1,  count = 8 },
-        { monitor = MONITOR2, first = 11, count = 4 },
-        { monitor = MONITOR3, first = 21, count = 4 },
+        { monitor = "", first = 1, count = 10 },
     },
 }
 
