@@ -331,8 +331,6 @@ run sudo usermod -s /usr/bin/fish "$desktop_user"
 record "set fish as the login shell"
 
 step "Creating the home directory layout"
-# xdg-user-dirs-update is deliberately not called: ~/.config/user-dirs.dirs is a
-# symlink into this repository, and the updater would rewrite a tracked file.
 for directory in \
     "${HOME}/Desktop" \
     "${HOME}/Documents" \
@@ -347,6 +345,24 @@ for directory in \
     "${HOME}/.local/share/wallpaper"; do
     [[ -d $directory ]] || run mkdir -p -- "$directory"
 done
+
+# user-dirs.dirs is machine-local mutable state, not tracked config:
+# xdg-user-dirs-update.service rewrites it at every login, which would sever a
+# stow link and leave a conflicting real file behind. Written once when absent,
+# like the GTK bookmarks; the login-time updater owns it from then on.
+if [[ ! -e "${HOME}/.config/user-dirs.dirs" ]]; then
+    write_file "${HOME}/.config/user-dirs.dirs" <<'USERDIRS'
+XDG_DESKTOP_DIR="$HOME/Desktop"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_PUBLICSHARE_DIR="$HOME/Public"
+XDG_TEMPLATES_DIR="$HOME/Templates"
+XDG_VIDEOS_DIR="$HOME/Videos"
+USERDIRS
+    record "wrote ~/.config/user-dirs.dirs"
+fi
 
 # ---------------------------------------------------------------------------
 # Link the tracked configuration into $HOME

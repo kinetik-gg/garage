@@ -29,3 +29,4 @@ desktop/.config/garage/displays.toml
 # Generated theme/state fragments now live outside the stow tree entirely, but
 # ignore the path in case anything ever lands one inside the repo checkout.
 .local/state/garage/generated/
+.config/user-dirs.dirs
