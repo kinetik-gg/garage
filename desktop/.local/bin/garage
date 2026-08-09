@@ -355,6 +355,12 @@ KEY_CHOICES = (
        "semicolon", "apostrophe", "grave", "comma", "period", "slash",
        "Print", "Pause", "Menu"]
 )
+# The whitelist's own spelling of each key, found case-insensitively. Keysym
+# names are mixed case on purpose -- "minus", "Page_Up", "BackSpace" -- so a key
+# is normalised by adopting the spelling above rather than by upper- or
+# lowercasing it. Anything not offered here (code:NN, mouse:NNN, the XF86 keys)
+# has no canonical spelling to adopt and keeps the one it arrived in.
+KEY_CANONICAL = {name.lower(): name for name in KEY_CHOICES}
 # Ceilings, so a runaway UI or a hand-edited file cannot produce a shortcut the
 # pane can no longer show or a command line nothing will run.
 KEYBIND_LIMITS = {"keys": 64, "description": 120, "command": 1024}
@@ -363,6 +369,11 @@ CUSTOM_KEYBIND_MAX = 64
 # exceptions: a shell command legitimately carries both, and they survive the
 # round trip through TOML and JSON as escapes.
 KEYBIND_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# The witness config/binds.lua writes as the last line of the catalog it
+# publishes: this word, a tab, and the number of rows above it. It is what lets a
+# reader tell a whole catalog from the leading fragment of one -- see
+# read_keybind_catalog(), which is the only thing that may act on the difference.
+KEYBIND_CATALOG_SENTINEL = "#end"
 
 
 # How a workspace relates to a display, and the ceiling on how many one may own.
@@ -1691,9 +1702,24 @@ def parse_combination(value: object) -> tuple[list[str], str]:
     return modifiers, parts[-1]
 
 
+def canonical_key(key: object) -> str:
+    """A key half spelled the way the pane's own list spells it.
+
+    Case is the writer's taste here exactly as it is for the modifiers: the
+    compositor matches keysyms case-insensitively, so "a" and "A" are one key and
+    storing whichever arrived left the Keyboard pane showing one shortcut two
+    ways. Not str.upper(), which would invent "MINUS" and "PAGE_UP" -- the
+    spelling adopted is KEY_CHOICES', looked up case-insensitively, and a key the
+    list does not offer keeps the spelling it came with.
+    """
+    text = str(key)
+    return KEY_CANONICAL.get(text.lower(), text)
+
+
 def canonical_combination(value: object) -> str:
     modifiers, key = parse_combination(value)
-    return " + ".join([name for name in KEY_MODIFIER_ORDER if name in modifiers] + [key])
+    return " + ".join([name for name in KEY_MODIFIER_ORDER if name in modifiers]
+                      + [canonical_key(key)])
 
 
 def combination_id(value: object) -> str:
@@ -1719,7 +1745,10 @@ def combination_signature(value: object) -> tuple[frozenset, str]:
 def require_bindable(value: object) -> str:
     """A combination the user may take over, canonically spelled."""
     modifiers, key = parse_combination(value)
-    if not modifiers and not KEY_STANDALONE.fullmatch(key):
+    # Against the canonical spelling, not the one that arrived: what is stored
+    # and handed to the compositor is the canonical form, so checking anything
+    # else would refuse "f5" while allowing the "F5" it normalises to.
+    if not modifiers and not KEY_STANDALONE.fullmatch(canonical_key(key)):
         raise SettingsError(
             f"{key} on its own would be swallowed everywhere; add SUPER, CONTROL, ALT or SHIFT")
     return canonical_combination(value)
@@ -1770,12 +1799,38 @@ def load_keybindings() -> dict:
     # An override naming a shortcut that does not exist, or one binds.lua keeps
     # for itself, is dropped here rather than refused later. Left in, it would
     # fail the guard on every subsequent change and leave the pane unable to
-    # correct the very file that was blocking it. Only while there is a catalog
-    # to check against: a session that has not published one yet must not lose
-    # the user's overrides merely because it cannot see whether they are valid.
-    catalog = keybind_catalog()
-    if catalog:
-        movable = {entry["id"] for entry in catalog if not entry["protected"]}
+    # correct the very file that was blocking it.
+    #
+    # Only against a catalog that proves itself whole, because this document is
+    # what keybind_action() renders back over keybindings.toml: a key missing
+    # here is a rebind deleted from the file. A truncated catalog reads as a
+    # complete short one, so filtering against an unproven catalog turned a
+    # Hyprland reload racing a rebind into permanent, silent data loss. Anything
+    # the reader cannot vouch for -- missing, empty, torn, or published by a
+    # binds.lua older than the witness -- is treated the way a missing catalog
+    # already was: read it, list it, change it, but never conclude from it that
+    # one of the user's shortcuts has stopped existing.
+    #
+    # What that costs is a refusal instead of a deletion. With an unverified
+    # catalog the overrides reach guard_keybinds() unfiltered, so one naming a
+    # bind the fragment does not carry makes the *current* change fail -- with
+    # "the shortcut list is still being published", which is what it is -- until
+    # the catalog is republished. A change that did not happen is recoverable; the
+    # rebinds it would have eaten were not.
+    catalog, verified = read_keybind_catalog()
+    if catalog and verified:
+        known = {entry["id"] for entry in catalog}
+        # Reported, unlike the protected ids the filter also drops: an override on
+        # a rescue bind is a hand edit the guard would refuse anyway, while an id
+        # the published set does not carry at all is a shortcut this release
+        # removed or renamed -- the one case where the user loses something they
+        # chose from the pane, and so the one worth a line in the journal.
+        absent = sorted(set(overrides) - known)
+        if absent:
+            print(f"garage: keybindings.toml: dropping {len(absent)} override(s) on "
+                  f"shortcut(s) config/binds.lua no longer publishes: "
+                  f"{', '.join(absent)}", file=sys.stderr)
+        movable = known - {entry["id"] for entry in catalog if entry["protected"]}
         overrides = {identifier: keys for identifier, keys in overrides.items()
                      if identifier in movable}
     custom: list[dict] = []
@@ -1803,26 +1858,49 @@ def keybindings_toml(document: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def keybind_catalog() -> list[dict]:
-    """The default bind set, as config/binds.lua published it on its last parse.
+def read_keybind_catalog() -> tuple[list[dict], bool]:
+    """The published bind set, and whether it can be proved whole.
 
     Read rather than derived. `hyprctl binds -j` reports where a bind ended up
     and an opaque Lua registry index, never the combination the file wanted --
     and the two differ in exactly the case there is something to show. Parsing
     binds.lua from here would be a second, worse Lua interpreter that would have
     to know what the workspace loop expands to.
+
+    The second half of the pair is the whole point of this function existing.
+    Every line of this file is self-describing, so a truncated catalog reads back
+    as a complete but shorter one and nothing in the entries marks it as a
+    fragment -- which is how a reader that filtered the user's overrides against
+    it came to delete the ones it simply had not seen yet. So config/binds.lua
+    writes a witness last, "#end<TAB>N" with N the number of rows, and this
+    returns False unless the file ends with that line and N is the number of rows
+    actually parsed. Fail-closed: any tear, any short count, any missing witness
+    is unverified, and the callers below may then read the catalog but never act
+    on something being absent from it.
+
+    False does not mean broken. A session still running the copy of binds.lua
+    that shipped before the witness existed publishes a perfectly good catalog
+    with no last line, and it must keep working -- listing shortcuts, changing
+    them, everything except concluding that a bind the catalog does not mention
+    has ceased to exist.
     """
     try:
         lines = KEYBINDS_CATALOG.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return []
+        return [], False
     catalog = []
     for line in lines:
         fields = line.split("\t")
         if len(fields) == 5 and fields[0]:
             catalog.append({"id": fields[0], "group": fields[1], "keys": fields[2],
                             "protected": fields[3] == "1", "description": fields[4]})
-    return catalog
+    witness = next((line for line in reversed(lines) if line.strip()), "")
+    return catalog, witness == f"{KEYBIND_CATALOG_SENTINEL}\t{len(catalog)}"
+
+
+def keybind_catalog() -> list[dict]:
+    """The default bind set alone, for everything that only has to display it."""
+    return read_keybind_catalog()[0]
 
 
 def resolve_keybinds(catalog: list[dict], document: dict) -> list[dict]:
@@ -1843,7 +1921,7 @@ def resolve_keybinds(catalog: list[dict], document: dict) -> list[dict]:
     return resolved
 
 
-def guard_keybinds(catalog: list[dict], document: dict) -> None:
+def guard_keybinds(catalog: list[dict], document: dict, verified: bool = True) -> None:
     """Refuse a shortcut set that could not be undone from the desktop itself.
 
     Before installing, not after. Hyprland's own emergency binds only appear
@@ -1853,6 +1931,14 @@ def guard_keybinds(catalog: list[dict], document: dict) -> None:
     never consults an override for them -- and this is the second lock on the
     same door, positioned so the pane can say why rather than the user finding
     out by pressing the key.
+
+    `verified` changes what an unknown id is *called*, never whether it is
+    refused. Against a catalog that cannot be proved whole -- see
+    read_keybind_catalog() -- load_keybindings() no longer filters, so an override
+    the fragment simply has not reached arrives here and stops the change. Saying
+    "there is no shortcut called super+s" about a shortcut the user can see in the
+    pane sends them to edit a file that is already correct; the truth is that the
+    list is mid-publication.
     """
     if not catalog:
         raise SettingsError(
@@ -1866,6 +1952,9 @@ def guard_keybinds(catalog: list[dict], document: dict) -> None:
     for identifier in document["overrides"]:
         entry = known.get(identifier)
         if entry is None:
+            if not verified:
+                raise SettingsError(
+                    "The shortcut list is still being published. Try again in a moment.")
             raise SettingsError(f"There is no shortcut called {identifier}")
         if entry["protected"]:
             raise SettingsError(f'"{entry["description"]}" cannot be changed')
@@ -1935,7 +2024,7 @@ def keybind_action(operation: str, payload: object) -> None:
     with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         document = load_keybindings()
-        catalog = keybind_catalog()
+        catalog, verified = read_keybind_catalog()
         known = {entry["id"]: entry for entry in catalog}
         if operation == "rebind":
             identifier = combination_id(values.get("id", ""))
@@ -1971,7 +2060,7 @@ def keybind_action(operation: str, payload: object) -> None:
                                   if item["id"] != identifier]
         else:
             raise SettingsError(f"Unknown shortcut action: {operation}")
-        guard_keybinds(catalog, document)
+        guard_keybinds(catalog, document, verified)
         atomic_write(KEYBINDINGS_PATH, keybindings_toml(document))
         render_keybinds(document)
         reload_keybinds()

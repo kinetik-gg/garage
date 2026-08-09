@@ -13,15 +13,23 @@ The fixture is the real catalog format. config/binds.lua publishes
 
 -- where `id` is bind_id(keys), i.e. the default combination with whitespace
 removed and lowercased, `keys` is the combination as the Lua file wrote it, and
-`protected` is "1" for a bind in binds.lua's RESCUE table and "0" otherwise. The
-file is written with a plain io.open(..., "w"), which truncates before it writes:
-there is no temporary and no rename, so a reader arriving mid-write sees a
-prefix of the lines and possibly a half-written last one. That is what
-`torn_catalog` below reproduces.
+`protected` is "1" for a bind in binds.lua's RESCUE table and "0" otherwise.
+
+The last line is the witness: "#end \t N", N being the number of rows above it.
+Two fields, so the five-field reader skips it as data, and short or missing in
+exactly the case the file is a fragment. binds.lua writes the whole thing to
+`keybinds.catalog.new` and renames it into place, so a reader now sees one whole
+catalog or the previous one -- but the witness is what the reader checks, because
+a file written by an older session's binds.lua, or by the fallback direct write
+that runs if os.rename is unavailable inside Hyprland's Lua sandbox, can still be
+a prefix. `torn_catalog` below reproduces that prefix; a catalog with complete
+rows and no witness reproduces the older session.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import unittest
 
 from harness import BINDS_LUA, BackendTestCase
@@ -42,10 +50,22 @@ CATALOG_ROWS = [
     ("super+s", "Workspaces", "SUPER + S", "0", "Toggle the scratchpad"),
 ]
 RESCUE_IDS = ("super+return", "super+space")
+# Spelled out rather than read off the backend, the same way the five-field
+# layout above is: this is the file format the two sides agree on, so a change on
+# either side has to come here and be seen.
+SENTINEL = "#end"
 
 
-def catalog_text(rows=CATALOG_ROWS) -> str:
-    return "\n".join("\t".join(row) for row in rows) + "\n"
+def catalog_text(rows=CATALOG_ROWS, *, witness: bool = True) -> str:
+    """The catalog as binds.lua publishes it: the rows, then the witness line.
+
+    `witness=False` is a catalog written by a binds.lua from before the witness
+    existed -- complete, but unprovable.
+    """
+    lines = ["\t".join(row) for row in rows]
+    if witness:
+        lines.append(f"{SENTINEL}\t{len(rows)}")
+    return "\n".join(lines) + "\n"
 
 
 class KeybindTestCase(BackendTestCase):
@@ -76,6 +96,22 @@ class KeybindTestCase(BackendTestCase):
 
     def catalog(self) -> list[dict]:
         return self.garage.keybind_catalog()
+
+    def verified(self) -> bool:
+        return self.garage.read_keybind_catalog()[1]
+
+    def load_reporting(self) -> tuple[dict, str]:
+        """`load_keybindings()` plus whatever it said on stderr.
+
+        Captured rather than left to the terminal both because the note is part
+        of the behaviour -- a dropped override has to be reported somewhere the
+        journal keeps it -- and so a test that expects a drop does not scribble
+        over the suite's own output.
+        """
+        stream = io.StringIO()
+        with contextlib.redirect_stderr(stream):
+            document = self.garage.load_keybindings()
+        return document, stream.getvalue()
 
     def document(self, overrides: dict[str, str], custom=()) -> dict:
         return {"overrides": dict(overrides), "custom": list(custom)}
@@ -117,6 +153,32 @@ class CatalogFormat(KeybindTestCase):
         """The reader's own tolerance, which the torn-write tests rely on."""
         self.write_catalog(catalog_text() + "super+x\tWindows\tSUPER + X\n")
         self.assertEqual(len(CATALOG_ROWS), len(self.catalog()))
+
+    def test_the_witness_line_is_not_read_as_a_bind(self) -> None:
+        """It rides in the same file as the binds and must stay invisible to
+        everything that lists them."""
+        self.assertNotIn(SENTINEL, {entry["id"] for entry in self.catalog()})
+        self.assertEqual(len(CATALOG_ROWS), len(self.catalog()))
+
+    def test_the_witness_word_is_the_one_the_backend_looks_for(self) -> None:
+        self.assertEqual(SENTINEL, self.garage.KEYBIND_CATALOG_SENTINEL)
+
+    def test_a_whole_catalog_verifies(self) -> None:
+        self.assertTrue(self.verified())
+
+    def test_binds_lua_publishes_the_witness_through_a_rename(self) -> None:
+        """The producer's half of the format, checked in the Lua source.
+
+        There is no Hyprland here to run binds.lua, so this is what keeps the two
+        sides honest: the word this file and the backend agree on has to appear in
+        the writer, and the writer has to reach the catalog through a temporary
+        and os.rename rather than truncating the file readers are looking at.
+        """
+        source = BINDS_LUA.read_text(encoding="utf-8")
+        publish = source.split("local rows = #catalog", 1)[1]
+        self.assertIn(f'"{SENTINEL}\\t"', publish)
+        self.assertIn('CATALOG_FILE .. ".new"', publish)
+        self.assertIn("pcall(os.rename, temporary, CATALOG_FILE)", publish)
 
 
 class CollisionRejection(KeybindTestCase):
@@ -238,25 +300,46 @@ class Normalisation(KeybindTestCase):
                      for text in self.MODIFIER_SPELLINGS}
         self.assertEqual({"SUPER + SHIFT + A"}, canonical)
 
-    # BUG (live, cosmetic): canonical_combination() normalises the modifiers --
-    # case and order -- but passes the key half through exactly as written, so
-    # 'shift + super + a' is stored and displayed as "SUPER + SHIFT + a" while
-    # 'SUPER+SHIFT+A' is stored as "SUPER + SHIFT + A". The two are one shortcut
-    # to combination_signature() and to Hyprland, which is why this is display
-    # and file contents rather than behaviour: the Keyboard pane shows the same
-    # binding two different ways depending on how it was spelled, defeating the
-    # stated purpose of KEY_MODIFIER_ORDER ("so two shortcuts that mean the same
-    # thing to the compositor also read the same way in the pane").
-    #
-    # Only reachable through a hand-edited keybindings.toml today: KEY_CHOICES
-    # offers letters as "A".."Z", so the pane never sends a lowercase letter. The
-    # fix is not str.upper() -- keysym names in KEY_CHOICES are mixed case on
-    # purpose ("minus", "Page_Up", "BackSpace") -- it is a case-insensitive
-    # lookup of the key against KEY_CHOICES, adopting the whitelist's spelling.
-    @unittest.expectedFailure
+    # The key half is normalised the same way the modifiers are, which is what
+    # KEY_MODIFIER_ORDER exists for ("so two shortcuts that mean the same thing to
+    # the compositor also read the same way in the pane"). It used to pass
+    # through verbatim, so a hand-edited 'shift + super + a' was stored and shown
+    # as "SUPER + SHIFT + a" beside 'SUPER+SHIFT+A' stored as "SUPER + SHIFT + A".
     def test_the_key_half_is_case_normalised_too(self) -> None:
         canonical = {self.garage.canonical_combination(text) for text in self.SPELLINGS}
         self.assertEqual({"SUPER + SHIFT + A"}, canonical)
+
+    def test_the_whitelists_spelling_is_the_one_adopted(self) -> None:
+        """Not str.upper(): the keysym names in KEY_CHOICES are mixed case on
+        purpose, and "MINUS" or "PAGE_UP" is not a key."""
+        for spelling, canonical in (("SUPER + MINUS", "SUPER + minus"),
+                                    ("SUPER + page_up", "SUPER + Page_Up"),
+                                    ("SUPER + backspace", "SUPER + BackSpace"),
+                                    ("SUPER + rEtUrN", "SUPER + Return")):
+            with self.subTest(spelling=spelling):
+                self.assertEqual(canonical, self.garage.canonical_combination(spelling))
+                self.assertIn(canonical.split(" + ")[-1], self.garage.KEY_CHOICES)
+
+    def test_a_key_outside_the_whitelist_keeps_its_spelling(self) -> None:
+        """code:NN, mouse:NNN and the XF86 keysyms are bindable and are not on
+        the pane's list, so there is no canonical spelling to adopt: theirs is
+        already it, and mangling the case would break the bind."""
+        for spelling in ("SUPER + code:82", "SUPER + mouse:273",
+                         "XF86AudioRaiseVolume", "SUPER + XF86AudioMute"):
+            with self.subTest(spelling=spelling):
+                self.assertEqual(spelling.replace("+", " + ").replace("  ", " "),
+                                 self.garage.canonical_combination(spelling))
+
+    def test_every_catalog_key_survives_canonicalisation(self) -> None:
+        """The keys binds.lua actually writes come back out unchanged in
+        meaning, so canonicalising an override cannot make it look like a move
+        away from the default it equals."""
+        for entry in self.catalog():
+            with self.subTest(keys=entry["keys"]):
+                canonical = self.garage.canonical_combination(entry["keys"])
+                self.assertEqual(self.garage.combination_signature(entry["keys"]),
+                                 self.garage.combination_signature(canonical))
+                self.assertEqual(entry["id"], self.garage.combination_id(canonical))
 
     def test_aliases_fold_onto_their_real_modifier(self) -> None:
         """CTRL/META/WIN/MOD4/ALTGR are spellings, not modifiers of their own."""
@@ -316,19 +399,22 @@ class Normalisation(KeybindTestCase):
 
 
 class TornCatalogNonDestruction(KeybindTestCase):
-    """An unreadable catalog must never cost the user their overrides.
+    """An unprovable catalog must never cost the user their overrides.
 
-    config/binds.lua writes generated/keybinds.catalog with a plain
+    config/binds.lua used to write generated/keybinds.catalog with a plain
     io.open(..., "w") -- truncate, write, close, with no temporary and no
-    rename -- so any reader that arrives during a Hyprland reload can see a
-    prefix of the file. `load_keybindings()` filters its overrides against
-    whatever ids that prefix contains and `keybind_action()` writes the filtered
-    set straight back over keybindings.toml, so a rebind racing a reload can
-    silently delete every other override the user had.
+    rename -- so any reader that arrived during a Hyprland reload could see a
+    prefix of the file. `load_keybindings()` filtered its overrides against
+    whatever ids that prefix contained and `keybind_action()` wrote the filtered
+    set straight back over keybindings.toml, so a rebind racing a reload silently
+    deleted every other override the user had.
 
-    The zero-byte and missing cases are already handled (`if catalog:` guards
-    the filter). The partial case is not: a non-empty prefix looks exactly like
-    a complete catalog to the reader.
+    Both ends are fixed. binds.lua renames a fully written temporary into place,
+    and the reader refuses to filter against a catalog it cannot prove is whole:
+    the row count on the witness line has to match the rows it parsed. Missing,
+    empty, torn, witness-less and miscounted all reach the same non-destructive
+    place -- read the catalog, keep every override -- and only a catalog that
+    proves itself may drop one.
     """
 
     OVERRIDES = {"super+w": "SUPER + ALT + W", "super+s": "SUPER + ALT + S",
@@ -347,10 +433,11 @@ class TornCatalogNonDestruction(KeybindTestCase):
         over keybindings.toml, so a key missing from the first is a key deleted
         from the file.
         """
-        document = self.garage.load_keybindings()
+        document, notes = self.load_reporting()
         self.assertEqual(self.OVERRIDES, document["overrides"],
                          "load_keybindings() dropped overrides it could not "
                          "find in an unreadable catalog")
+        self.assertEqual("", notes, "nothing was dropped, so nothing to report")
         self.garage.atomic_write(self.keybindings_path,
                                  self.garage.keybindings_toml(document))
         self.assertEqual(baseline, self.keybindings_path.read_bytes(),
@@ -382,16 +469,10 @@ class TornCatalogNonDestruction(KeybindTestCase):
         self.assertEqual([], self.catalog())
         self.assert_overrides_survive(baseline)
 
-    # BUG (live, Wave 4.2 to fix): keybind_catalog() cannot tell a truncated
-    # catalog from a complete one, so load_keybindings() treats every override
-    # whose bind has not been written yet as naming a shortcut that does not
-    # exist and drops it. keybind_action() then writes that filtered set over
-    # keybindings.toml -- a permanent, silent loss of the user's rebinds,
-    # triggered by nothing more than changing one shortcut while Hyprland is
-    # reloading. Flip this to a plain test once the reader refuses to filter
-    # against a catalog it cannot prove is whole.
-    @unittest.expectedFailure
     def test_a_torn_catalog_preserves_overrides(self) -> None:
+        """The case that used to lose the user's rebinds: a non-empty prefix,
+        indistinguishable from a complete short catalog on its rows alone. The
+        witness is what distinguishes it -- the tear took it away."""
         baseline = self.write_overrides(self.OVERRIDES)
         self.torn_catalog()
         # Precondition: the tear is the interesting kind -- a non-empty catalog
@@ -399,18 +480,121 @@ class TornCatalogNonDestruction(KeybindTestCase):
         catalog = self.catalog()
         self.assertTrue(catalog, "fixture is not a partial catalog")
         self.assertLess(len(catalog), len(CATALOG_ROWS))
+        self.assertFalse(self.verified())
         self.assert_overrides_survive(baseline)
 
-    def test_a_torn_catalog_is_read_as_a_short_but_valid_catalog(self) -> None:
-        """Documents the mechanism the bug rests on, so the finding survives
-        even if the expectedFailure above is flipped by a different fix."""
+    def test_a_witness_less_catalog_preserves_overrides(self) -> None:
+        """A session still running the binds.lua that shipped before the witness.
+
+        Complete, but unprovable, and the two cannot be told apart -- so it is
+        read and served like any other catalog and simply never filtered against.
+        Backward compatibility that costs a stale override, not a working pane.
+        """
+        baseline = self.write_overrides(self.OVERRIDES)
+        self.write_catalog(catalog_text(witness=False))
+        self.assertEqual(len(CATALOG_ROWS), len(self.catalog()),
+                         "an old catalog must still list every shortcut")
+        self.assertFalse(self.verified())
+        self.assert_overrides_survive(baseline)
+
+    def test_a_witness_counting_more_rows_than_arrived_preserves_overrides(self) -> None:
+        """The tear that ends exactly on a line boundary, and the reason the
+        witness carries a count rather than only marking the end: the rows are
+        all whole, so nothing but the number gives the loss away."""
+        baseline = self.write_overrides(self.OVERRIDES)
+        rows = CATALOG_ROWS[:-2]
+        self.write_catalog("\n".join("\t".join(row) for row in rows) + "\n"
+                           + f"{SENTINEL}\t{len(CATALOG_ROWS)}\n")
+        self.assertEqual(len(rows), len(self.catalog()))
+        self.assertFalse(self.verified())
+        self.assert_overrides_survive(baseline)
+
+    def test_a_witness_counting_fewer_rows_than_arrived_preserves_overrides(self) -> None:
+        """The mirror image, so the check is an equality and not a floor."""
+        baseline = self.write_overrides(self.OVERRIDES)
+        self.write_catalog(catalog_text() + f"{SENTINEL}\t{len(CATALOG_ROWS) - 1}\n")
+        self.assertFalse(self.verified())
+        self.assert_overrides_survive(baseline)
+
+    def test_a_witness_that_is_not_the_last_line_preserves_overrides(self) -> None:
+        """Written last by binds.lua, so anything after it is not a catalog this
+        reader wrote and not one it will act on."""
+        baseline = self.write_overrides(self.OVERRIDES)
+        self.write_catalog(catalog_text() + "super+x\tWindows\tSUPER + X\t0\tLater\n")
+        self.assertFalse(self.verified())
+        self.assert_overrides_survive(baseline)
+
+    def test_a_verified_catalog_drops_only_the_absent_override(self) -> None:
+        """The audit-era intent, kept and confined.
+
+        A shortcut a release really did remove leaves a stale override that would
+        fail the guard on every later change, so it is still dropped -- but only
+        from a catalog that proved itself whole, only the one id that is missing,
+        and never quietly.
+        """
+        rows = [row for row in CATALOG_ROWS if row[0] != "super+s"]
+        self.write_catalog(catalog_text(rows))
+        self.assertTrue(self.verified())
+        self.write_overrides(self.OVERRIDES)
+        document, notes = self.load_reporting()
+        self.assertEqual({"super+w": "SUPER + ALT + W",
+                          "super+shift+w": "SUPER + ALT + P"}, document["overrides"])
+        self.assertIn("super+s", notes)
+        self.assertIn("no longer publishes", notes)
+
+    def test_an_unverified_catalog_is_refused_by_name(self) -> None:
+        """What replaces the deletion, and it has to be honest.
+
+        An override the fragment has not reached is no longer filtered away, so
+        it reaches the guard and stops the change. Telling the user there is no
+        such shortcut sends them to edit a file that is already right; the truth
+        is that the list is mid-publication.
+        """
+        # Torn past both rescue rows, so it is the unknown id that stops the
+        # change rather than the missing-rescue check ahead of it.
+        rows = CATALOG_ROWS[:5]
+        self.assertTrue({row[0] for row in rows} >= set(RESCUE_IDS))
+        self.write_catalog(catalog_text(rows, witness=False))
+        catalog, verified = self.garage.read_keybind_catalog()
+        self.assertFalse(verified)
+        document = self.document(self.OVERRIDES)
+        with self.assertRaises(self.garage.SettingsError) as caught:
+            self.garage.guard_keybinds(catalog, document, verified)
+        self.assertIn("still being published", str(caught.exception))
+        # Verified, the same document is refused with the name of the id, which
+        # is the message that means "this override really is stale".
+        with self.assertRaises(self.garage.SettingsError) as caught:
+            self.garage.guard_keybinds(catalog, document, True)
+        self.assertIn("There is no shortcut called", str(caught.exception))
+
+    def test_a_verified_catalog_drops_a_rescue_override_without_a_note(self) -> None:
+        """The other half of the filter, unreported on purpose: an override on a
+        protected id is a hand edit the guard refuses anyway, so dropping it
+        costs nothing the user chose from the pane."""
+        self.write_overrides({"super+return": "SUPER + ALT + F12",
+                              "super+w": "SUPER + ALT + W"})
+        document, notes = self.load_reporting()
+        self.assertEqual({"super+w": "SUPER + ALT + W"}, document["overrides"])
+        self.assertEqual("", notes)
+
+    def test_a_torn_catalog_is_still_read_as_a_short_but_valid_catalog(self) -> None:
+        """The mechanism the bug rested on, pinned rather than removed.
+
+        The entries themselves are unchanged: a fragment still parses as a
+        complete shorter catalog and nothing in a row says otherwise. That is
+        deliberate -- the rows stay the format the pane draws -- so the whole
+        defence is the witness beside them, and this test is what keeps the two
+        facts from being confused for each other.
+        """
         self.torn_catalog()
-        catalog = self.catalog()
+        catalog, verified = self.garage.read_keybind_catalog()
         self.assertTrue(catalog)
         self.assertLess(len(catalog), len(CATALOG_ROWS))
         # Nothing in the returned value marks it as incomplete.
         self.assertEqual({"id", "group", "keys", "protected", "description"},
                          set(catalog[0]))
+        # Only the second half of the pair does.
+        self.assertFalse(verified)
 
     def test_custom_binds_survive_a_torn_catalog(self) -> None:
         """Custom shortcuts are never filtered against the catalog, so they are

@@ -10,11 +10,13 @@ from pathlib import Path
 # These scripts emit their own markup, so the bar's stylesheet cannot reach the
 # colours; they resolve the current appearance themselves.
 def _theme_fg() -> str:
+    # The bar publishes the colour it picked from the wallpaper. Deriving one
+    # from the theme instead is what made these widgets disagree with every
+    # other module in the bar.
     try:
-        scheme = (Path.home() / ".local/state/garage/generated/color-scheme").read_text().strip()
+        return (Path.home() / ".local/state/garage/generated/bar-foreground").read_text().strip()
     except OSError:
-        scheme = "dark"
-    return "#1c1c1e" if scheme == "light" else "#f5f5f7"
+        return "#f5f5f7"
 
 
 THEME_FG = _theme_fg()

@@ -499,11 +499,55 @@ end
 -- and unescaped on purpose: every field here was written in this file, and none
 -- of them contains a tab or a newline. Nothing the user typed passes through.
 --
--- Best effort. generated/ belongs to the helper and does not exist on a first
--- login until it has run once; a desktop whose shortcuts work but cannot yet be
--- listed is a far better failure than the other way round.
-local catalog_file = io.open(CATALOG_FILE, "w")
-if catalog_file ~= nil then
-    catalog_file:write(table.concat(catalog, "\n"), "\n")
-    catalog_file:close()
+-- Written to a temporary and renamed into place, never straight over the file
+-- the helper reads. A plain io.open(..., "w") truncates before it writes, so a
+-- `garage` process arriving mid-write saw a leading fragment of this list --
+-- which looks exactly like a complete but shorter catalog. The helper filtered
+-- the user's overrides against it and wrote the survivors back over
+-- keybindings.toml, so changing one shortcut during a reload could silently
+-- delete every rebind whose bind had not been written yet. rename(2) is atomic
+-- within one filesystem and generated/ is a single directory, so a reader now
+-- sees either the previous catalog or this one, whole.
+--
+-- The last line is the witness the helper checks: "#end<TAB>N", where N is the
+-- number of rows above it. Two fields, so the helper's five-field parse skips it
+-- as data rather than reading it as a bind, and it is absent or short in exactly
+-- the case a file is a fragment. A catalog without it is treated as unverified
+-- rather than as an error -- which is what an older session's copy of this file
+-- still running against a newer helper produces.
+local rows = #catalog
+catalog[rows + 1] = "#end\t" .. tostring(rows)
+local catalog_body = table.concat(catalog, "\n") .. "\n"
+
+local function write_catalog(path)
+    local file = io.open(path, "w")
+    if file == nil then
+        return false
+    end
+    local wrote = file:write(catalog_body)
+    file:close()
+    return wrote and true or false
+end
+
+-- Best effort, and the fallback matters as much as the atomic path. generated/
+-- belongs to the helper and does not exist on a first login until it has run
+-- once, and os.rename is a standard-library call this file cannot prove is
+-- reachable inside Hyprland's Lua sandbox -- os.getenv is the only os.* function
+-- the rest of this config tree uses. pcall covers both a sandbox that does not
+-- expose it (calling nil raises) and a rename that merely fails (nil plus a
+-- message). Either way the old direct write is used instead: a torn catalog
+-- becomes possible again, but the witness above keeps the helper from acting on
+-- one, and a desktop whose shortcuts work but cannot yet be listed is a far
+-- better failure than the other way round.
+local temporary = CATALOG_FILE .. ".new"
+local published = false
+if write_catalog(temporary) then
+    local called, renamed = pcall(os.rename, temporary, CATALOG_FILE)
+    published = (called and renamed) and true or false
+    if not published then
+        pcall(os.remove, temporary)
+    end
+end
+if not published then
+    write_catalog(CATALOG_FILE)
 end
