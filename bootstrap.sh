@@ -83,6 +83,22 @@ if [[ ! -e /etc/arch-release ]] || ! command -v pacman >/dev/null; then
     fail "This bootstrap targets an Arch Linux installation (pacman and /etc/arch-release)."
 fi
 
+# $USER is PAM's business and is unset in some contexts (docker exec, runuser);
+# the kernel always knows who we are.
+desktop_user="$(id -un)"
+
+# Checked before anything mutates: the per-user enable step near the end needs a
+# systemd user manager, and discovering that only there would strand a real run
+# with the shell changed and the links already made. A dry run reports and
+# continues -- it changes nothing, so it can afford to preview the full plan.
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+    if ((dry_run)); then
+        warn "no systemd user manager is reachable here; a real run would stop at this point."
+    else
+        fail "No systemd user manager is reachable. Log in on a TTY as $desktop_user (not via su) and re-run."
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # Freshness gate
 #
@@ -166,7 +182,7 @@ else
 
     foreign_sessions="$(foreign_session_files)"
     if [[ -n $foreign_sessions ]]; then
-        freshness_findings+=("another desktop session is installed: $(echo "$foreign_sessions" | tr '\n' ' ')")
+        freshness_findings+=("another desktop session is installed: ${foreign_sessions//$'\n'/ }")
     fi
 
     config_entries="$(count_config_entries)"
@@ -306,7 +322,7 @@ record "enabled NetworkManager, bluetooth, sddm and docker"
 # equivalent to passwordless root on this machine, and that is not a decision an
 # installer should make for you. See docs/INSTALL.md if you want to opt in.
 
-run sudo usermod -s /usr/bin/fish "$USER"
+run sudo usermod -s /usr/bin/fish "$desktop_user"
 record "set fish as the login shell"
 
 step "Creating the home directory layout"
@@ -450,7 +466,14 @@ if ((dry_run)); then
     if ! stow_output=$(stow --dir="$repo_dir" --target="$HOME" --restow \
         --no-folding --simulate --verbose=1 desktop 2>&1); then
         printf '%s\n' "$stow_output" | sed 's/^/    /' >&2
-        warn "stow --simulate reported a problem; see above."
+        if ((${#to_backup[@]} + ${#to_unlink[@]})); then
+            # The simulate runs against the unmodified $HOME: the backups and
+            # stale-link removals above have not actually happened in a dry run,
+            # so stow still sees those paths in the way.
+            info "[dry-run] conflicts at path(s) listed in the backup plan above are expected: a real run moves them before stow."
+        else
+            warn "stow --simulate reported a problem; see above."
+        fi
     else
         operations=$(printf '%s\n' "$stow_output" | grep -c '^\(LINK\|UNLINK\|MKDIR\|RMDIR\):' || true)
         info "[dry-run] stow would perform $operations link operations."
@@ -534,9 +557,6 @@ fi
 # ---------------------------------------------------------------------------
 
 step "Enabling the per-user services"
-if ! systemctl --user show-environment >/dev/null 2>&1; then
-    fail "No systemd user manager is reachable. Log in on a TTY as $USER (not via su) and re-run."
-fi
 
 # The units were just linked into ~/.config/systemd/user, so the manager has to
 # re-read them before enable can resolve their [Install] sections.
