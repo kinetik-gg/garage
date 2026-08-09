@@ -134,74 +134,9 @@ MIGRATED_FILES = {
     "workspace-blocks.toml": WORKSPACE_BLOCKS_PATH,
 }
 
-FALLBACK_DEFAULTS = {
-    "schema": {
-        "preferences_version": PREFERENCES_VERSION,
-    },
-    "appearance": {
-        "wallpaper_light": "",
-        "wallpaper_dark": "",
-        "wallpaper_light_source": "image",
-        "wallpaper_dark_source": "image",
-        "wallpaper_light_color": "#f5f5f7",
-        "wallpaper_dark_color": "#1c1c1e",
-        "wallpaper_fit": "cover",
-        "accent_color": "blue",
-        "night_shift_enabled": True,
-        "night_shift_start": "18:00",
-        "night_shift_end": "06:00",
-        "night_shift_temperature": 4500,
-        "theme_mode": "dark",
-        "corner_radius": "normal",
-        "border_size": 0,
-        "reduce_motion": False,
-        "animation_speed": 1.0,
-        "theme_light_at": "07:00",
-        "theme_dark_at": "19:00",
-        "search_engine": "google",
-        "search_custom_url": "",
-        "glass_mode": "liquid",
-        "glass_blur": "normal",
-        "glass_transparency": 0.04,
-        "glass_edge_width": 24,
-        "glass_refraction": 0.7,
-        "glass_clarity": 0.75,
-        "glass_highlight": 0.12,
-    },
-    "general": {
-        "terminal": "",
-        "builtin_launcher": True,
-    },
-    "input": {
-        "pointer_sensitivity": 0.0,
-        "accel_profile": "flat",
-        "natural_scroll": False,
-        "keyboard_layout": "us",
-        "repeat_rate": 25,
-        "repeat_delay": 600,
-        "touchpad_tap_to_click": True,
-        "touchpad_natural_scroll": True,
-        "touchpad_disable_while_typing": True,
-    },
-    "lock": {
-        "lock_timeout": 600,
-        "display_off_timeout": 900,
-        "suspend_timeout": 0,
-    },
-    "region": {
-        "locale": "",
-        "time_format": "24",
-        "date_format": "dmy",
-        "first_day_of_week": "sunday",
-    },
-    "workspaces": {
-        "mode": "per-display",
-        "default_count": 4,
-        "counts": "",
-        "shared_count": 8,
-        "indicator": True,
-    },
-}
+# FALLBACK_DEFAULTS is no longer written out here. It is derived, along with the
+# validation pass and `set`'s routing, from PREFERENCE_SCHEMA -- one table, below
+# the constants it constrains itself with. See "The preference schema".
 
 
 # The clock halves, as strftime fragments. Both the bar and the shell's own
@@ -392,6 +327,507 @@ WORKSPACE_BLOCK = WORKSPACE_COUNT_MAX
 # so it survives the fragment being reformatted.
 INSTALLED_GROUP = re.compile(
     r'monitor\s*=\s*"([^"]*)"\s*,\s*first\s*=\s*(\d+)\s*,\s*count\s*=\s*(\d+)')
+
+
+# ---------------------------------------------------------------------------
+# The preference schema
+#
+# ADDING A SETTING. It used to cost seven touch points across three languages:
+# preferences.defaults.toml, FALLBACK_DEFAULTS, a branch in
+# validate_preferences(), a renderer, a branch in apply_changed_preference(),
+# plus the QML control and its metadata. Nothing checked that the five
+# Python-side ones agreed, and two of the five failed *silently* when they were
+# forgotten:
+#
+#   * a key with no branch in validate_preferences() was simply never checked.
+#     Not hypothetical: night_shift_enabled, the two wallpaper paths,
+#     natural_scroll and the three touchpad switches shipped that way for
+#     releases, and the table below is the first thing to make it visible -- they
+#     are the "unchecked" kind now, each with the reason it is safe written next
+#     to it;
+#   * a key in a section whose apply branch dispatched by section rather than by
+#     name -- input, lock, region, workspaces -- was applied by whatever that
+#     section happened to do, which is right by luck rather than by declaration.
+#
+# The table below is now the only Python-side place. One addition is:
+#
+#   1. one entry here -- section and name (the dotted key), the default, the
+#      kind and its constraints, the reason the constraint is what it is, and
+#      the route `set` takes to move the running desktop onto the new value;
+#   2. one line in preferences.defaults.toml, which stays the shipped source of
+#      truth for values. Deliberately not generated from this table: a
+#      checked-in, commented, hand-editable file is worth more than a build
+#      step, and the schema coherence tests in tests/test_schema.py are the sync
+#      check -- a key or value in one and not the other is a test failure now
+#      rather than a silent disagreement;
+#   3. a renderer, but only if the setting reaches a surface no existing
+#      render_* function already writes. Most do not: a new appearance number
+#      lands in preferences.lua, which render_preferences() already emits;
+#   4. the QML control.
+#
+# Two files always, a third only for a surface that genuinely does not exist yet,
+# and the control. Derived from what is below and never hand-maintained again:
+# FALLBACK_DEFAULTS, the sections and keys `set` will accept, the whole of
+# validate_preferences(), and apply_changed_preference()'s key -> action routing.
+# Forgetting step 2 is a test failure, not a silent disagreement, and a key with
+# no route is a test failure too -- see tests/test_schema_table.py.
+#
+# WHAT AN ENTRY SAYS.
+#
+#   default     The shipped value. FALLBACK_DEFAULTS is exactly these, grouped
+#               by section, and it is also what a value that cannot be rendered
+#               is coerced back to.
+#   kind        Which predicate in PREFERENCE_KINDS decides whether a stored
+#               value is usable. "int" and "float" are range-checked
+#               identically -- see in_number_range() -- and the name records
+#               what the renderer will coerce the number to, not an integrality
+#               check the schema has never made.
+#   minimum,    The range, for "int" and "float". Inclusive both ends.
+#   maximum
+#   members     The permitted values, for "enum". A set, tuple or mapping, so
+#               the constant that already spells the choices out for the
+#               renderers can be named here rather than copied.
+#   renames     Withdrawn spellings, mapped to what they mean now. Applied
+#               before the check and *silently*: a name this build no longer
+#               offers is not a bad value, it is the same choice under the name
+#               it had when it was made.
+#   also        An extra condition that needs the rest of the configuration, so
+#               it cannot be expressed as a kind. Called with (config, value)
+#               after the kind passes.
+#   normalise   Rewrites the value instead of checking it, with no note. For the
+#               one preference whose stored form is a parsed structure.
+#   route       Which entry of PREFERENCE_ROUTES `set` walks after the file is
+#               written. Absent means the key is not settable at all.
+#
+# A key with no entry here does not exist: set_nested() refuses it, the
+# validation pass never sees it, and preference_deltas() drops it from the file.
+# ---------------------------------------------------------------------------
+
+# Entry order is the order the validation pass walks, which is the order
+# coercion notes reach the journal, and it is load-bearing in one place:
+# search_custom_url's cross-key check reads search_engine, so search_engine has
+# to have been coerced first. It is deliberately not required to match
+# preferences.defaults.toml's order -- both are mappings, and the coherence
+# tests compare keys, types and values rather than sequence.
+PREFERENCE_SCHEMA: dict[str, dict] = {
+    # Bookkeeping rather than a preference: written unconditionally by
+    # preference_document(), never validated, and not settable. It is in the
+    # table only because FALLBACK_DEFAULTS has to carry it -- a file with no
+    # [schema] section reads as version 1 and replays every migration.
+    "schema.preferences_version": {
+        "default": PREFERENCES_VERSION, "kind": "bookkeeping",
+    },
+
+    # The desktop picture belongs to the appearance, so light and dark each keep
+    # their own image, source and colour. Spelled out per appearance rather than
+    # looped over SCHEMES because each really is a key of its own, with its own
+    # default and its own route: only the half that is on screen may reach the
+    # desktop, or dressing the light appearance from a dark session would change
+    # what is behind the pane.
+    #
+    # The two image paths are unchecked, which is a gap the table makes visible
+    # rather than one it introduces: nothing here has ever confirmed the file
+    # exists, and wallpaper_target() already falls back when it does not.
+    "appearance.wallpaper_light": {
+        "default": "", "kind": "unchecked", "route": "wallpaper_light",
+    },
+    "appearance.wallpaper_dark": {
+        "default": "", "kind": "unchecked", "route": "wallpaper_dark",
+    },
+    # Fit is shared -- it describes how an image meets the displays, which does
+    # not change with the palette -- so it always reaches the desktop.
+    # "stretch" was offered before anyone checked it against hyprpaper, which
+    # only knows the four in WALLPAPER_FITS. Anything else is a parse error that
+    # leaves the desktop with no wallpaper at all.
+    "appearance.wallpaper_fit": {
+        "default": "cover", "kind": "enum", "members": WALLPAPER_FITS,
+        "renames": {"stretch": "cover"}, "route": "wallpaper",
+    },
+    "appearance.wallpaper_light_source": {
+        "default": "image", "kind": "enum", "members": {"image", "color"},
+        "route": "wallpaper_light",
+    },
+    "appearance.wallpaper_light_color": {
+        "default": "#f5f5f7", "kind": "hex_color", "route": "wallpaper_light",
+    },
+    "appearance.wallpaper_dark_source": {
+        "default": "image", "kind": "enum", "members": {"image", "color"},
+        "route": "wallpaper_dark",
+    },
+    "appearance.wallpaper_dark_color": {
+        "default": "#1c1c1e", "kind": "hex_color", "route": "wallpaper_dark",
+    },
+    # The swatch names the palette is built from. Held as names rather than
+    # colours because the accent drives a whole generated palette, not one fill.
+    "appearance.accent_color": {
+        "default": "blue", "kind": "enum", "route": "accent",
+        "members": {"blue", "teal", "green", "yellow", "orange", "red", "pink",
+                    "purple", "slate"},
+    },
+    # Unchecked, and the schedule keys beside it are not: a non-bool here is
+    # read through bool() by night_shift_active() and cannot fail, where a
+    # malformed time would reach minutes() and raise.
+    "appearance.night_shift_enabled": {
+        "default": True, "kind": "unchecked", "route": "night_shift",
+    },
+    "appearance.night_shift_start": {
+        "default": "18:00", "kind": "time", "route": "night_shift",
+    },
+    "appearance.night_shift_end": {
+        "default": "06:00", "kind": "time", "route": "night_shift",
+    },
+    # Kelvin. The range is hyprsunset's: below 1000 the screen goes orange
+    # enough to be unusable, above 10000 it stops being a shift at all.
+    "appearance.night_shift_temperature": {
+        "default": 4500, "kind": "int", "minimum": 1000, "maximum": 10000,
+        "route": "night_shift",
+    },
+    # "auto" follows theme_light_at / theme_dark_at; the other two pin it.
+    "appearance.theme_mode": {
+        "default": "dark", "kind": "enum", "members": {"light", "dark", "auto"},
+        "route": "theme",
+    },
+    "appearance.theme_light_at": {
+        "default": "07:00", "kind": "time", "route": "theme",
+    },
+    "appearance.theme_dark_at": {
+        "default": "19:00", "kind": "time", "route": "theme",
+    },
+    # The same withdrawn-name case as wallpaper_fit, one step further on: a file
+    # that escaped the version stamp -- restored from a backup, or hand-edited --
+    # still carries a name from the old corner radius scale, and it means what
+    # the new name says. CORNER_RADIUS_STALE is the subset of the rename map
+    # that cannot be confused with a current name, so it is safe to apply
+    # unconditionally here; the ambiguous half is gated on the stamp in
+    # migrate_preference_values().
+    "appearance.corner_radius": {
+        "default": "normal", "kind": "enum", "members": CORNER_RADII,
+        "renames": CORNER_RADIUS_STALE, "route": "corner_radius",
+    },
+    # px per window edge. Ten is already a frame rather than a border.
+    "appearance.border_size": {
+        "default": 0, "kind": "int", "minimum": 0, "maximum": 10,
+        "route": "border",
+    },
+    "appearance.reduce_motion": {
+        "default": False, "kind": "bool", "route": "motion",
+    },
+    # A multiplier over the durations in ANIMATION_LEAVES; see MOTION_SPEED_RANGE
+    # for why the ends are where they are.
+    "appearance.animation_speed": {
+        "default": 1.0, "kind": "float",
+        "minimum": MOTION_SPEED_RANGE[0], "maximum": MOTION_SPEED_RANGE[1],
+        "route": "motion",
+    },
+    "appearance.search_engine": {
+        "default": "google", "kind": "enum", "members": SEARCH_ENGINES,
+        "route": "search",
+    },
+    # Only a template a query cannot be put into is dropped. An empty one is the
+    # state the pane is in for as long as it takes to fill the field in after
+    # choosing "custom", and render_search_engine() already falls back for it --
+    # so clearing this when the engine is not "custom" would make custom
+    # impossible to select. Hence `also` rather than a stricter kind: the
+    # condition is about search_engine, not about this value alone.
+    "appearance.search_custom_url": {
+        "default": "", "kind": "free_string", "route": "search",
+        "also": lambda config, value: (
+            not value or "%s" in value
+            or config["appearance"]["search_engine"] != "custom"),
+    },
+    "appearance.glass_mode": {
+        "default": "liquid", "kind": "enum",
+        "members": {"liquid", "frosted", "off"}, "route": "glass",
+    },
+    "appearance.glass_blur": {
+        "default": "normal", "kind": "enum", "members": GLASS_BLUR_LEVELS,
+        "route": "glass",
+    },
+    "appearance.glass_transparency": {
+        "default": 0.04, "kind": "float",
+        "minimum": 0, "maximum": GLASS_TRANSPARENCY_MAX, "route": "glass",
+    },
+    # px of refracted edge. Below 4 there is nothing to see; past 128 the edge
+    # is wider than most of the controls it is drawn on.
+    "appearance.glass_edge_width": {
+        "default": 24, "kind": "int", "minimum": 4, "maximum": 128,
+        "route": "glass",
+    },
+    # The three unit-interval material weights. 0 and 1 are both meaningful
+    # ends, so the range is closed on both.
+    "appearance.glass_refraction": {
+        "default": 0.7, "kind": "float", "minimum": 0, "maximum": 1,
+        "route": "glass",
+    },
+    "appearance.glass_clarity": {
+        "default": 0.75, "kind": "float", "minimum": 0, "maximum": 1,
+        "route": "glass",
+    },
+    "appearance.glass_highlight": {
+        "default": 0.12, "kind": "float", "minimum": 0, "maximum": 1,
+        "route": "glass",
+    },
+
+    # Held as a desktop id rather than a command so the pane can show the name
+    # and icon the application ships. An id that is no longer installed is left
+    # alone -- any string will do -- because resolve_terminal() falls back on its
+    # own, and the choice is worth keeping in case the application comes back.
+    "general.terminal": {
+        "default": "", "kind": "free_string", "route": "terminal",
+    },
+    "general.builtin_launcher": {
+        "default": True, "kind": "bool", "route": "launcher",
+    },
+
+    # libinput's own range, and its own two profiles.
+    "input.pointer_sensitivity": {
+        "default": 0.0, "kind": "float", "minimum": -1, "maximum": 1,
+        "route": "input",
+    },
+    "input.accel_profile": {
+        "default": "flat", "kind": "enum", "members": {"flat", "adaptive"},
+        "route": "input",
+    },
+    # The four switches below are unchecked, and were before this table: every
+    # one reaches the generated Lua through bool(), which cannot fail whatever
+    # the file says. Declared all the same, because a key absent from the table
+    # is a key `set` refuses.
+    "input.natural_scroll": {
+        "default": False, "kind": "unchecked", "route": "input",
+    },
+    # Hyprland's own bounds for repeat_rate (Hz) and repeat_delay (ms). Outside
+    # them the compositor either drops the setting or repeats unusably.
+    "input.repeat_rate": {
+        "default": 25, "kind": "int", "minimum": 1, "maximum": 100,
+        "route": "input",
+    },
+    "input.repeat_delay": {
+        "default": 600, "kind": "int", "minimum": 100, "maximum": 2000,
+        "route": "input",
+    },
+    # An xkb layout name, not checked against the installed set: xkb resolves
+    # names the session has never seen, and an empty one would leave the
+    # compositor with no layout at all.
+    "input.keyboard_layout": {
+        "default": "us", "kind": "nonempty_string", "route": "input",
+    },
+    "input.touchpad_tap_to_click": {
+        "default": True, "kind": "unchecked", "route": "input",
+    },
+    "input.touchpad_natural_scroll": {
+        "default": True, "kind": "unchecked", "route": "input",
+    },
+    "input.touchpad_disable_while_typing": {
+        "default": True, "kind": "unchecked", "route": "input",
+    },
+
+    # Seconds, and 0 means never. A day is the ceiling on all three: past it the
+    # timeout is indistinguishable from off and hypridle would rather be told so.
+    "lock.lock_timeout": {
+        "default": 600, "kind": "int", "minimum": 0, "maximum": 86400,
+        "route": "idle",
+    },
+    "lock.display_off_timeout": {
+        "default": 900, "kind": "int", "minimum": 0, "maximum": 86400,
+        "route": "idle",
+    },
+    "lock.suspend_timeout": {
+        "default": 0, "kind": "int", "minimum": 0, "maximum": 86400,
+        "route": "idle",
+    },
+
+    # The set of locales is whatever locale-gen last produced, so a name that was
+    # valid when it was chosen can disappear from under the file. "" is the
+    # no-override state, which always works -- and the "locale" kind
+    # short-circuits on it, so the common case never shells out to locale -a.
+    "region.locale": {
+        "default": "", "kind": "locale", "route": "locale",
+    },
+    "region.time_format": {
+        "default": "24", "kind": "enum", "members": TIME_FORMATS,
+        "route": "region",
+    },
+    "region.date_format": {
+        "default": "dmy", "kind": "enum", "members": DATE_FORMATS,
+        "route": "region",
+    },
+    "region.first_day_of_week": {
+        "default": "sunday", "kind": "enum", "members": FIRST_WEEKDAYS,
+        "route": "region",
+    },
+
+    "workspaces.mode": {
+        "default": "per-display", "kind": "enum", "members": WORKSPACE_MODES,
+        "route": "workspaces",
+    },
+    # See WORKSPACE_COUNT_MAX for why ten: there are only ten number keys.
+    "workspaces.default_count": {
+        "default": 4, "kind": "int", "minimum": 1, "maximum": WORKSPACE_COUNT_MAX,
+        "route": "workspaces",
+    },
+    "workspaces.shared_count": {
+        "default": 8, "kind": "int", "minimum": 1, "maximum": WORKSPACE_COUNT_MAX,
+        "route": "workspaces",
+    },
+    # Only the bar is affected -- the workspaces, their rules and their keys are
+    # untouched -- so this is the one workspaces key that does not disturb the
+    # compositor.
+    "workspaces.indicator": {
+        "default": True, "kind": "bool", "route": "workspace_indicator",
+    },
+    # Normalised rather than checked in place, and never reported: the pane sends
+    # the whole map on every edit, so rewriting it as whatever parsing understood
+    # means a hand-typed stray comma is dropped once instead of being carried
+    # back out to the file on every later save. parse_workspace_counts() is
+    # lenient by design -- see its docstring -- so there is no invalid value here
+    # to coerce, only a value to restate.
+    "workspaces.counts": {
+        "default": "", "kind": "normalised", "route": "workspaces",
+        "normalise": lambda value: format_workspace_counts(
+            parse_workspace_counts(value)),
+    },
+}
+
+
+# What "kind" means, as one predicate each over (entry, value). The predicates
+# themselves are in_number_range(), is_clock_time() and is_hex_color(), which sit
+# beside validate_preferences() where their reasoning is; this table is only the
+# mapping from a name in the schema to one of them.
+PREFERENCE_KINDS: dict[str, object] = {
+    # Not validated at all, and settable. Either the renderer coerces whatever
+    # it is handed and cannot fail on it, or nothing downstream reads it as
+    # anything but a string.
+    "unchecked": lambda entry, value: True,
+    # Not validated and not settable: the version stamp.
+    "bookkeeping": lambda entry, value: True,
+    # Rewritten by the entry's own `normalise`, so it never reaches a predicate.
+    "normalised": lambda entry, value: True,
+    "bool": lambda entry, value: isinstance(value, bool),
+    "int": lambda entry, value: in_number_range(
+        value, entry["minimum"], entry["maximum"]),
+    "float": lambda entry, value: in_number_range(
+        value, entry["minimum"], entry["maximum"]),
+    "enum": lambda entry, value: value in entry["members"],
+    "time": lambda entry, value: is_clock_time(value),
+    "hex_color": lambda entry, value: is_hex_color(value),
+    "free_string": lambda entry, value: isinstance(value, str),
+    "nonempty_string": lambda entry, value: isinstance(value, str) and bool(value),
+    "locale": lambda entry, value: isinstance(value, str) and (
+        not value or value in installed_locales()),
+}
+
+# Which extra keys `set` may not be given a range or a member list for, because
+# they are not numbers or enums. Derived, so a kind that grows a constraint
+# cannot forget to declare it: see tests/test_schema_table.py.
+PREFERENCE_KIND_CONSTRAINTS: dict[str, tuple[str, ...]] = {
+    "int": ("minimum", "maximum"),
+    "float": ("minimum", "maximum"),
+    "enum": ("members",),
+    "normalised": ("normalise",),
+}
+
+
+# What `set` does after the file is written, per route, as data: the calls in
+# order. A step is the name of a module-level function called with the config, or
+# a tuple of that name and the extra arguments to pass after it -- resolved
+# through globals() at call time, because every renderer and applier is defined
+# further down the file. tests/test_schema_table.py checks that each name is
+# really there and takes the arguments named beside it.
+#
+# The split this preserves: a render_* step writes a file and signals nothing, an
+# apply_* or push_* step moves the running session. See render_all().
+PREFERENCE_ROUTES: dict[str, tuple] = {
+    # No theme work on any of these: every palette output is derived from the
+    # resolved scheme alone, including the bar foreground. Nothing reads the
+    # image, so a new wallpaper cannot change what the theme would emit.
+    "wallpaper": ("apply_wallpaper",),
+    "wallpaper_light": (("apply_live_wallpaper", "light"),),
+    "wallpaper_dark": (("apply_live_wallpaper", "dark"),),
+    "accent": ("apply_accent",),
+    "search": ("render_search_engine",),
+    "corner_radius": ("render_preferences", "apply_corner_radius"),
+    "border": ("render_preferences", "apply_border"),
+    "motion": ("render_preferences", "apply_motion"),
+    "theme": ("apply_theme_if_scheme_moved",),
+    "glass": ("render_preferences", "apply_glass"),
+    "night_shift": ("apply_night_shift",),
+    "terminal": ("apply_terminal",),
+    # Nothing to reload: the wrapper reads the marker on every press and the
+    # shell watches it, so the switch takes effect as it is written.
+    "launcher": ("render_general",),
+    "input": ("render_preferences",
+              ("run_or_raise", ["hyprctl", "reload"],
+               "Unable to reload input settings")),
+    # Nothing but hypridle.conf: the whole lock section is timeouts, and no other
+    # fragment carries one. Narrow also because the restart is synchronous and
+    # its ExecStartPre re-enters this binary as `garage render-idle` -- all of
+    # this runs with PREFERENCES_LOCK held by `set`, so the re-entrant render
+    # must stay on a path that never takes it.
+    "idle": ("render_idle",
+             ("run_or_raise", ["systemctl", "--user", "restart", "hypridle.service"],
+              "Unable to reload idle settings")),
+    # Every region key reaches the bar clock -- the locale names its weekday and
+    # month, the rest shape the format string -- so all four take the same route
+    # out, and the locale takes one step more.
+    "locale": ("apply_locale", "apply_region"),
+    "region": ("apply_region",),
+    "workspaces": ("apply_workspace_plan",),
+    # Nothing in the compositor depends on this, so the desktop is left alone.
+    "workspace_indicator": ("apply_bar_workspaces",),
+}
+
+# The route a key the table does not have takes, per section. Unreachable through
+# `set`, which gates on the schema -- so this is not a fallback the product uses,
+# it is the behaviour a key outside the schema has always had, kept because a
+# section-wide reload was never an error and a refactor must not invent one.
+# appearance and general are absent on purpose: both have always refused an
+# unknown key by name, and apply_changed_preference() raises for them.
+SECTION_ROUTES = {"input": "input", "lock": "idle", "region": "region",
+                  "workspaces": "workspaces"}
+
+# Keys the schema used to have, dropped from the merged view on every load so a
+# file that somehow carries both a version stamp and an old key cannot write it
+# back out on every save. The wallpaper singles are pre-v3 -- see WALLPAPER_SPLIT
+# and migrate_preference_values(), which is where they are carried across rather
+# than lost -- and highlight_color was withdrawn outright.
+WITHDRAWN_KEYS = {"appearance": tuple(WALLPAPER_SPLIT) + ("highlight_color",)}
+
+
+def schema_defaults() -> dict:
+    """FALLBACK_DEFAULTS, derived: the table's defaults in the file's own shape.
+
+    Nested section -> key -> value, because that is what preferences.defaults.toml
+    is and what every consumer already expects. Sections and keys come out in the
+    table's order.
+    """
+    defaults: dict[str, dict] = {}
+    for dotted, entry in PREFERENCE_SCHEMA.items():
+        section, key = dotted.split(".", 1)
+        defaults.setdefault(section, {})[key] = entry["default"]
+    return defaults
+
+
+def schema_sections() -> tuple[str, ...]:
+    """The sections the validation pass walks, in the table's order.
+
+    [schema] is not one of them: the version stamp is this program's
+    bookkeeping, it is written unconditionally by preference_document(), and
+    coercing it would mean coercing the very thing the migration reads to decide
+    whether to run.
+    """
+    return tuple(dict.fromkeys(
+        dotted.split(".", 1)[0] for dotted, entry in PREFERENCE_SCHEMA.items()
+        if entry["kind"] != "bookkeeping"))
+
+
+# Layer 1 as this build compiles it in: what load_toml(DEFAULTS_PATH, ...) falls
+# back to when the shipped file is missing, and what validate_preferences()
+# coerces an unusable value to. Derived from the table above, which is why it can
+# no longer disagree with the validation pass -- it used to be a second copy of
+# the same schema, agreeing with the first only by hand. It must still agree with
+# preferences.defaults.toml, and tests/test_schema.py is what enforces that.
+FALLBACK_DEFAULTS = schema_defaults()
+VALIDATED_SECTIONS = schema_sections()
 
 
 class SettingsError(RuntimeError):
@@ -911,119 +1347,62 @@ def validate_preferences(config: dict, sink: list[str] | None = None) -> dict:
     count the coercions to report them, and reading its own stderr back is not
     something a process can do honestly -- it would also swallow the journal line
     every other caller depends on.
+
+    Every branch this used to be written out as is now one entry in
+    PREFERENCE_SCHEMA: the kind and its constraints say what a usable value is,
+    `renames` carries a withdrawn spelling across silently, `also` holds the one
+    condition that needs a second key, and `normalise` restates a value instead
+    of checking it. The reason each constraint is what it is went into the table
+    with it. Nothing here knows the name of any preference, which is the point --
+    a key added to the table is validated by having been added.
     """
     notes: list[str] = []
 
-    def keep(section: str, key: str, valid: bool) -> None:
+    def keep(section: str, key: str, default: object, valid: bool) -> None:
         """Leave a usable value alone; put the shipped default over anything else."""
         if valid:
             return
-        default = FALLBACK_DEFAULTS[section][key]
         notes.append(f"{section}.{key} {config[section].get(key)!r} is not valid, "
                      f"using {default!r}")
         config[section][key] = default
 
-    appearance = config.setdefault("appearance", {})
-    # "stretch" was offered before anyone checked it against hyprpaper, which
-    # only knows the four in WALLPAPER_FITS. A withdrawn name rather than a bad
-    # value, so it is carried across to its replacement without a warning.
-    if appearance.get("wallpaper_fit") == "stretch":
-        appearance["wallpaper_fit"] = "cover"
-    keep("appearance", "wallpaper_fit", appearance.get("wallpaper_fit") in WALLPAPER_FITS)
-    # The pre-v3 singles. Dropped here as well as in the migration so a file
-    # that somehow carries both a stamp and an old key cannot write it back out
-    # on every save, the same way highlight_color is handled below.
-    for legacy in WALLPAPER_SPLIT:
-        appearance.pop(legacy, None)
-    for scheme in SCHEMES:
-        keep("appearance", f"wallpaper_{scheme}_source",
-             appearance.get(f"wallpaper_{scheme}_source") in {"image", "color"})
-        keep("appearance", f"wallpaper_{scheme}_color",
-             is_hex_color(appearance.get(f"wallpaper_{scheme}_color")))
-    keep("appearance", "accent_color", appearance.get("accent_color") in {
-        "blue", "teal", "green", "yellow", "orange", "red", "pink", "purple", "slate"})
-    appearance.pop("highlight_color", None)
-    keep("appearance", "night_shift_start", is_clock_time(appearance.get("night_shift_start")))
-    keep("appearance", "night_shift_end", is_clock_time(appearance.get("night_shift_end")))
-    keep("appearance", "night_shift_temperature",
-         in_number_range(appearance.get("night_shift_temperature"), 1000, 10000))
-    keep("appearance", "theme_mode", appearance.get("theme_mode") in {"light", "dark", "auto"})
-    keep("appearance", "theme_light_at", is_clock_time(appearance.get("theme_light_at")))
-    keep("appearance", "theme_dark_at", is_clock_time(appearance.get("theme_dark_at")))
-    # The same withdrawn-name case as wallpaper_fit: a file that escaped the
-    # version stamp -- restored from a backup, or hand-edited -- still carries a
-    # name from the old corner radius scale, and it means what the new name says.
-    if appearance.get("corner_radius") in CORNER_RADIUS_STALE:
-        appearance["corner_radius"] = CORNER_RADIUS_STALE[appearance["corner_radius"]]
-    keep("appearance", "corner_radius", appearance.get("corner_radius") in CORNER_RADII)
-    keep("appearance", "border_size", in_number_range(appearance.get("border_size"), 0, 10))
-    keep("appearance", "reduce_motion", isinstance(appearance.get("reduce_motion"), bool))
-    keep("appearance", "animation_speed", in_number_range(
-        appearance.get("animation_speed"), MOTION_SPEED_RANGE[0], MOTION_SPEED_RANGE[1]))
-    keep("appearance", "search_engine", appearance.get("search_engine") in SEARCH_ENGINES)
-    # Only a template a query cannot be put into is dropped. An empty one is the
-    # state the pane is in for as long as it takes to fill the field in after
-    # choosing "custom", and render_search_engine() already falls back for it --
-    # so clearing search_engine here too would make custom impossible to select.
-    custom = appearance.get("search_custom_url")
-    keep("appearance", "search_custom_url", isinstance(custom, str) and (
-        not custom or "%s" in custom or appearance["search_engine"] != "custom"))
-    keep("appearance", "glass_mode", appearance.get("glass_mode") in {"liquid", "frosted", "off"})
-    keep("appearance", "glass_blur", appearance.get("glass_blur") in GLASS_BLUR_LEVELS)
-    keep("appearance", "glass_transparency",
-         in_number_range(appearance.get("glass_transparency"), 0, GLASS_TRANSPARENCY_MAX))
-    keep("appearance", "glass_edge_width",
-         in_number_range(appearance.get("glass_edge_width"), 4, 128))
-    keep("appearance", "glass_refraction", in_number_range(appearance.get("glass_refraction"), 0, 1))
-    keep("appearance", "glass_clarity", in_number_range(appearance.get("glass_clarity"), 0, 1))
-    keep("appearance", "glass_highlight", in_number_range(appearance.get("glass_highlight"), 0, 1))
+    # Ahead of the pass, so a key whose section is missing entirely is coerced
+    # rather than raising, and so `set` has somewhere to write.
+    for section in VALIDATED_SECTIONS:
+        config.setdefault(section, {})
 
-    general = config.setdefault("general", {})
-    # Held as a desktop id rather than a command so the pane can show the name
-    # and icon the application ships. An id that is no longer installed is left
-    # alone: resolve_terminal() falls back on its own, and the choice is worth
-    # keeping in case the application comes back.
-    keep("general", "terminal", isinstance(general.get("terminal"), str))
-    keep("general", "builtin_launcher", isinstance(general.get("builtin_launcher"), bool))
+    for dotted, entry in PREFERENCE_SCHEMA.items():
+        kind = entry["kind"]
+        if kind == "bookkeeping":
+            continue
+        section, key = dotted.split(".", 1)
+        values = config[section]
+        renames = entry.get("renames")
+        # Withdrawn spellings, before the check and without a note: the same
+        # choice under the name it had when it was made. Only a string can be a
+        # spelling, and the isinstance is load-bearing rather than defensive: a
+        # hand-edited file can carry a TOML array here, and an unhashable value
+        # must reach the kind check that has always been the thing to refuse it.
+        if renames and isinstance(values.get(key), str) and values[key] in renames:
+            values[key] = renames[values[key]]
+        normalise = entry.get("normalise")
+        if normalise is not None:
+            values[key] = normalise(values.get(key))
+            continue
+        value = values.get(key)
+        valid = PREFERENCE_KINDS[kind](entry, value)
+        also = entry.get("also")
+        if valid and also is not None:
+            valid = also(config, value)
+        keep(section, key, entry["default"], valid)
 
-    inputs = config.setdefault("input", {})
-    keep("input", "pointer_sensitivity",
-         in_number_range(inputs.get("pointer_sensitivity"), -1, 1))
-    keep("input", "accel_profile", inputs.get("accel_profile") in {"flat", "adaptive"})
-    keep("input", "repeat_rate", in_number_range(inputs.get("repeat_rate"), 1, 100))
-    keep("input", "repeat_delay", in_number_range(inputs.get("repeat_delay"), 100, 2000))
-    keep("input", "keyboard_layout",
-         isinstance(inputs.get("keyboard_layout"), str) and bool(inputs["keyboard_layout"]))
+    # Last rather than beside the keys that replaced them, because it is the one
+    # step whose order cannot matter: no check above reads a withdrawn key, and
+    # nothing below it does either.
+    for section, withdrawn in WITHDRAWN_KEYS.items():
+        for name in withdrawn:
+            config[section].pop(name, None)
 
-    lock = config.setdefault("lock", {})
-    for key in ("lock_timeout", "display_off_timeout", "suspend_timeout"):
-        keep("lock", key, in_number_range(lock.get(key), 0, 86400))
-
-    region = config.setdefault("region", {})
-    # The set of locales is whatever locale-gen last produced, so a name that was
-    # valid when it was chosen can disappear from under the file. "" is the
-    # no-override state, which always works. Short-circuited on the empty value
-    # so the common case never shells out to locale -a.
-    locale = region.get("locale")
-    keep("region", "locale",
-         isinstance(locale, str) and (not locale or locale in installed_locales()))
-    keep("region", "time_format", region.get("time_format") in TIME_FORMATS)
-    keep("region", "date_format", region.get("date_format") in DATE_FORMATS)
-    keep("region", "first_day_of_week", region.get("first_day_of_week") in FIRST_WEEKDAYS)
-
-    workspaces = config.setdefault("workspaces", {})
-    keep("workspaces", "mode", workspaces.get("mode") in WORKSPACE_MODES)
-    keep("workspaces", "default_count",
-         in_number_range(workspaces.get("default_count"), 1, WORKSPACE_COUNT_MAX))
-    keep("workspaces", "shared_count",
-         in_number_range(workspaces.get("shared_count"), 1, WORKSPACE_COUNT_MAX))
-    keep("workspaces", "indicator", isinstance(workspaces.get("indicator"), bool))
-    # Written back as whatever parsing understood rather than checked in place.
-    # The pane sends the whole map on every edit, so normalising here means a
-    # hand-typed stray comma is dropped once instead of being carried back out
-    # to the file on every later save.
-    workspaces["counts"] = format_workspace_counts(
-        parse_workspace_counts(workspaces.get("counts")))
     # stderr rather than the snapshot: the pane has one channel for this, .error,
     # and it means "the command did nothing" -- putting a coercion there would
     # report a working desktop as a broken one. Nothing in the QML reads a
@@ -3159,6 +3538,19 @@ def apply_region(config: dict) -> None:
     reload_bar()
 
 
+def apply_bar_workspaces(config: dict) -> None:
+    """Publish the bar's module list and signal the bar to re-read it.
+
+    The same shape as apply_region() above, and paired the same way with its own
+    renderer, because reload_bar() takes no configuration of its own and a route
+    step is always handed one. The compositor is deliberately untouched: the
+    workspaces, their rules and their keys do not depend on whether the bar
+    lists them.
+    """
+    render_bar_workspaces(config)
+    reload_bar()
+
+
 def render_theme(config: dict) -> None:
     """Write every file the resolved palette decides. Pure: nothing is signalled.
 
@@ -3363,120 +3755,88 @@ def apply_preferences(config: dict, *, restart_idle: bool = True) -> None:
         run(["systemctl", "--user", "restart", "hypridle.service"])
 
 
-def apply_changed_preference(config: dict, dotted: str) -> None:
-    section, key = dotted.split(".", 1)
-    if section == "appearance":
-        if key.startswith("wallpaper"):
-            # No theme work: every palette output is derived from the resolved
-            # scheme alone, including the bar foreground. Nothing reads the
-            # image, so a new wallpaper cannot change what the theme would emit.
-            #
-            # Only the half that is on screen reaches the desktop -- dressing the
-            # light appearance from a dark session must not change what is behind
-            # the pane. wallpaper_fit belongs to neither half, so it always does.
-            other = "light" if resolve_theme(config) == "dark" else "dark"
-            if not key.startswith(f"wallpaper_{other}"):
-                apply_wallpaper(config)
-        elif key == "accent_color":
-            apply_accent(config)
-        elif key.startswith("search_"):
-            render_search_engine(config)
-        elif key == "corner_radius":
-            render_preferences(config)
-            apply_corner_radius(config)
-        elif key == "border_size":
-            render_preferences(config)
-            apply_border(config)
-        elif key in {"reduce_motion", "animation_speed"}:
-            render_preferences(config)
-            apply_motion(config)
-        elif key.startswith("theme_"):
-            # Rewriting a dozen toolkit configs and reloading Hyprland is only
-            # worth it when the palette actually moves. Nothing downstream reads
-            # the mode or the schedule -- render_preferences() picks its
-            # decoration colours from the resolved scheme too -- so an unchanged
-            # scheme means every output would be byte-identical. That also
-            # covers switching to auto at night when dark is already live; the
-            # garage-theme.timer re-checks the schedule every five minutes anyway.
-            if resolve_theme(config) != applied_scheme():
-                apply_theme(config)
-                render_preferences(config)
-                result = run(["hyprctl", "reload"])
-                if result.returncode != 0:
-                    raise SettingsError(result.stderr.strip() or "Unable to reload theme")
-        elif key.startswith("glass_"):
-            render_preferences(config)
-            apply_glass(config)
-        elif key.startswith("night_shift_"):
-            apply_night_shift(config)
-        else:
-            raise SettingsError(f"Unsupported appearance preference: {key}")
-        return
-    if section == "general":
-        if key == "terminal":
-            apply_terminal(config)
-        elif key == "builtin_launcher":
-            # Nothing to reload: the wrapper reads the marker on every press and
-            # the shell watches it, so the switch takes effect as it is written.
-            render_general(config)
-        else:
-            raise SettingsError(f"Unsupported general preference: {key}")
-        return
-    if section == "input":
+def run_or_raise(config: dict, command: list[str], message: str) -> None:
+    """A route step that signals the session and refuses to fail quietly.
+
+    `config` is unused: every step in PREFERENCE_ROUTES is called with it, so the
+    route table can stay data rather than becoming a table of closures.
+    """
+    result = run(command)
+    if result.returncode != 0:
+        raise SettingsError(result.stderr.strip() or message)
+
+
+def apply_live_wallpaper(config: dict, scheme: str) -> None:
+    """Dress the desktop only if the appearance this key belongs to is on screen.
+
+    Dressing the light appearance from a dark session must not change what is
+    behind the pane. wallpaper_fit belongs to neither half, so its route is
+    apply_wallpaper() directly and it always lands.
+    """
+    if resolve_theme(config) == scheme:
+        apply_wallpaper(config)
+
+
+def apply_theme_if_scheme_moved(config: dict) -> None:
+    """Re-theme the session, but only when the palette actually moves.
+
+    Rewriting a dozen toolkit configs and reloading Hyprland is only worth it
+    then. Nothing downstream reads the mode or the schedule --
+    render_preferences() picks its decoration colours from the resolved scheme too
+    -- so an unchanged scheme means every output would be byte-identical. That
+    also covers switching to auto at night when dark is already live; the
+    garage-theme.timer re-checks the schedule every five minutes anyway.
+    """
+    if resolve_theme(config) != applied_scheme():
+        apply_theme(config)
         render_preferences(config)
-        result = run(["hyprctl", "reload"])
-        if result.returncode != 0:
-            raise SettingsError(result.stderr.strip() or "Unable to reload input settings")
-        return
-    if section == "lock":
-        # Nothing but hypridle.conf: the whole lock section is timeouts, and no
-        # other fragment carries one. Narrow also because the restart below is
-        # synchronous and its ExecStartPre re-enters this binary as `garage
-        # render-idle` -- all of this runs with PREFERENCES_LOCK held by `set`,
-        # so the re-entrant render must stay on a path that never takes it.
-        render_idle(config)
-        result = run(["systemctl", "--user", "restart", "hypridle.service"])
-        if result.returncode != 0:
-            raise SettingsError(result.stderr.strip() or "Unable to reload idle settings")
-        return
-    if section == "region":
-        if key == "locale":
-            apply_locale(config)
-        # Every region key reaches the bar clock -- the locale names its weekday
-        # and month, the rest shape the format string -- so all four take the
-        # same route out.
-        apply_region(config)
-        return
-    if section == "workspaces":
-        if key == "indicator":
-            # Nothing in the compositor depends on this: it only decides whether
-            # the bar lists the module, so the desktop is left alone.
-            render_bar_workspaces(config)
-            reload_bar()
-            return
-        # Salvage first, reload second: the windows have to be moved while the
-        # workspaces they are on are still the ones the compositor knows about,
-        # and while render_workspaces has not yet overwritten the only record of
-        # the plan they were placed under. Remap before reap, so a window is
-        # inside its own display's block before anything asks which block it is
-        # in.
-        plan = workspace_plan(config)
-        showing = active_workspaces()
-        moves = remap_workspaces(plan)
-        reap_stranded_windows(plan)
-        render_workspaces(config)
-        # A full reload, not an eval: workspace rules are collected as the config
-        # is parsed, and the binds are registered by the same pass. Both have to
-        # come back together or the keys would address a layout that no longer
-        # exists.
-        result = run(["hyprctl", "reload"])
-        if result.returncode != 0:
-            raise SettingsError(result.stderr.strip() or "Unable to reload workspaces")
-        # Last, because it needs the surviving slots to be back on their own
-        # displays before it sends anyone to one.
-        restore_active_workspaces(plan, moves, showing)
-        return
-    raise SettingsError(f"Unsupported preference section: {section}")
+        run_or_raise(config, ["hyprctl", "reload"], "Unable to reload theme")
+
+
+def apply_workspace_plan(config: dict) -> None:
+    """Move the session onto a new workspace plan without losing any windows."""
+    # Salvage first, reload second: the windows have to be moved while the
+    # workspaces they are on are still the ones the compositor knows about, and
+    # while render_workspaces has not yet overwritten the only record of the plan
+    # they were placed under. Remap before reap, so a window is inside its own
+    # display's block before anything asks which block it is in.
+    plan = workspace_plan(config)
+    showing = active_workspaces()
+    moves = remap_workspaces(plan)
+    reap_stranded_windows(plan)
+    render_workspaces(config)
+    # A full reload, not an eval: workspace rules are collected as the config is
+    # parsed, and the binds are registered by the same pass. Both have to come
+    # back together or the keys would address a layout that no longer exists.
+    run_or_raise(config, ["hyprctl", "reload"], "Unable to reload workspaces")
+    # Last, because it needs the surviving slots to be back on their own displays
+    # before it sends anyone to one.
+    restore_active_workspaces(plan, moves, showing)
+
+
+def apply_changed_preference(config: dict, dotted: str) -> None:
+    """Move the running session onto one changed key, and nothing else.
+
+    The dispatch is PREFERENCE_SCHEMA's `route` field, walked through
+    PREFERENCE_ROUTES: this used to be a second copy of the schema written as a
+    ladder of string prefixes -- `key.startswith("glass_")` and the rest -- which
+    is what let a new key be added, saved, and then silently never applied,
+    because the ladder's final `else` was the only thing that would have said so.
+    """
+    section, key = dotted.split(".", 1)
+    entry = PREFERENCE_SCHEMA.get(dotted)
+    route = entry.get("route") if entry is not None else None
+    if route is None:
+        route = SECTION_ROUTES.get(section)
+    if route is None:
+        # appearance and general name the key, because both have always been able
+        # to: every one of their keys routes somewhere of its own.
+        if section in {"appearance", "general"}:
+            raise SettingsError(f"Unsupported {section} preference: {key}")
+        raise SettingsError(f"Unsupported preference section: {section}")
+    for step in PREFERENCE_ROUTES[route]:
+        name, *arguments = (step,) if isinstance(step, str) else step
+        globals()[name](config, *arguments)
 
 
 def json_command(command: list[str], fallback: object) -> object:
