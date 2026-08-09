@@ -715,7 +715,7 @@ def validate_preferences(config: dict, sink: list[str] | None = None) -> dict:
     keep("appearance", "search_engine", appearance.get("search_engine") in SEARCH_ENGINES)
     # Only a template a query cannot be put into is dropped. An empty one is the
     # state the pane is in for as long as it takes to fill the field in after
-    # choosing "custom", and apply_search_engine() already falls back for it --
+    # choosing "custom", and render_search_engine() already falls back for it --
     # so clearing search_engine here too would make custom impossible to select.
     custom = appearance.get("search_custom_url")
     keep("appearance", "search_custom_url", isinstance(custom, str) and (
@@ -1065,7 +1065,27 @@ end
 '''
     lua += "\n" + motion_lua(config)
     write_lua(HYPRLAND_FRAGMENT, lua)
+    render_idle(config)
 
+
+def render_idle(config: dict) -> None:
+    """Write hypridle.conf from the lock preferences, and nothing else.
+
+    Its own function because it is its own entry point: `garage render-idle` is
+    hypridle.service's ExecStartPre, and hypridle reads exactly this one file --
+    the generated config names no include and sources nothing, so there is
+    nothing else for that unit to need. Narrow on purpose. It used to run the
+    full render there, which meant restarting hypridle to pick up a new lock
+    timeout also re-themed every toolkit, reloaded the compositor and pushed
+    gsettings, from inside the `set lock.*` that asked for the restart.
+
+    Nothing here takes PREFERENCES_LOCK, and nothing here may ever be made to.
+    `set lock.*` holds that lock across a *synchronous* `systemctl restart
+    hypridle.service`, whose ExecStartPre re-enters this binary and runs this
+    function: waiting on the lock here would deadlock the setting against
+    itself.
+    """
+    GENERATED.mkdir(parents=True, exist_ok=True)
     lock = config["lock"]
     listeners: list[str] = []
     if int(lock["lock_timeout"]) > 0:
@@ -1095,12 +1115,22 @@ general {
     atomic_write(HYPRIDLE_CONFIG, idle)
 
 
-def apply_accent(config: dict) -> None:
+def render_accent(config: dict) -> None:
+    """Publish the accent for the shell to read. The file half of apply_accent."""
+    write_marker(ACCENT_FILE, str(config["appearance"]["accent_color"]) + "\n")
+
+
+def push_accent(config: dict) -> None:
+    """Push the accent into GNOME's interface settings. The world half."""
     accent = str(config["appearance"]["accent_color"])
-    write_marker(ACCENT_FILE, accent + "\n")
     schema = run(["gsettings", "range", "org.gnome.desktop.interface", "accent-color"])
     if schema.returncode == 0 and f"'{accent}'" in schema.stdout:
         run(["gsettings", "set", "org.gnome.desktop.interface", "accent-color", accent])
+
+
+def apply_accent(config: dict) -> None:
+    render_accent(config)
+    push_accent(config)
 
 
 def load_display_config() -> dict:
@@ -1971,19 +2001,36 @@ def keybindings_snapshot(document: dict) -> dict:
 
 
 def render_all(config: dict) -> None:
-    # First, so that on a machine which has never had a saved layout the
-    # workspace plan and the display fragment below are both rendered from one --
-    # the same one, describing the monitors actually attached.
-    initialize_display_config()
+    """Write every generated fragment from the stored configuration.
+
+    Pure, and that is the contract rather than a happy accident: this writes
+    files and signals nothing. No gsettings, no service restart, no pkill, no
+    `hyprctl eval` or `reload`. Everything that moves the running desktop lives
+    on the apply side -- push_accent(), push_corner_radius(), push_theme(),
+    apply_wallpaper(), apply_night_shift() -- and apply_preferences() is where
+    the two halves are put back together.
+
+    It used to apply as well, which made every caller an applier whether it
+    wanted to be or not: hypridle.service's ExecStartPre ran `garage render`, so
+    restarting the locker to pick up a new lock timeout re-themed every toolkit,
+    pushed gsettings and reloaded the compositor -- and at session start it did
+    all of that a second time, once from that unit and once from the `garage
+    apply` in autostart.lua.
+
+    `hyprctl monitors` still runs from render_workspaces(), through
+    workspace_outputs(). That is a question, not an instruction: the plan cannot
+    be written without knowing which displays exist. Nothing here answers back.
+    """
     render_preferences(config)
     render_keybinds(load_keybindings())
     render_general(config)
     render_region(config)
     render_workspaces(config)
     render_bar_workspaces(config)
-    apply_accent(config)
-    apply_corner_radius(config)
-    apply_theme(config)
+    render_accent(config)
+    render_corner_radius(config)
+    render_theme(config)
+    render_wallpaper(config)
     layout = load_display_config()
     if layout["displays"]:
         render_displays(layout)
@@ -2106,7 +2153,14 @@ def wallpaper_target(config: dict, scheme: str) -> Path | None:
     return path
 
 
-def apply_wallpaper(config: dict) -> None:
+def apply_wallpaper(config: dict, *, config_changed: bool | None = None) -> None:
+    """Put the resolved wallpaper on screen.
+
+    `config_changed` is for the one caller that has already rendered
+    hyprpaper.conf itself -- apply_preferences(), where render_all() writes it --
+    and so has taken the changed/unchanged answer this would otherwise compute.
+    None means "render it now and see", which is every other caller.
+    """
     path = wallpaper_target(config, resolve_theme(config))
     if path is None:
         return
@@ -2117,7 +2171,8 @@ def apply_wallpaper(config: dict) -> None:
     temporary.symlink_to(path)
     os.replace(temporary, CURRENT_WALLPAPER)
 
-    if render_wallpaper(config):
+    moved = render_wallpaper(config) if config_changed is None else config_changed
+    if moved:
         run(["systemctl", "--user", "restart", "hyprpaper.service"])
         return
 
@@ -2173,10 +2228,14 @@ def resolve_theme(config: dict) -> str:
 
 
 def applied_scheme() -> str:
-    """The palette apply_theme() last published, or "" if it never has.
+    """The palette the desktop was last moved onto, or "" if it never has.
 
-    SCHEME_FILE is written by apply_theme() and nothing else, so it is by
-    definition the scheme currently live on the desktop.
+    SCHEME_FILE is written by push_theme() and nothing else -- in particular not
+    by render_theme(), which writes the toolkit files -- so it is by definition
+    the scheme currently live rather than the scheme last generated. That is what
+    makes it usable as the change gate: a render that wrote the files without
+    pushing them must still leave this saying what is on screen, or `theme-sync`
+    and `set appearance.theme_*` would both skip the apply that was still owed.
     """
     try:
         return SCHEME_FILE.read_text(encoding="utf-8").strip()
@@ -2431,12 +2490,16 @@ general="IBM Plex Sans,10,-1,5,50,0,0,0,0,0"
 ''')
 
 
-def apply_search_engine(config: dict) -> None:
+def render_search_engine(config: dict) -> None:
     """Publish the resolved search URL template.
 
     The launcher reads a resolved template, so it never has to know the engine
     list or how a custom entry is stored. This is the whole of what a search
     change needs: it touches no palette, so it must not drag in apply_theme.
+
+    A render, not an apply, and named for it: the launcher opens the marker on
+    every press and the shell watches it, so writing the file *is* the change
+    landing. There is no world half to pair this with.
     """
     GENERATED.mkdir(parents=True, exist_ok=True)
     engine = str(config["appearance"]["search_engine"])
@@ -2774,14 +2837,35 @@ def apply_region(config: dict) -> None:
     reload_bar()
 
 
-def apply_theme(config: dict) -> None:
-    """Write the resolved palette everywhere and reload what can be reloaded.
+def render_theme(config: dict) -> None:
+    """Write every file the resolved palette decides. Pure: nothing is signalled.
 
-    Only generated paths are written. Everything under ~/.config is a stow
-    symlink into the dotfiles repo, so writing there would edit tracked files and
-    leave the working tree dirty on every switch.
+    Only generated paths are written. Everything under ~/.config that this
+    checkout tracks is a stow symlink into the dotfiles repo, so writing there
+    would edit tracked files and leave the working tree dirty on every switch.
+
+    SCHEME_FILE is deliberately *not* written here. It is the witness the change
+    gate reads -- applied_scheme() -- so it has to mean "this palette is live on
+    the desktop", not "these files have been written". Writing it from a pure
+    render would make `theme-sync` and `set appearance.theme_*` skip the apply
+    that was still owed.
     """
     GENERATED.mkdir(parents=True, exist_ok=True)
+    scheme = resolve_theme(config)
+    render_search_engine(config)
+    # The bar's widgets draw their own SVG text, which no stylesheet reaches.
+    # Publish the resolved theme foreground so they match Waybar's CSS.
+    write_marker(BAR_FG_FILE, ("#ffffff" if scheme == "dark" else "#000000") + "\n")
+    render_toolkits(scheme)
+
+
+def push_theme(config: dict) -> None:
+    """Move the running desktop onto the palette render_theme() just wrote.
+
+    The world half, and the one that publishes SCHEME_FILE: from here on
+    applied_scheme() answers with this scheme, which is true because everything
+    below has been told about it.
+    """
     scheme = resolve_theme(config)
     look = THEME_TOOLKITS[scheme]
 
@@ -2805,14 +2889,6 @@ def apply_theme(config: dict) -> None:
     if target is not None and str(target.resolve()) != current_wallpaper():
         apply_wallpaper(config)
 
-    apply_search_engine(config)
-
-    # The bar's widgets draw their own SVG text, which no stylesheet reaches.
-    # Publish the resolved theme foreground so they match Waybar's CSS.
-    bar_fg = "#ffffff" if scheme == "dark" else "#000000"
-    write_marker(BAR_FG_FILE, bar_fg + "\n")
-    render_toolkits(scheme)
-
     # GTK4 and libadwaita follow the portal setting live.
     run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", look["scheme"]])
     run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", look["gtk"]])
@@ -2828,6 +2904,12 @@ def apply_theme(config: dict) -> None:
     run(["pkill", "-USR2", "-x", "waybar"])
     run(["pkill", "-USR1", "-x", "kitty"])
     run(["systemctl", "--user", "try-restart", "swayosd.service"])
+
+
+def apply_theme(config: dict) -> None:
+    """Write the resolved palette everywhere, then move the desktop onto it."""
+    render_theme(config)
+    push_theme(config)
 
 
 def eval_config(body: str) -> subprocess.CompletedProcess[str]:
@@ -2877,16 +2959,20 @@ def apply_glass(config: dict) -> None:
                             or "Unable to apply glass settings")
 
 
-def apply_corner_radius(config: dict) -> None:
-    """Publish the corner radius to the shell and the running compositor.
+def render_corner_radius(config: dict) -> None:
+    """Publish the corner radius for the shell to read. The file half."""
+    # Quickshell watches this marker, so its surfaces re-round with no restart.
+    write_marker(CORNER_RADIUS_FILE, f"{corner_rounding(config)}\n")
 
-    Not fatal when either half fails: this also runs from render_all() at
-    session start, where the compositor may not be up yet, and the generated
-    fragment carries the same values into the next reload regardless.
+
+def push_corner_radius(config: dict) -> None:
+    """Push the corner radius into the running compositor. The world half.
+
+    Not fatal when it fails: this also runs from apply_preferences() at session
+    start, where the compositor may not be up yet, and the generated fragment
+    carries the same values into the next reload regardless.
     """
     rounding = corner_rounding(config)
-    # Quickshell watches this marker, so its surfaces re-round with no restart.
-    write_marker(CORNER_RADIUS_FILE, f"{rounding}\n")
     if eval_config(
         f"decoration = {{rounding = {rounding}, rounding_power = {CORNER_POWER:g}}}, "
         f"plugin = {{kinetik_glass = {{layer_rounding = {rounding}, corner_power = {CORNER_POWER:g}}}, "
@@ -2895,6 +2981,11 @@ def apply_corner_radius(config: dict) -> None:
         # A plugin that never loaded takes the whole eval down with it, so the
         # guarded fragment is the only thing that can apply this correctly.
         run(["hyprctl", "reload"])
+
+
+def apply_corner_radius(config: dict) -> None:
+    render_corner_radius(config)
+    push_corner_radius(config)
 
 
 def apply_border(config: dict) -> None:
@@ -2923,9 +3014,28 @@ def apply_night_shift(config: dict) -> None:
 
 
 def apply_preferences(config: dict, *, restart_idle: bool = True) -> None:
+    """Render everything, then move the whole running session onto it.
+
+    The session-start path, from autostart.lua, and the only command that is
+    supposed to touch every subsystem at once. `render` is the pure half of this.
+    """
+    # First, so that on a machine which has never had a saved layout the
+    # workspace plan and the display fragment are both rendered from one -- the
+    # same one, describing the monitors actually attached. On the apply side
+    # because it is the only part of a render that needs a live compositor to
+    # answer, and because session start is the moment it exists for.
+    initialize_display_config()
+    # Ahead of render_all(), which writes the same file: the restart below is
+    # owed exactly when hyprpaper.conf moved, and only the first writer can see
+    # that it did. hyprpaper reads fit_mode once, at startup, and exposes no
+    # reload.
+    paper_moved = render_wallpaper(config)
     render_all(config)
+    push_accent(config)
+    push_corner_radius(config)
+    push_theme(config)
     run(["hyprctl", "reload"])
-    apply_wallpaper(config)
+    apply_wallpaper(config, config_changed=paper_moved)
     apply_night_shift(config)
     if restart_idle:
         run(["systemctl", "--user", "restart", "hypridle.service"])
@@ -2948,7 +3058,7 @@ def apply_changed_preference(config: dict, dotted: str) -> None:
         elif key == "accent_color":
             apply_accent(config)
         elif key.startswith("search_"):
-            apply_search_engine(config)
+            render_search_engine(config)
         elif key == "corner_radius":
             render_preferences(config)
             apply_corner_radius(config)
@@ -2997,7 +3107,12 @@ def apply_changed_preference(config: dict, dotted: str) -> None:
             raise SettingsError(result.stderr.strip() or "Unable to reload input settings")
         return
     if section == "lock":
-        render_preferences(config)
+        # Nothing but hypridle.conf: the whole lock section is timeouts, and no
+        # other fragment carries one. Narrow also because the restart below is
+        # synchronous and its ExecStartPre re-enters this binary as `garage
+        # render-idle` -- all of this runs with PREFERENCES_LOCK held by `set`,
+        # so the re-entrant render must stay on a path that never takes it.
+        render_idle(config)
         result = run(["systemctl", "--user", "restart", "hypridle.service"])
         if result.returncode != 0:
             raise SettingsError(result.stderr.strip() or "Unable to reload idle settings")
@@ -3452,20 +3567,32 @@ def action(name: str, value: object | None) -> None:
     elif name == "notifications.clear":
         run(["swaync-client", "-C"], check=True)
     elif name == "glass.reset":
-        config = load_preferences()
-        defaults = load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
-        # Every material preference is a glass_ key, so this needs no list of
-        # its own to keep in step with the schema.
-        for key, fallback in defaults["appearance"].items():
-            if key.startswith("glass_"):
-                config["appearance"][key] = fallback
-        validate_preferences(config)
-        atomic_write(PREFERENCES_PATH, dump_toml(config))
-        render_preferences(config)
-        # The same live push a single slider takes, rather than the full reload
-        # this used to do: apply_glass now covers the core decoration options
-        # too, and falls back to a reload itself if the eval cannot land.
-        apply_glass(config)
+        # Under PREFERENCES_LOCK, exactly like `set`: this is another whole-file
+        # read-modify-write, and the pane can fire it while a slider elsewhere in
+        # the same pane is still writing. Unserialised, the loser's copy predates
+        # the winner's keys and the last writer restores them. Safe to lock here
+        # -- unlike anything on the render path -- because nothing below restarts
+        # a service whose ExecStartPre re-enters this binary.
+        PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
+        with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            config = load_preferences()
+            defaults = load_toml(DEFAULTS_PATH, FALLBACK_DEFAULTS)
+            # Every material preference is a glass_ key, so this needs no list of
+            # its own to keep in step with the schema.
+            for key, fallback in defaults["appearance"].items():
+                if key.startswith("glass_"):
+                    config["appearance"][key] = fallback
+            validate_preferences(config)
+            atomic_write(PREFERENCES_PATH, dump_toml(config))
+            render_preferences(config)
+            # The same live push a single slider takes, rather than the full
+            # reload this used to do: apply_glass now covers the core decoration
+            # options too, and falls back to a reload itself if the eval cannot
+            # land. Inside the lock for the same reason `set` applies inside it:
+            # a stale apply landing last would leave the desktop disagreeing
+            # with the file.
+            apply_glass(config)
     elif name.startswith("keybind."):
         keybind_action(name.split(".", 1)[1], value)
     elif name.startswith("defaults."):
@@ -4236,7 +4363,16 @@ def update(argv: list[str]) -> int:
         # runs inside load_preferences(), so a pull that bumped the schema is
         # applied here. The corrected file itself is written on the next save,
         # which is the same contract every other command works under.
-        render_all(load_preferences())
+        preferences = load_preferences()
+        render_all(preferences)
+        # render_all() only writes files now. These three are what it used to
+        # push from inside itself, and an update still owes them: the toolkit
+        # configs it just rewrote are half a theme until the portal setting,
+        # xsettingsd and the two signalled clients agree with them. The
+        # compositor's own reload is step 6, which knows how to skip a TTY.
+        push_accent(preferences)
+        push_corner_radius(preferences)
+        push_theme(preferences)
         note(f"rewrote the fragments under {tilde(GENERATED)}.")
 
     # ---- 5. plugins --------------------------------------------------------
@@ -4306,7 +4442,8 @@ Human commands:
 
 Settings backend (each prints one JSON object: {"ok","data","error"}):
   snapshot                the whole live state, and the default with no command
-  render                  rewrite every generated fragment
+  render                  rewrite every generated fragment (files only, applies nothing)
+  render-idle             rewrite hypridle.conf only (hypridle's ExecStartPre)
   render-bar              rewrite the bar's fragments only (waybar's ExecStartPre)
   render-wallpaper        rewrite hyprpaper.conf only (hyprpaper's ExecStartPre)
   apply                   render, then push everything into the running session
@@ -4347,21 +4484,32 @@ def main(argv: list[str]) -> int:
         if command == "snapshot":
             response(make_snapshot())
         elif command == "render":
+            # Files only. Every fragment is rewritten and nothing is signalled:
+            # see render_all(). `apply` is the one that also moves the session.
             render_all(load_preferences())
+            response(True)
+        elif command == "render-idle":
+            # hypridle's ExecStartPre. One file, which is all hypridle reads --
+            # and all it may render, because `set lock.*` restarts that unit
+            # synchronously while holding PREFERENCES_LOCK. See render_idle().
+            render_idle(load_preferences())
             response(True)
         elif command == "render-bar":
             # waybar's modules-left now lives only in the generated fragment, so
             # the bar comes up with an empty left side if it starts before the
             # first render. Its unit runs this first; narrow rather than a full
-            # render, which would re-theme every toolkit at session start.
+            # render, which would rewrite a dozen toolkit configs the bar does
+            # not read. Nothing is signalled: the unit starts the bar right
+            # after, and it reads these on the way up.
             config = load_preferences()
             render_region(config)
             render_bar_workspaces(config)
             response(True)
         elif command == "render-wallpaper":
             # hyprpaper's ExecStartPre. Deliberately not "render": that rewrites
-            # a dozen toolkit configs and restarts three services, which is both
-            # wasteful and racy to chain onto a second unit at session start.
+            # a dozen toolkit configs, which is wasteful to chain onto a second
+            # unit at session start. Nothing is signalled here either -- the unit
+            # starts hyprpaper next, which reads the file it just wrote.
             render_wallpaper(load_preferences())
             response(True)
         elif command == "apply":

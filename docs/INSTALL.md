@@ -138,16 +138,13 @@ In order:
 
 ## Why bootstrap does not render your settings
 
-`garage render` is deliberately not called during the bootstrap. Rendering
-reloads Hyprland through `hyprctl`, which cannot work with no compositor
-running, so from a TTY the render has nothing sensible to do and errors out.
-
-The first full render happens at your first graphical login instead, as
-`hypridle.service`'s `ExecStartPre` (see
-`desktop/.config/systemd/user/hypridle.service.d/garage.conf`). Waybar and
-hyprpaper render their own fragments the same way, through `garage render-bar`
-and `garage render-wallpaper`. This is why the first login takes a few seconds
-longer than the ones after it.
+Nothing renders or applies during the bootstrap — from a TTY there is no
+compositor for the applied half to talk to. The first full render-and-apply
+happens at your first graphical login, driven by the `garage apply` in
+Hyprland's autostart; the waybar, hyprpaper and hypridle units each render
+their own narrow fragment in an `ExecStartPre` (`garage render-bar`,
+`garage render-wallpaper`, `garage render-idle`) on the way up. This is why
+the first login takes a few seconds longer than the ones after it.
 
 The settings CLI that renders and manages preferences is `garage`
 (`~/.local/bin/garage`), with helper commands prefixed `garage-`.

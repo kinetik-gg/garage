@@ -790,7 +790,7 @@ run systemctl --user mask dunst.service || true
 user_units=(
     waybar.service    # + ExecStartPre=garage render-bar
     hyprpaper.service # + ExecStartPre=garage render-wallpaper
-    hypridle.service  # + ExecStartPre=garage render  (the first full render)
+    hypridle.service  # + ExecStartPre=garage render-idle
     hyprsunset.service
     hyprpolkitagent.service
     swaync.service
@@ -806,13 +806,11 @@ user_units=(
 run systemctl --user enable "${user_units[@]}"
 record "enabled ${#user_units[@]} per-user units"
 
-# `garage render` is deliberately NOT called here. render_all() reloads Hyprland
-# through `hyprctl`, which fails with no compositor running and makes the whole
-# render error out -- there is nothing sensible for it to do from a TTY. The
-# first full render happens at the first graphical login instead, as
-# hypridle.service's ExecStartPre (see desktop/.config/systemd/user/
-# hypridle.service.d/garage.conf), with waybar and hyprpaper rendering their own
-# fragments the same way.
+# Nothing renders or applies here. The first full render-and-apply happens at
+# the first graphical login, as the `garage apply` in autostart.lua; the
+# waybar/hyprpaper/hypridle units each render their own narrow fragment in an
+# ExecStartPre on the way up. From a TTY there is no compositor for any of it
+# to talk to.
 
 # ---------------------------------------------------------------------------
 # Toolchains
