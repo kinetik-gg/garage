@@ -1,0 +1,31 @@
+[Unit]
+Description=Check the Hyprland plugins against the running plugin ABI
+Documentation=file:///usr/local/lib/kinetik/kinetik-plugin-hook
+# After=, not Before=: this unit exists to notice that a `pacman -Syu` moved the
+# plugin ABI, and it must never sit between the user and their desktop. Ordering
+# it after the target means the session is already up before it runs, so it
+# cannot delay login however long it takes.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+# The plugins have already been loaded (or not) by the time this runs -- the
+# compositor read hyprland.lua before graphical-session.target was reached. So
+# this cannot fix the session it runs in; it tells the user what to run to fix
+# the next one. It builds nothing, writes nothing and never calls sudo, which is
+# what makes it safe to run unattended: `--check` is a comparison and a
+# notification, nothing more.
+# Leading `-`: this is a diagnostic, and a diagnostic that breaks must not leave
+# a failed unit sitting in the session complaining about itself. `--check` exits
+# 0 on every path it knows about -- including no Hyprland, no plugins ever
+# deployed, and no notification daemon listening -- so this only covers the ones
+# it does not.
+ExecStart=-%h/.config/hypr/scripts/garage-rebuild-plugins --check
+# It is quiet and exits 0 when the deployed plugins match the running ABI, which
+# is every login but the one after an ABI-moving upgrade. A timeout in case
+# `Hyprland --version` ever hangs; a stuck check must not leave a job pending.
+TimeoutStartSec=30
+
+[Install]
+WantedBy=graphical-session.target

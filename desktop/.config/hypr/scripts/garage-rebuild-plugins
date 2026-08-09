@@ -1,10 +1,204 @@
 #!/bin/sh
+#
+# garage-rebuild-plugins [--check]
+#
+# Builds and deploys the pinned Hyprland plugins for the ABI the installed
+# Hyprland reports, under /usr/lib/kinetik/plugins/<abi>/ with two stable
+# symlinks one level up for hyprland.lua to load.
+#
+# --check does the opposite of work: it compares what is deployed against the
+# running ABI, says so if they disagree, and exits. It is what
+# garage-plugins-check.service runs at every graphical login, which is how a
+# `pacman -Syu` that moved the plugin ABI becomes something the user is told
+# about rather than something they discover.
+#
+# The root half of the same story is the pacman hook in
+# /usr/local/lib/kinetik/kinetik-plugin-hook (tracked at
+# system/bin/kinetik-plugin-hook), which cannot build anything and explains
+# itself at length.
+
 set -eu
 
-glass_pin="2a594b7e99e19c71e585a77ccf085134bf379a16"
-hyprexpo_pin="00a451996e26489360eedd3cd621381045a4052c"
+mode=deploy
+case "${1-}" in
+    "") ;;
+    --check) mode=check ;;
+    -h | --help)
+        printf 'Usage: %s [--check]\n' "${0##*/}"
+        printf '\n  (no argument)  build and deploy the pinned plugins for the installed ABI\n'
+        printf '  --check        report whether the deployed plugins match the running ABI\n'
+        exit 0
+        ;;
+    *)
+        echo "Unknown argument: $1 (only --check is accepted)" >&2
+        exit 2
+        ;;
+esac
+
 plugin_root="/usr/lib/kinetik/plugins"
+pins_installed="/usr/lib/kinetik/plugin-pins"
+marker="/var/lib/kinetik/plugins-stale"
 cache_root="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+abi=$(Hyprland --version 2>/dev/null | awk -F ': ' '/Version ABI string:/ { print $2 }')
+if [ -z "$abi" ]; then
+    # --check runs unattended from a systemd user unit at every login. With no
+    # ABI to compare against there is nothing it can usefully say, and failing
+    # would leave a red unit in the session for a question nobody asked.
+    if [ "$mode" = check ]; then
+        exit 0
+    fi
+    echo "Unable to determine the running Hyprland ABI" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# --check
+#
+# The comparison is made against the running ABI and the symlinks on disk, and
+# not against the marker file the pacman hook leaves behind. That is the whole
+# reason this is marker-free:
+#
+#   - "is what is deployed built for the ABI I am running" has a live answer, so
+#     it cannot be wrong, cannot be missed and cannot go stale;
+#   - a marker would have to be cleared once the plugins were back, and the only
+#     process that can prove that is the deploy path below -- which needs sudo,
+#     which a login-time user unit does not have and must never be given
+#     (passwordless sudo for a script that builds from a user-writable tree and
+#     installs the result into /usr/lib is a root escalation, not a
+#     convenience);
+#   - the live comparison additionally catches the cases a marker cannot: a
+#     hand-rolled `pacman -U` downgrade, a build that half-finished, a
+#     /usr/lib wiped by something else.
+#
+# The marker is still read, purely to date the message.
+# ---------------------------------------------------------------------------
+
+# Which ABI directory a stable symlink resolves into, or "" for no link. One hop
+# only, deliberately: the link is absolute and resolving further would follow
+# the .so out of the tree.
+deployed_abi() {
+    target=$(readlink "$1" 2>/dev/null) || return 0
+    case $target in
+        "$plugin_root"/*/*.so) ;;
+        *) return 0 ;;
+    esac
+    target=${target%/*}
+    printf '%s\n' "${target##*/}"
+}
+
+if [ "$mode" = check ]; then
+    behind=""
+    for name in kinetik-glass hyprexpo; do
+        if [ "$(deployed_abi "$plugin_root/$name.so")" != "$abi" ] ||
+            [ ! -e "$plugin_root/$name.so" ]; then
+            behind="$behind $name"
+        fi
+    done
+
+    # Nothing to say. The quiet path, and the one taken at almost every login.
+    [ -n "$behind" ] || exit 0
+
+    # A machine that never had these plugins is not behind on anything -- Glass's
+    # source is not published yet, so most installs are in exactly that state
+    # and must not be nagged at every login. Evidence of a past deployment is a
+    # build sitting in a versioned directory.
+    ever_deployed=0
+    for candidate in "$plugin_root"/*/*.so; do
+        if [ -e "$candidate" ]; then
+            ever_deployed=1
+        fi
+        break
+    done
+    [ "$ever_deployed" = 1 ] || exit 0
+
+    detail=""
+    if [ -r "$marker" ]; then
+        stale_at=$(sed -n 's/^stale_at=//p' "$marker" 2>/dev/null | head -1)
+        if [ -n "$stale_at" ]; then
+            detail=" Hyprland was updated on $stale_at."
+        fi
+    fi
+
+    # Journal first, so this is recoverable when no notification daemon answered.
+    printf 'Hyprland plugins are not built for the running ABI (%s):%s\n' "$abi" "$behind" >&2
+    printf 'Run ~/.config/hypr/scripts/garage-rebuild-plugins to restore them.\n' >&2
+
+    if command -v notify-send >/dev/null; then
+        # Sticky on purpose (--expire-time=0). A toast that fades while the
+        # session is still coming up is a notice that never happened, and this
+        # one asks the user to run a command. It is dismissible like any other.
+        notify-send --app-name=Garage --urgency=normal --expire-time=0 \
+            --icon=dialog-warning \
+            "Hyprland plugins need rebuilding" \
+            "A Hyprland update changed the plugin ABI, so the glass material is off.${detail}
+Run this in a terminal to restore it:
+~/.config/hypr/scripts/garage-rebuild-plugins" || true
+    fi
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Deploy
+#
+# Everything below runs only in deploy mode. --check has already returned, which
+# is why the pins are resolved here rather than at the top: they are needed to
+# name a build, --check never names one, and resolving them can call sudo. A
+# login-time check must not do that, and must not fail on a machine whose pin
+# file has gone missing either.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Pins
+#
+# The pinned commits live in one tracked file, system/plugin-pins, because two
+# processes need them and only one of the two has a checkout: the pacman hook
+# runs as root inside a transaction with no $HOME and reads the copy bootstrap
+# installs at $pins_installed.
+#
+# The tracked copy wins whenever this script can see one, and is pushed into
+# place when the two differ -- so bumping a pin stays a one-file edit and the
+# hook can never go looking for a build of a commit that is no longer pinned.
+# The installed copy is the fallback for a home that no longer has the checkout.
+# ---------------------------------------------------------------------------
+
+# This script reaches $HOME as a stow symlink into the checkout, so the tracked
+# pins sit four directories above the resolved path:
+#   <repo>/desktop/.config/hypr/scripts/garage-rebuild-plugins
+script_path=$(readlink -f "$0")
+pins_repo="${script_path%/*}/../../../../system/plugin-pins"
+
+if [ -f "$pins_repo" ]; then
+    if ! cmp -s "$pins_repo" "$pins_installed" 2>/dev/null; then
+        printf 'Publishing the plugin pins to %s for the pacman hook to read.\n' "$pins_installed"
+        sudo install -D -m 0644 "$pins_repo" "$pins_installed"
+    fi
+    pins_file=$pins_repo
+elif [ -f "$pins_installed" ]; then
+    pins_file=$pins_installed
+else
+    echo "No plugin pins found at $pins_installed or in the checkout." >&2
+    echo "Re-run bootstrap.sh, or restore system/plugin-pins." >&2
+    exit 1
+fi
+
+glass_pin=""
+hyprexpo_pin=""
+# shellcheck source=../../../../system/plugin-pins
+. "$pins_file"
+
+# Each pin becomes a filename and a git revision, so shape-check both before
+# use rather than discovering a typo as a confusing build error.
+valid_pin() {
+    case $1 in
+        *[!0-9a-f]* | "") return 1 ;;
+    esac
+    [ ${#1} -eq 40 ]
+}
+if ! valid_pin "$glass_pin" || ! valid_pin "$hyprexpo_pin"; then
+    echo "$pins_file does not hold two 40-character commit ids." >&2
+    exit 1
+fi
 
 # glass is a first-party repository the user develops in, so it lives in the
 # repository root and this script treats it as read-only. hyprexpo is a pinned
@@ -22,9 +216,6 @@ hyprexpo_repo="$cache_root/hyprland-plugin-src/hyprexpo"
 # Deploy builds never write into the first-party working tree; its own build/
 # directory belongs to the developer's iteration loop.
 glass_build="$cache_root/hyprland-plugin-build/glass"
-
-abi=$(Hyprland --version | awk -F ': ' '/Version ABI string:/ { print $2 }')
-[ -n "$abi" ] || { echo "Unable to determine the running Hyprland ABI" >&2; exit 1; }
 
 require_clean() {
     repo=$1
@@ -72,8 +263,8 @@ prepare_owned_repo() {
     if [ "$head" != "$expected" ]; then
         echo "$repo is at $head but the pin expects $expected." >&2
         echo "This repository is checked out for development and is never moved by this script." >&2
-        echo "Either check out the pinned commit yourself, or update the pin in this script" >&2
-        echo "to the commit you want deployed." >&2
+        echo "Either check out the pinned commit yourself, or update the pin in" >&2
+        echo "system/plugin-pins to the commit you want deployed." >&2
         exit 1
     fi
 }
@@ -100,6 +291,12 @@ fi
 
 sudo ln -sfn "$glass_target" "$plugin_root/kinetik-glass.so"
 sudo ln -sfn "$expo_target" "$plugin_root/hyprexpo.so"
+
+# The pacman hook writes this when it unlinks a stale plugin. Cleared here and
+# nowhere else: this is the only point on the machine where the plugins are
+# provably back, and it is already elevated, so no user-context process ever
+# needs write access to /var/lib to retract the note.
+sudo rm -f "$marker"
 
 printf 'Plugins deployed for Hyprland ABI %s\n' "$abi"
 printf 'Reload Hyprland to activate newly deployed builds.\n'

@@ -1,0 +1,35 @@
+# Installed by bootstrap.sh to /etc/pacman.d/hooks/kinetik-plugins.hook.
+#
+# Fires after any transaction that installs or upgrades hyprland, because that
+# is the transaction that can move the plugin ABI string out from under the
+# deployed Kinetik plugins. See /usr/local/lib/kinetik/kinetik-plugin-hook for
+# what it then does and, at length, why it does not rebuild anything.
+#
+# Target is exactly `hyprland`, not `hyprland-git` and not the hypr* libraries:
+#
+#   - hyprland-git is a different package with its own deployment story, and a
+#     machine running it is a machine whose owner is already rebuilding plugins
+#     by hand. Adding it here would fire this hook on a package Garage does not
+#     install.
+#   - hyprutils, hyprgraphics, aquamarine, hyprcursor and hyprlang all appear in
+#     the ABI string, but they appear as the versions hyprland was *compiled*
+#     against, read from its own compile-time constants. Upgrading one of them
+#     cannot change what `Hyprland --version` reports; it changes the ABI only
+#     by way of the hyprland rebuild that a soname bump forces, and that rebuild
+#     arrives as an hyprland upgrade, which this trigger already catches.
+#
+# Operation Remove is deliberately absent. With hyprland gone there is no ABI to
+# redeploy for and no compositor to load anything, so the correct action is
+# none; the plugins under /usr/lib/kinetik are Garage's to clean up, not
+# pacman's.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = hyprland
+
+[Action]
+Description = Checking the Kinetik Hyprland plugins against the new ABI...
+When = PostTransaction
+Exec = /usr/local/lib/kinetik/kinetik-plugin-hook

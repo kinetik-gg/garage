@@ -119,16 +119,22 @@ In order:
    and `~/.config/gtk-3.0/bookmarks`. These embed an absolute `$HOME`, so they
    are real files rather than links into the repository, and they are only
    written when absent: your edits survive a re-run.
-8. **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset,
+8. **Picks a window material your GPU can afford** (see below). On a machine
+   with a discrete GPU it writes nothing at all.
+9. **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset,
    the polkit agent, SwayNC, SwayOSD, cliphist, xsettingsd, the Garage shell,
-   and the theme and Night Shift timers — and masks `dunst.service` so D-Bus
-   cannot activate it ahead of SwayNC. Nothing is *started*: every unit is
-   wanted by `graphical-session.target` (or `timers.target`) and comes up at
-   your first graphical login.
-9. **Installs the Pure Fish prompt** at a pinned tag and the stable Rust
-   toolchain.
-10. **Deploys the optional Hyprland plugins**, if their source is present.
-11. **Prints a summary and tells you to reboot.**
+   the plugin ABI check, and the theme and Night Shift timers — and masks
+   `dunst.service` so D-Bus cannot activate it ahead of SwayNC. Nothing is
+   *started*: every unit is wanted by `graphical-session.target` (or
+   `timers.target`) and comes up at your first graphical login.
+10. **Installs the Pure Fish prompt** at a pinned tag and the stable Rust
+    toolchain.
+11. **Installs the plugin ABI hook** — a pacman hook, the root script it runs,
+    and the pinned plugin commits (see below). Always, even on a machine with no
+    plugin source: it is the part that notices a broken plugin, so it has to be
+    in place before the upgrade that breaks one.
+12. **Deploys the optional Hyprland plugins**, if their source is present.
+13. **Prints a summary and tells you to reboot.**
 
 ## Why bootstrap does not render your settings
 
@@ -145,6 +151,101 @@ longer than the ones after it.
 
 The settings CLI that renders and manages preferences is `garage`
 (`~/.local/bin/garage`), with helper commands prefixed `garage-`.
+
+## The window material gate
+
+Garage ships `glass_mode = "liquid"`, and Liquid Glass is expensive in a specific
+way: for every glass window, on every damaged frame, the plugin captures the
+whole monitor framebuffer, downscales it and runs a multi-pass blur over it. A
+discrete GPU does not notice. Integrated graphics, sharing memory bandwidth with
+the CPU, cannot keep up, and a first login that stutters reads as a broken
+desktop rather than as a setting.
+
+So the bootstrap decides the default from your hardware, before anything
+renders:
+
+- **A discrete GPU** (NVIDIA, an AMD card, Intel Arc) — nothing is written.
+  Liquid Glass stays.
+- **Integrated graphics only** — it writes a minimal
+  `~/.config/garage/preferences.toml` containing exactly a schema stamp and
+  `glass_mode = "off"`. Every other preference stays absent so it keeps coming
+  from the shipped defaults.
+- **Nothing identifiable** (no `lspci`, no GPU-class PCI device) — nothing is
+  written, and it says so. There is no evidence to act on.
+
+It prints the devices it found and the verdict either way.
+
+Two honest details. **Off, not Frosted**: Frosted looks like the cheap middle
+setting but is not one — it flattens the bevel and still captures and blurs the
+full framebuffer. Only Off skips the plugin's render path, which is the part that
+costs. And this is a **default, not a decision**: change it under System
+Preferences → Appearance, or
+
+```sh
+garage set appearance.glass_mode '"liquid"'
+```
+
+Bootstrap only writes that file when it does not already exist, so a re-run never
+overwrites your choice.
+
+## Day two: what happens when Hyprland updates
+
+Hyprland plugins are locked to the exact compositor build they were compiled
+against — the ABI string is Hyprland's own commit plus the versions of five
+`hypr*` libraries. So any `pacman -Syu` that bumps `hyprland` invalidates the
+deployed Kinetik Glass and `hyprexpo` builds at a stroke. Garage handles that in
+three places, and none of them can cost you your desktop:
+
+1. **Hyprland's config guards the load.** `hyprland.lua` wraps each
+   `hl.plugin.load` in a `pcall`, so a plugin that cannot load leaves you without
+   the glass material and nothing else. The rest of the configuration — binds,
+   window rules, monitors — still applies.
+2. **A pacman hook does the bookkeeping.** After a transaction that installs or
+   upgrades `hyprland`, `/etc/pacman.d/hooks/kinetik-plugins.hook` runs
+   `/usr/local/lib/kinetik/kinetik-plugin-hook` as root. It builds nothing — it
+   is inside your transaction, and a multi-minute compile there would be both
+   slow and fragile. It either re-points a plugin at a build already present for
+   the new ABI (which is what makes a downgrade, or an upgrade back to a version
+   you have built for before, instant and silent), or unlinks the stale one and
+   prints a line into pacman's output telling you what to run. It always exits
+   successfully: no plugin question is worth a failed transaction.
+3. **A login-time check tells you.** `garage-plugins-check.service` runs
+   `garage-rebuild-plugins --check` after your session comes up. It compares the
+   running ABI against what is deployed — a live comparison, so it cannot go
+   stale or be missed — and notifies you if they disagree. It is silent
+   otherwise, never blocks login, and on a machine that never had the plugins it
+   says nothing at all.
+
+To bring the plugins back:
+
+```sh
+~/.config/hypr/scripts/garage-rebuild-plugins
+```
+
+It asks for `sudo` once, since it installs into `/usr/lib/kinetik/plugins`, then
+tells you to reload Hyprland.
+
+**Why isn't this automatic?** Because doing it for you means building Kinetik
+Glass as root out of `~/repositories/glass`, a directory you can write to. That
+is a local root escalation dressed up as a convenience: anything running as you
+could edit the build files and have root run them at the next upgrade. A
+passwordless `sudo` rule for the rebuild script has the same problem. Once Glass
+is published and a root-owned clone can be verified against its pinned commit,
+the rebuild can move into a system service and this becomes invisible. Until
+then it is one command, once, after an upgrade that moved the ABI.
+
+The unlinked build is not deleted: `/usr/lib/kinetik/plugins/<abi>/` keeps every
+plugin you have ever deployed, which is why going back to a Hyprland you have
+used before needs no rebuild at all.
+
+### The pinned commits
+
+Both plugins are pinned, and the pins live in exactly one tracked file,
+`system/plugin-pins`. The bootstrap publishes a copy to
+`/usr/lib/kinetik/plugin-pins` because the pacman hook runs as root with no
+checkout and no `$HOME` to read them from; `garage-rebuild-plugins` re-publishes
+that copy whenever the tracked one changes, so bumping a plugin stays a one-file
+edit.
 
 ## Docker
 
@@ -174,6 +275,21 @@ Honest state of the installer today:
   guards both plugin loads, so the desktop comes up without them — you lose the
   glass material and `hyprexpo`, nothing else. `hyprexpo` is skipped along with
   it, because the deploy script handles both in one pass.
+- **The GPU verdict is a heuristic.** It reads PCI vendor ids and device names:
+  NVIDIA is always discrete, Intel is integrated unless it names itself Arc, and
+  an AMD device is discrete when it carries a card model number or a known GPU
+  family name. A new AMD part that breaks that naming pattern would be
+  misclassified — which costs one setting either way, not a broken install. A
+  virtual adapter (virtio, QXL) counts as integrated, deliberately: software
+  rendering is the last place to run a full-framebuffer blur.
+- **The bootstrap writes `preferences.toml` directly for the GPU gate.** Every
+  other writer of that file is `garage` itself, which is how it should be. The
+  CLI has no way to write a preference without also pushing it into a running
+  compositor, and there is no compositor during the bootstrap — so this one
+  write goes around it, keeps to two keys, and is marked in the source for the
+  render/apply split to remove.
+- **The plugin ABI hook watches `hyprland` only.** A machine switched to
+  `hyprland-git` is on its own; the hook will not fire for it.
 - **A forced install on a used system is not reversible.** Managed paths are
   backed up, but packages and enabled services are not rolled back.
 - **`--dry-run` reports package names against the current sync database.** On a

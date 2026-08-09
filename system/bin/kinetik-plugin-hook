@@ -1,0 +1,302 @@
+#!/bin/sh
+#
+# kinetik-plugin-hook -- the body of the pacman PostTransaction hook on the
+# `hyprland` package. Installed by bootstrap.sh to
+# /usr/local/lib/kinetik/kinetik-plugin-hook.
+#
+# ===========================================================================
+# What this exists for
+# ===========================================================================
+#
+# Hyprland plugins are ABI-locked to the exact compositor they were compiled
+# against: the ABI string is the Hyprland commit plus the versions of five
+# Hypr* libraries. A routine `pacman -Syu` that bumps hyprland therefore
+# invalidates every deployed plugin at once. Garage deploys them under
+# /usr/lib/kinetik/plugins/<abi>/ with two stable symlinks one level up, which
+# is what hyprland.lua loads:
+#
+#   /usr/lib/kinetik/plugins/kinetik-glass.so -> <abi>/kinetik-glass-<pin>.so
+#   /usr/lib/kinetik/plugins/hyprexpo.so      -> <abi>/hyprexpo-<pin>.so
+#
+# After an upgrade those links still resolve, but to a build for the previous
+# ABI. This hook's job is to leave the machine in the best state it can reach
+# without building anything, and to say what it did.
+#
+# ===========================================================================
+# Design: (A), root bookkeeping only. (B), a root-context rebuild, is rejected
+# ===========================================================================
+#
+# The two shapes considered were:
+#
+#   (A) The hook builds nothing. It re-points a stable symlink when a build for
+#       the new ABI already exists, removes the link when it does not, and
+#       prints a line telling the user to run garage-rebuild-plugins.
+#
+#   (B) The hook performs a full rebuild as root from a root-owned pinned clone
+#       under /var/cache/kinetik, falling back to (A) on any failure.
+#
+# (A) is what is implemented, and (B) is not attempted at all, for three
+# reasons that are not going away soon:
+#
+#   1. A pacman hook must be fast and must never fail the transaction. Building
+#      Kinetik Glass is a multi-minute C++ compile against Hyprland's headers.
+#      Deferring it out of the transaction (hook does `systemctl start
+#      --no-block`) would fix the blocking half, but not the next two.
+#
+#   2. Glass has no published upstream yet. The only source on the machine is
+#      the user's own working tree at ~/repositories/glass. A root build of a
+#      CMake project living in a user-writable directory is a local privilege
+#      escalation: anything running as the desktop user can edit CMakeLists.txt
+#      and have root execute it on the next `pacman -Syu`. A root-owned clone
+#      cannot be seeded without a URL to clone from, so (B) reduces to exactly
+#      that escalation. hyprexpo alone does have a public URL, but rebuilding
+#      only hyprexpo leaves the interesting plugin broken and adds a second
+#      pipeline to keep in step.
+#
+#   3. A build wants the network (`git fetch` at the pin) and a pacman
+#      transaction is precisely where the network may have just been used up or
+#      may not exist at all.
+#
+#   (B) becomes worth revisiting once Glass is published: a root-owned clone in
+#   /var/cache/kinetik verified against the pinned object id, built by a
+#   separate oneshot system unit the hook merely nudges, would then be both
+#   unattended and safe. Until then, honest is better than magic.
+#
+# The user-visible cost of (A) is one command with one sudo prompt after an
+# upgrade that moved the ABI. The two things that make that cost bearable are
+# both outside this file: hyprland.lua wraps the plugin load in pcall, so a
+# stale or missing plugin costs the glass material and nothing else; and
+# garage-plugins-check.service notifies at the next graphical login, so the
+# user is told rather than left to notice.
+#
+# ===========================================================================
+# Why the stale symlink is removed rather than left in place
+# ===========================================================================
+#
+# Leaving it would make hyprland.lua's pcall catch a real load failure and file
+# it into `hyprctl configerrors`, which is a visible hint. Removing it means
+# io.open() fails first and the plugin is simply absent, with no error text.
+# The hint is worth less than the risk it buys: loading a plugin compiled
+# against a different Hyprland means dlopen()ing a shared object whose global
+# constructors run against mismatched struct layouts before any version check
+# can reject it. The failure mode there is a compositor that does not start,
+# and a desktop that will not come up is far worse than a desktop that comes up
+# without its glass. Absent cleanly beats failing to load. The lost hint is
+# replaced by the login-time notification, which is more visible than
+# `hyprctl configerrors` was anyway.
+#
+# The versioned <abi>/ directories are never touched. They are the reason a
+# downgrade back to a previously deployed Hyprland re-links instantly instead
+# of rebuilding, and they cost a few megabytes.
+#
+# ===========================================================================
+# Rules this script obeys
+# ===========================================================================
+#
+#   - It always exits 0. A hook that exits non-zero makes pacman report a
+#     failed transaction, and no plugin question is worth that.
+#   - It never builds, never fetches, never touches the network.
+#   - It never writes outside /usr/lib/kinetik/plugins and /var/lib/kinetik.
+#   - It is idempotent: running it twice changes nothing the second time.
+#   - It prints at most a few lines, and only when it has something to say.
+
+# Hooks inherit pacman's environment, which is not guaranteed to carry a useful
+# PATH. Everything used below is coreutils or hyprland itself.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+# Deliberately no `set -e`: every failure below is handled where it happens,
+# and an unexpected non-zero from a probe must not skip the exit 0 at the end.
+set -u
+
+plugin_root=/usr/lib/kinetik/plugins
+pins_file=/usr/lib/kinetik/plugin-pins
+marker_dir=/var/lib/kinetik
+marker=$marker_dir/plugins-stale
+
+# pacman has already printed the hook's Description line, so these are
+# continuation lines under it.
+say() { printf '  %s\n' "$*"; }
+
+# HOOK_TEST=1 makes every mutation a printed intention instead of an action, so
+# the decision logic can be exercised against a real machine's state without
+# changing it. Not a general dry-run flag: pacman never sets it.
+act() {
+    if [ "${HOOK_TEST:-0}" = 1 ]; then
+        printf '  [hook-test] %s\n' "$*"
+        return 0
+    fi
+    "$@"
+}
+
+# Nothing to look after: this machine has never deployed a plugin. The common
+# case on a Garage install, since Glass's source is not published yet.
+[ -d "$plugin_root" ] || exit 0
+
+# ---------------------------------------------------------------------------
+# The new ABI
+#
+# Read from the binary the transaction just installed, which is why this is a
+# PostTransaction hook. `Hyprland --version` prints and exits -- it neither
+# opens a DRM device nor needs a session -- but it is still the compositor
+# binary being run as root inside a transaction, so it gets a timeout and its
+# output is treated as untrusted until it has been shape-checked.
+# ---------------------------------------------------------------------------
+
+# HOOK_TEST_ABI stands in for the reported ABI, so the decision logic can be
+# exercised for an upgrade that has not happened. Gated on HOOK_TEST because
+# PATH is fixed above -- shimming the binary cannot reach this -- and because a
+# real transaction must read the ABI from the binary it just installed and
+# nothing else.
+if [ "${HOOK_TEST:-0}" = 1 ] && [ -n "${HOOK_TEST_ABI:-}" ]; then
+    abi=$HOOK_TEST_ABI
+else
+    abi=$(timeout 10 Hyprland --version 2>/dev/null |
+        awk -F': ' '/Version ABI string:/ { print $2; exit }')
+fi
+
+# A plausible ABI string is the commit plus the library suffixes, and it becomes
+# a path component below, so anything with a slash or whitespace in it is
+# refused rather than joined onto a path.
+case ${abi:-} in
+    "" | *[!A-Za-z0-9._-]*)
+        say "could not read the new Hyprland plugin ABI; leaving the deployed plugins alone."
+        say "if the glass material is missing after the next login, run:"
+        say "    ~/.config/hypr/scripts/garage-rebuild-plugins"
+        exit 0
+        ;;
+esac
+
+# ---------------------------------------------------------------------------
+# The pins
+#
+# Sourced rather than duplicated: garage-rebuild-plugins owns the same two
+# values and keeps this copy in step. Absent is not fatal -- the pins are only
+# needed for the fast re-link path, and a missing file just means every
+# mismatch takes the slow route.
+# ---------------------------------------------------------------------------
+
+glass_pin=""
+hyprexpo_pin=""
+if [ -f "$pins_file" ]; then
+    # shellcheck source=../plugin-pins
+    . "$pins_file"
+fi
+
+# A pin reaches a filename below. Only a full hex object id is accepted.
+valid_pin() {
+    case $1 in
+        *[!0-9a-f]* | "") return 1 ;;
+    esac
+    [ ${#1} -eq 40 ]
+}
+valid_pin "${glass_pin:-}" || glass_pin=""
+valid_pin "${hyprexpo_pin:-}" || hyprexpo_pin=""
+
+# ---------------------------------------------------------------------------
+# Per-plugin decision
+# ---------------------------------------------------------------------------
+
+stale=0
+relinked=0
+
+# Which ABI directory a deployed stable symlink resolves into, or "" when there
+# is no link. One hop only: the link is written absolute by the deploy script,
+# and resolving further would follow the .so's own path out of the tree.
+deployed_abi() {
+    target=$(readlink "$1" 2>/dev/null) || return 0
+    case $target in
+        "$plugin_root"/*/*.so) ;;
+        *) return 0 ;;
+    esac
+    target=${target%/*}
+    printf '%s\n' "${target##*/}"
+}
+
+# name is both the stable link's stem and the versioned build's prefix:
+#   kinetik-glass.so -> <abi>/kinetik-glass-<pin>.so
+handle_plugin() {
+    name=$1
+    pin=$2
+    link=$plugin_root/$name.so
+    current=$(deployed_abi "$link")
+
+    # In step. Checked before anything else so the overwhelmingly common case --
+    # a hyprland rebuild that did not move the ABI string, an -Syu that
+    # reinstalled the same version -- costs one readlink and no output.
+    #
+    # Compared on the ABI directory rather than on the whole path on purpose: a
+    # host sitting on an older pin than the one this file now names is deployed
+    # correctly for its ABI, and re-pointing it at a build that does not exist
+    # is not this hook's business. Pins are the deploy script's problem.
+    if [ -n "$current" ] && [ "$current" = "$abi" ] && [ -e "$link" ]; then
+        return 0
+    fi
+
+    # Fast path: a build for the new ABI is already sitting in the versioned
+    # directory, so the whole redeploy is one symlink write. Reached after a
+    # downgrade to a Hyprland that was deployed for before, or after an upgrade
+    # that lands back on an ABI this machine has already built against.
+    #
+    # This also fires when the stable link is absent entirely, which is how the
+    # machine heals itself after a previous run of this hook removed it: the
+    # .so it points at was put there by garage-rebuild-plugins, so restoring
+    # the link restores this machine's own earlier deployment rather than
+    # inventing a deployment it never had.
+    if [ -n "$pin" ] && [ -f "$plugin_root/$abi/$name-$pin.so" ]; then
+        act ln -sfn "$plugin_root/$abi/$name-$pin.so" "$link"
+        relinked=$((relinked + 1))
+        say "re-pointed $name at the build already present for the new ABI."
+        return 0
+    fi
+
+    # Nothing deployed and nothing to deploy. Silent: a machine that never had
+    # plugins does not want to hear about them on every hyprland upgrade.
+    if [ ! -L "$link" ] && [ ! -e "$link" ]; then
+        return 0
+    fi
+
+    # Stale, and no build to swap in. Remove the link -- see the header for why
+    # absent beats mismatched -- and leave the versioned build in place.
+    act rm -f "$link"
+    stale=$((stale + 1))
+}
+
+handle_plugin kinetik-glass "$glass_pin"
+handle_plugin hyprexpo "$hyprexpo_pin"
+
+# ---------------------------------------------------------------------------
+# The marker
+#
+# Written as a breadcrumb, not as a control signal. Nothing decides anything on
+# its presence: garage-plugins-check compares the running ABI against what is
+# deployed, which is a question with a live answer, so it cannot go stale, needs
+# no write access to /var/lib to clear, and races with nothing. This file only
+# lets the login-time notice say *why* the plugins went away and when.
+#
+# It is cleared by garage-rebuild-plugins, which is already running under sudo
+# at the point where it has succeeded -- so the one process that can prove the
+# plugins are back is also the one that removes the note saying they are not.
+# ---------------------------------------------------------------------------
+
+if [ "$stale" -gt 0 ]; then
+    act mkdir -p "$marker_dir"
+    if [ "${HOOK_TEST:-0}" = 1 ]; then
+        printf '  [hook-test] write %s (abi %s)\n' "$marker" "$abi"
+    else
+        {
+            printf '# Written by the kinetik-plugins pacman hook. Not a control file:\n'
+            printf '# garage-plugins-check compares ABIs and ignores this entirely.\n'
+            printf 'stale_at=%s\n' "$(date -Is 2>/dev/null || echo unknown)"
+            printf 'new_abi=%s\n' "$abi"
+        } >"$marker" 2>/dev/null || true
+    fi
+
+    say "this Hyprland update changed the plugin ABI, so the Kinetik plugins were"
+    say "unlinked rather than left to fail inside the compositor. The desktop comes"
+    say "up without the glass material until they are rebuilt. To restore them:"
+    say "    ~/.config/hypr/scripts/garage-rebuild-plugins"
+    say "you will be reminded at the next graphical login."
+fi
+
+exit 0

@@ -1,0 +1,23 @@
+# Commits the Hyprland plugins are deployed from.
+#
+# Sourced by two readers that cannot see each other's world:
+#
+#   - desktop/.config/hypr/scripts/garage-rebuild-plugins, in the user's
+#     session, which builds and installs from these commits;
+#   - system/bin/kinetik-plugin-hook, as root inside a pacman transaction,
+#     which has no checkout and no $HOME to look in and reads the copy
+#     bootstrap.sh installs at /usr/lib/kinetik/plugin-pins.
+#
+# This file is the single source of truth for both. Bumping a plugin means
+# editing it here and nowhere else; garage-rebuild-plugins refreshes the
+# installed copy from this one whenever the two differ, so the hook cannot end
+# up looking for a build of a commit that is no longer pinned.
+#
+# Format is deliberately plain KEY=VALUE with no expansion, quoting or
+# substitution: both readers are POSIX sh and `.` this file directly, so
+# anything else here would execute in a root shell inside a pacman transaction.
+# Both readers additionally check that each value is a full 40-character hex
+# object id before using it.
+
+glass_pin=2a594b7e99e19c71e585a77ccf085134bf379a16
+hyprexpo_pin=00a451996e26489360eedd3cd621381045a4052c
