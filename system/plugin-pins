@@ -19,5 +19,5 @@
 # Both readers additionally check that each value is a full 40-character hex
 # object id before using it.
 
-glass_pin=2a594b7e99e19c71e585a77ccf085134bf379a16
+glass_pin=e8317e0059584dea3b0b9df9d317809f5abfe816
 hyprexpo_pin=00a451996e26489360eedd3cd621381045a4052c
