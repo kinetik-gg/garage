@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+    region)
+        geometry="$(slurp)" || exit 0
+        grim -g "$geometry" - | wl-copy --type image/png
+        ;;
+    monitor)
+        output="$(slurp -o -r -f '%o')" || exit 0
+        if [[ -z "$output" ]]; then
+            notify-send --urgency=critical --expire-time=2400 "Screenshot failed" "No monitor was selected."
+            exit 1
+        fi
+        grim -o "$output" - | wl-copy --type image/png
+        ;;
+    window)
+        active_workspaces="$(hyprctl monitors -j | jq '[.[] | .activeWorkspace.id, .specialWorkspace.id] | map(select(. != 0))')"
+        windows="$(hyprctl clients -j | jq --argjson active "$active_workspaces" -r '
+            .[]
+            | select(.mapped and (.hidden | not))
+            | select(.pinned or (.workspace.id as $id | $active | index($id)))
+            | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1]) \(.title | gsub("[\\r\\n]"; " "))"
+        ')"
+        if [[ -z "$windows" ]]; then
+            notify-send --urgency=normal --expire-time=2400 "Screenshot" "No visible windows to capture."
+            exit 0
+        fi
+        geometry="$(slurp -r <<< "$windows")" || exit 0
+        grim -g "$geometry" - | wl-copy --type image/png
+        ;;
+    *)
+        echo "usage: garage-screenshot-copy {region|monitor|window}" >&2
+        exit 2
+        ;;
+esac
+
+notify-send --expire-time=1600 "Screenshot copied" "Image is ready to paste from the clipboard."

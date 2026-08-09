@@ -1,0 +1,105 @@
+#!/bin/sh
+set -eu
+
+glass_pin="2a594b7e99e19c71e585a77ccf085134bf379a16"
+hyprexpo_pin="00a451996e26489360eedd3cd621381045a4052c"
+plugin_root="/usr/lib/kinetik/plugins"
+cache_root="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# glass is a first-party repository the user develops in, so it lives in the
+# repository root and this script treats it as read-only. hyprexpo is a pinned
+# third-party checkout with no local history worth keeping, so it stays a
+# disposable clone under the cache and may be re-fetched and detached freely.
+glass_repo="$HOME/repositories/glass"
+# Transition fallback: the repository was renamed from hyprliquid to glass; if
+# the new path has not been checked out yet but the old one is still present,
+# keep working against it rather than failing outright.
+if [ ! -d "$glass_repo" ] && [ -d "$HOME/repositories/hyprliquid" ]; then
+    glass_repo="$HOME/repositories/hyprliquid"
+fi
+hyprexpo_repo="$cache_root/hyprland-plugin-src/hyprexpo"
+
+# Deploy builds never write into the first-party working tree; its own build/
+# directory belongs to the developer's iteration loop.
+glass_build="$cache_root/hyprland-plugin-build/glass"
+
+abi=$(Hyprland --version | awk -F ': ' '/Version ABI string:/ { print $2 }')
+[ -n "$abi" ] || { echo "Unable to determine the running Hyprland ABI" >&2; exit 1; }
+
+require_clean() {
+    repo=$1
+    if [ -n "$(git -C "$repo" status --porcelain)" ]; then
+        echo "$repo has uncommitted or untracked changes." >&2
+        echo "Deployed artefacts are named after a commit, so the tree must match it exactly." >&2
+        echo "Commit, stash or clean the tree and re-run." >&2
+        exit 1
+    fi
+}
+
+# Disposable checkout: fetch and detach onto the pin as needed.
+prepare_managed_repo() {
+    repo=$1
+    url=$2
+    expected=$3
+
+    if [ ! -d "$repo/.git" ]; then
+        git clone "$url" "$repo"
+    else
+        require_clean "$repo"
+    fi
+
+    if ! git -C "$repo" cat-file -e "$expected^{commit}" 2>/dev/null; then
+        git -C "$repo" fetch origin "$expected"
+    fi
+
+    git -C "$repo" checkout --detach "$expected"
+}
+
+# First-party working tree: verify only, never check out. Detaching here would
+# silently move the user off their branch and discard in-progress work.
+prepare_owned_repo() {
+    repo=$1
+    url=$2
+    expected=$3
+
+    if [ ! -d "$repo/.git" ]; then
+        git clone "$url" "$repo"
+    fi
+
+    require_clean "$repo"
+
+    head=$(git -C "$repo" rev-parse HEAD)
+    if [ "$head" != "$expected" ]; then
+        echo "$repo is at $head but the pin expects $expected." >&2
+        echo "This repository is checked out for development and is never moved by this script." >&2
+        echo "Either check out the pinned commit yourself, or update the pin in this script" >&2
+        echo "to the commit you want deployed." >&2
+        exit 1
+    fi
+}
+
+mkdir -p "$(dirname "$hyprexpo_repo")" "$(dirname "$glass_repo")"
+prepare_owned_repo "$glass_repo" "https://github.com/kinetik-gg/glass.git" "$glass_pin"
+prepare_managed_repo "$hyprexpo_repo" "https://github.com/sandwichfarm/hyprexpo.git" "$hyprexpo_pin"
+
+abi_dir="$plugin_root/$abi"
+glass_target="$abi_dir/kinetik-glass-$glass_pin.so"
+expo_target="$abi_dir/hyprexpo-$hyprexpo_pin.so"
+sudo mkdir -p "$abi_dir"
+
+if [ ! -e "$glass_target" ]; then
+    cmake -S "$glass_repo" -B "$glass_build" -DCMAKE_BUILD_TYPE=Release
+    cmake --build "$glass_build" --parallel
+    sudo install -m 0755 "$glass_build/libkinetik-glass.so" "$glass_target"
+fi
+
+if [ ! -e "$expo_target" ]; then
+    make -C "$hyprexpo_repo" all
+    sudo install -m 0755 "$hyprexpo_repo/hyprexpo.so" "$expo_target"
+fi
+
+sudo ln -sfn "$glass_target" "$plugin_root/kinetik-glass.so"
+sudo ln -sfn "$expo_target" "$plugin_root/hyprexpo.so"
+
+printf 'Plugins deployed for Hyprland ABI %s\n' "$abi"
+printf 'Reload Hyprland to activate newly deployed builds.\n'

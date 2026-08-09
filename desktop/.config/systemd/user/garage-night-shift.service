@@ -1,0 +1,8 @@
+[Unit]
+Description=Synchronize Night Shift with Jakarta local time
+After=hyprsunset.service
+Requires=hyprsunset.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/hypr/scripts/garage-night-shift-sync

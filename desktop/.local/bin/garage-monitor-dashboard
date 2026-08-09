@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config="${XDG_CONFIG_HOME:-${HOME}/.config}/waybar/monitor-dashboard-url"
+if [[ ! -s $config ]]; then
+    notify-send "Dashboard" "Set the URL in ${config}"
+    exit 1
+fi
+
+read -r url < "$config"
+exec xdg-open "$url"

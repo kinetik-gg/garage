@@ -1,0 +1,54 @@
+/* Structure only. A palette defines the colours then imports this. */
+window#osd {
+  border: 1px solid @osd_edge;
+  border-radius: 14px;
+  background: @osd_bg;
+  color: @osd_fg;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+window#osd #container {
+  margin: 12px 16px;
+}
+
+window#osd image {
+  color: @osd_fg_muted;
+  -gtk-icon-size: 18px;
+}
+
+window#osd label {
+  color: @osd_fg_muted;
+  min-width: 42px;
+}
+
+window#osd progressbar,
+window#osd segmentedprogress {
+  min-width: 176px;
+  min-height: 5px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+}
+
+window#osd trough,
+window#osd segment {
+  min-height: inherit;
+  border: none;
+  border-radius: inherit;
+  background: @osd_track;
+}
+
+window#osd progress,
+window#osd segment.active {
+  min-height: inherit;
+  border: none;
+  border-radius: inherit;
+  background: @osd_fill;
+}
+
+window#osd progressbar:disabled,
+window#osd image:disabled {
+  opacity: 0.45;
+}

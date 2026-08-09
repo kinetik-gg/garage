@@ -1,0 +1,12 @@
+#!/bin/sh
+
+inhibitor="lock-screen"
+
+cleanup() {
+    swaync-client --inhibitor-remove "$inhibitor" >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT HUP INT TERM
+swaync-client --close-panel >/dev/null 2>&1 || true
+swaync-client --inhibitor-add "$inhibitor" >/dev/null 2>&1 || true
+hyprlock

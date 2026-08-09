@@ -1,0 +1,98 @@
+# Stamped into preferences.toml so a one-shot migration can tell a file written
+# before a value was renamed from one written after. Without it a rename whose
+# new set reuses an old name -- corner_radius normal, which used to mean what
+# large means now -- would re-fire on every load and walk the setting away.
+[schema]
+preferences_version = 4
+
+[appearance]
+# The desktop picture belongs to the appearance, so light and dark each keep
+# their own image, source and colour: a wallpaper chosen for a dark palette is
+# rarely the one that reads on a light one. Fit is shared -- it describes how an
+# image meets the displays, which does not change with the palette.
+wallpaper_light = ""
+wallpaper_dark = ""
+wallpaper_light_source = "image"
+wallpaper_dark_source = "image"
+wallpaper_light_color = "#f5f5f7"
+wallpaper_dark_color = "#1c1c1e"
+wallpaper_fit = "cover"
+accent_color = "blue"
+night_shift_enabled = true
+night_shift_start = "18:00"
+night_shift_end = "06:00"
+night_shift_temperature = 4500
+theme_mode = "dark"
+corner_radius = "normal"
+border_size = 0
+reduce_motion = false
+animation_speed = 1.0
+theme_light_at = "07:00"
+theme_dark_at = "19:00"
+search_engine = "google"
+search_custom_url = ""
+glass_mode = "liquid"
+glass_blur = "normal"
+glass_transparency = 0.04
+glass_edge_width = 24
+glass_refraction = 0.7
+glass_clarity = 0.75
+glass_highlight = 0.12
+
+[general]
+terminal = ""
+builtin_launcher = true
+
+[input]
+pointer_sensitivity = 0.0
+accel_profile = "flat"
+natural_scroll = false
+keyboard_layout = "us"
+repeat_rate = 25
+repeat_delay = 600
+touchpad_tap_to_click = true
+touchpad_natural_scroll = true
+touchpad_disable_while_typing = true
+
+[lock]
+lock_timeout = 600
+display_off_timeout = 900
+suspend_timeout = 0
+
+[workspaces]
+# per-display: every display owns a private block of workspace IDs and a
+# workspace never leaves the display it was allocated to. The block is fixed to
+# the display -- which block is remembered in workspace-blocks.toml -- so no
+# count change and no display coming or going renumbers another display's
+# workspaces. shared: nothing is pinned to a monitor, which is what Hyprland does
+# with no workspace rules at all -- a workspace is created on the display that
+# asks for it and can be carried to another.
+mode = "per-display"
+# How many workspaces a display gets when `counts` says nothing about it: every
+# display on a fresh install, and any display plugged in later. Ten is the hard
+# ceiling everywhere below, because there are only ten number keys to bind, and
+# it is also how wide a display's block of IDs is -- so a count can always grow
+# to the ceiling without ever reaching into the next display's block.
+default_count = 4
+# Per-output counts as "OUTPUT=N", comma separated. Connector names are hardware
+# rather than schema, so they cannot be keys of their own: this file is the
+# merge base for a flat section/key whitelist, which would have to know DP-1
+# before the cable was ever plugged in. Left empty here for the same reason
+# displays.toml is untracked -- the real map is machine-local.
+counts = ""
+# The size of the shared pool, kept apart from the per-display counts because
+# the two modes answer different questions and switching between them must not
+# rewrite the other one's answer.
+shared_count = 8
+# Whether the menu bar shows the workspace indicator at all. Only the bar is
+# affected -- the workspaces, their rules and their keys are untouched.
+indicator = true
+
+[region]
+# Empty means "no override": the session keeps whatever LANG the system locale
+# gives it. Setting the system one needs root through polkit, so this is a
+# per-user override that only the next login can pick up in full.
+locale = ""
+time_format = "24"
+date_format = "dmy"
+first_day_of_week = "sunday"

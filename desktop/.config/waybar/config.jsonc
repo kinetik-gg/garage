@@ -1,0 +1,112 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 36,
+  "margin-top": 0,
+  "margin-right": 0,
+  "margin-bottom": 0,
+  "margin-left": 0,
+  "spacing": 0,
+  // Parked: "custom/media"
+  // modules-left is not here on purpose. The Workspaces pane can hide the
+  // workspace indicator, which means dropping "hyprland/workspaces" from the
+  // list -- and an option named in this file is won by this file, so the
+  // generated fragment included below could never override it. The whole list
+  // lives there instead; without the fragment the left side is simply empty.
+  "modules-center": [],
+  // Parked: "custom/containers", "custom/git", "custom/monitor",
+  //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
+  "modules-right": ["clock"],
+  "hyprland/workspaces": {
+    "format": " ",
+    "on-click": "activate",
+    "sort-by-number": true
+  },
+  "custom/menu": {
+    "format": "",
+    "on-click": "$HOME/.local/bin/garage-menu-toggle",
+    "tooltip": false
+  },
+  "custom/media": {
+    "exec": "$HOME/.config/waybar/media-status.py",
+    "return-type": "json",
+    "interval": 2,
+    "hide-empty-text": true,
+    "tooltip": true,
+    "on-click": "$HOME/.config/waybar/media-status.py --activate",
+    "on-click-middle": "/usr/bin/playerctl --player=playerctld play-pause",
+    "on-click-right": "/usr/bin/playerctl --player=playerctld next",
+    "on-scroll-up": "/usr/bin/playerctl --player=playerctld previous",
+    "on-scroll-down": "/usr/bin/playerctl --player=playerctld next"
+  },
+  "custom/containers": {
+    "exec": "$HOME/.config/waybar/context-status.py containers",
+    "return-type": "json",
+    "interval": 5,
+    "hide-empty-text": true,
+    "tooltip": true
+  },
+  "custom/microphone": {
+    "exec": "$HOME/.config/waybar/context-status.py microphone",
+    "return-type": "json",
+    "interval": 2,
+    "hide-empty-text": true,
+    "tooltip": true
+  },
+  "custom/smb": {
+    "exec": "$HOME/.config/waybar/context-status.py smb",
+    "return-type": "json",
+    "interval": 15,
+    "hide-empty-text": true,
+    "tooltip": true
+  },
+  "custom/git": {
+    "format": "GIT"
+  },
+  "custom/monitor": {
+    "format": "MON",
+    "on-click": "$HOME/.local/bin/garage-monitor-dashboard",
+    "tooltip-format": "Open infrastructure monitor"
+  },
+  // Parked: re-add "image#activity" to modules-right to bring it back.
+  // "image#activity": {
+  //     "exec": "$HOME/.config/waybar/activity-graph.py all",
+  //     "size": 569,
+  //     "interval": 2,
+  //     "tooltip": true
+  //   },
+  "network": {
+    "format-wifi": "󰖩",
+    "format-ethernet": "󰈀",
+    "format-disconnected": "󰖪",
+    "tooltip-format": "{ifname}  {ipaddr}\n{essid}  {signalStrength}%"
+  },
+  "pulseaudio": {
+    "format": "VOL {volume}%",
+    "format-muted": "VOL {volume}%",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 1%+",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-",
+    "tooltip-format": "Volume {volume}%"
+  },
+  "custom/network": {
+    "exec": "$HOME/.config/waybar/system-activity.py network",
+    "return-type": "json",
+    "restart-interval": 5,
+    "tooltip": true
+  },
+  "tray": { "spacing": 11, "icon-size": 19 },
+  // The clock's format, locale and calendar come from Language & Region. This
+  // file is a stow symlink into the dotfiles repo, so the setting cannot be
+  // written here; waybar merges the generated fragment instead, and an option
+  // named in both files is won by this one -- which is why format is not here.
+  // A missing fragment is not an error: the clock falls back to waybar's own
+  // default format. The second fragment carries modules-left, for the same
+  // reason and by the same rule; see the note where modules-left used to be.
+  "include": ["$HOME/.local/state/garage/generated/waybar-clock.jsonc",
+              "$HOME/.local/state/garage/generated/waybar-workspaces.jsonc"],
+  "clock": {
+    "on-click": "swaync-client --toggle-panel",
+    "tooltip-format": "<tt>{calendar}</tt>"
+  }
+}

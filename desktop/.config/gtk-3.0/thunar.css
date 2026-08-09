@@ -1,0 +1,69 @@
+/* Compact Vanta treatment for Thunar. Keep every selector scoped to Thunar. */
+.thunar {
+  background-color: @window_bg_color;
+  color: @window_fg_color;
+}
+
+.thunar toolbar {
+  min-height: 38px;
+  padding: 4px 7px;
+  background-color: @headerbar_bg_color;
+  border-bottom: 1px solid @sidebar_border_color;
+}
+
+.thunar toolbar button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 2px;
+  border-radius: 7px;
+}
+
+.thunar toolbar entry {
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background-color: @view_bg_color;
+}
+
+.thunar .sidebar,
+.thunar .shortcuts-pane,
+.thunar treeview.sidebar {
+  background-color: @sidebar_bg_color;
+  color: @sidebar_fg_color;
+}
+
+.thunar treeview {
+  padding: 2px;
+}
+
+.thunar treeview:selected,
+.thunar iconview:selected {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+}
+
+.thunar statusbar {
+  padding: 3px 8px;
+  border-top: 1px solid @sidebar_border_color;
+  color: @theme_unfocused_fg_color;
+}
+
+.thunar paned > separator {
+  min-width: 1px;
+  min-height: 1px;
+  background-color: @sidebar_border_color;
+}
+
+.thunar notebook > header {
+  background-color: @headerbar_bg_color;
+  border-color: @sidebar_border_color;
+}
+
+.thunar notebook tab {
+  min-height: 28px;
+  padding: 2px 9px;
+}
+
+.thunar .disk-space-usage-bar {
+  min-height: 5px;
+}

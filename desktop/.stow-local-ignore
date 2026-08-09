@@ -1,0 +1,33 @@
+# Stow's built-in ignore list is replaced wholesale once this file exists, so the
+# defaults have to be repeated here.
+RCS
+.+,v
+CVS
+\.\#.+
+\.cvsignore
+\.svn
+_darcs
+\.hg
+\.git
+\.gitignore
+.+~
+\#.*\#
+^/README.*
+^/LICENSE.*
+^/COPYING
+
+# Rendered by garage into ~/.config so the theme switch can
+# rewrite them. Stowing these would make every switch edit a tracked file.
+^/\.config/gtk-3\.0/settings\.ini$
+^/\.config/gtk-4\.0/settings\.ini$
+^/\.config/xsettingsd/xsettingsd\.conf$
+^/\.config/qt6ct/qt6ct\.conf$
+^/\.config/gtk-3\.0/gtk\.css$
+^/\.config/gtk-4\.0/gtk\.css$
+^/\.config/swaync/style\.css$
+^/\.config/rofi/config\.rasi$
+^/\.config/waybar/style\.css$
+^/\.config/swayosd/style\.css$
+^/\.config/kitty/theme\.conf$
+^/\.config/micro/settings\.json$
+^/\.config/btop/themes/vanta\.theme$

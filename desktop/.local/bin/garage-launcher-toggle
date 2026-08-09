@@ -1,0 +1,39 @@
+#!/bin/sh
+# SUPER+Space calls this unconditionally, so turning the built-in launcher off
+# never has to rewrite a keybinding.
+set -eu
+
+# The setting, not preferences.toml: this runs on every press, and starting
+# Python to parse TOML for one boolean would be felt on the keystroke. read is
+# a builtin, so the whole check costs an open. An unreadable or empty marker
+# means the shell's own launcher, which is what a fresh session has.
+mode=builtin
+if [ -r "${XDG_STATE_HOME:-$HOME/.local/state}/garage/generated/launcher" ]; then
+    read -r mode < "${XDG_STATE_HOME:-$HOME/.local/state}/garage/generated/launcher" \
+        || mode=builtin
+fi
+
+if [ "$mode" != external ]; then
+    exec qs -c garage ipc call shell launcher
+fi
+
+# Toggling, not launching: the built-in launcher closes on a second press, and
+# an external one would otherwise stack an instance per press behind its own
+# keyboard grab.
+for launcher in rofi wofi; do
+    command -v "$launcher" >/dev/null 2>&1 || continue
+    if pgrep -x "$launcher" >/dev/null; then
+        pkill -x "$launcher"
+        exit 0
+    fi
+    case "$launcher" in
+        rofi) exec rofi -normal-window -show drun -modes drun ;;
+        wofi) exec wofi --show drun ;;
+    esac
+done
+
+# Neither is installed and the built-in one is switched off, so the key would do
+# nothing at all. Say so instead, and name the way back.
+notify-send --icon=system-search 'No launcher available' \
+    'Install rofi or wofi, or turn the built-in Launcher back on in System Preferences.' \
+    2>/dev/null || hyprctl notify 3 6000 0 'No launcher available'

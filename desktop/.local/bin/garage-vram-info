@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# Report only memory capacities exposed by the driver or a full-size resizable
+# PCI BAR. Small PCI apertures are not VRAM capacity and are deliberately skipped.
+for info in /proc/driver/nvidia/gpus/*/information; do
+    [[ -r "$info" ]] || continue
+    model=$(awk -F ':[[:space:]]*' '$1 == "Model" { print $2; exit }' "$info")
+    bus=$(sed -n 's/^Bus Location:[[:space:]]*//p' "$info")
+    resource="/sys/bus/pci/devices/$bus/resource"
+    [[ -n "$model" && -r "$resource" ]] || continue
+
+    largest=0
+    while read -r start end flags; do
+        (( (flags & 0x2000) != 0 )) || continue
+        size=$((end - start + 1))
+        (( size > largest )) && largest=$size
+    done < "$resource"
+
+    (( largest >= 1073741824 )) && printf '%s\t%s\n' "$model" "$largest"
+done
+
+for card in /sys/class/drm/card[0-9]*; do
+    total="$card/device/mem_info_vram_total"
+    [[ -r "$total" ]] || continue
+    bytes=$(<"$total")
+    (( bytes > 0 )) && printf 'Radeon Graphics\t%s\n' "$bytes"
+done

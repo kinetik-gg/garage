@@ -1,0 +1,31 @@
+# Local/editor noise should never enter the dotfiles repository.
+.DS_Store
+*~
+*.bak
+*.swp
+*.tmp
+__pycache__/
+*.py[cod]
+
+# Keep credentials and machine-generated state out if added later.
+**/hosts.yml
+**/fish_variables
+**/cookie
+**/*.db
+**/*.sqlite*
+
+# systemctl enable creates host-local activation symlinks.
+**/.config/systemd/user/*.target.wants/
+
+# Generated per-user files. bootstrap.sh recreates these with the active home.
+desktop/.config/gtk-3.0/bookmarks
+desktop/.config/swayosd/config.toml
+desktop/.config/waybar/monitor-dashboard-url
+
+# System Preferences keeps writable per-machine state beside tracked defaults.
+desktop/.config/garage/preferences.toml
+desktop/.config/garage/displays.toml
+
+# Generated theme/state fragments now live outside the stow tree entirely, but
+# ignore the path in case anything ever lands one inside the repo checkout.
+.local/state/garage/generated/

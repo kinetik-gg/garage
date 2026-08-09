@@ -1,0 +1,62 @@
+/* Static app rules. The palette import lives in the generated gtk.css. */
+/* Nautilus uses the same quiet hierarchy as the rest of Vanta. */
+window.nautilus-window {
+    background-color: @window_bg_color;
+}
+
+.nautilus-window headerbar {
+    background-color: @window_bg_color;
+    border-bottom: 1px solid @borders;
+    box-shadow: none;
+}
+
+.nautilus-window headerbar button,
+.nautilus-window .nautilus-path-bar button {
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+.nautilus-window headerbar button:hover,
+.nautilus-window .nautilus-path-bar button:hover {
+    color: @theme_fg_color;
+    background-color: @theme_hover_bg_color;
+}
+
+.nautilus-window placessidebar,
+.nautilus-window .navigation-sidebar {
+    min-width: 300px;
+    background-color: @sidebar_bg_color;
+    border: none;
+    box-shadow: none;
+    padding: 8px 4px;
+}
+
+.nautilus-window .navigation-sidebar row {
+    margin: 2px 6px;
+    border-radius: 4px;
+}
+
+.nautilus-window .navigation-sidebar row:hover,
+.nautilus-window columnview row:hover,
+.nautilus-window gridview > child:hover {
+    background-color: @theme_hover_bg_color;
+}
+
+.nautilus-window .navigation-sidebar row:selected,
+.nautilus-window columnview row:selected,
+.nautilus-window gridview > child:selected {
+    color: @theme_selected_fg_color;
+    background-color: @theme_selected_bg_color;
+    border-radius: 4px;
+}
+
+.nautilus-window columnview row {
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.035);
+}
+
+.nautilus-window scrollbar slider {
+    min-width: 5px;
+    min-height: 5px;
+    border-radius: 999px;
+    background-color: alpha(@theme_fg_color, 0.28);
+}

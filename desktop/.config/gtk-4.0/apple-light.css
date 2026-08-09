@@ -1,0 +1,80 @@
+/* Vanta: neutral light GTK4/libadwaita palette, mirroring apple-dark.css.
+   Every token defined there has a counterpart here, so the generated gtk.css can
+   swap the import without leaving anything undefined. */
+@define-color accent_color #007aff;
+@define-color accent_bg_color #007aff;
+@define-color accent_fg_color #ffffff;
+
+@define-color window_bg_color #f2f2f7;
+@define-color window_fg_color #1c1c1e;
+@define-color view_bg_color #ffffff;
+@define-color view_fg_color #1c1c1e;
+@define-color headerbar_bg_color #f5f5f7;
+@define-color headerbar_fg_color #1c1c1e;
+@define-color headerbar_backdrop_color #f2f2f7;
+@define-color sidebar_bg_color #ebebf0;
+@define-color sidebar_fg_color #1c1c1e;
+@define-color sidebar_backdrop_color #f2f2f7;
+@define-color sidebar_border_color rgba(0, 0, 0, 0.12);
+@define-color secondary_sidebar_bg_color #f2f2f7;
+@define-color secondary_sidebar_fg_color #1c1c1e;
+@define-color card_bg_color #ffffff;
+@define-color card_fg_color #1c1c1e;
+@define-color popover_bg_color #ffffff;
+@define-color popover_fg_color #1c1c1e;
+@define-color dialog_bg_color #f5f5f7;
+@define-color dialog_fg_color #1c1c1e;
+@define-color borders rgba(0, 0, 0, 0.12);
+
+@define-color theme_bg_color #f2f2f7;
+@define-color theme_fg_color #1c1c1e;
+@define-color theme_base_color #ffffff;
+@define-color theme_text_color #1c1c1e;
+@define-color theme_selected_bg_color #007aff;
+@define-color theme_selected_fg_color #ffffff;
+@define-color theme_hover_bg_color rgba(0, 0, 0, 0.05);
+@define-color theme_unfocused_bg_color #f2f2f7;
+@define-color theme_unfocused_fg_color #6c6c70;
+@define-color theme_unfocused_selected_bg_color #d1d1d6;
+@define-color theme_unfocused_selected_fg_color #3a3a3c;
+
+@define-color destructive_bg_color #ffdad6;
+@define-color destructive_fg_color #93000a;
+@define-color error_bg_color #ffdad6;
+@define-color error_fg_color #93000a;
+@define-color warning_bg_color #fff4d6;
+@define-color warning_fg_color #614700;
+@define-color success_bg_color #d9f2e3;
+@define-color success_fg_color #0b3d24;
+
+:root {
+    --accent-color: #007aff;
+    --accent-bg-color: #007aff;
+    --accent-fg-color: #ffffff;
+    --window-bg-color: #f2f2f7;
+    --window-fg-color: #1c1c1e;
+    --view-bg-color: #ffffff;
+    --view-fg-color: #1c1c1e;
+    --headerbar-bg-color: #f5f5f7;
+    --headerbar-fg-color: #1c1c1e;
+    --headerbar-backdrop-color: #f2f2f7;
+    --sidebar-bg-color: #ebebf0;
+    --sidebar-fg-color: #1c1c1e;
+    --sidebar-backdrop-color: #f2f2f7;
+    --sidebar-border-color: rgba(0, 0, 0, 0.12);
+    --card-bg-color: #ffffff;
+    --card-fg-color: #1c1c1e;
+    --popover-bg-color: #ffffff;
+    --popover-fg-color: #1c1c1e;
+    --dialog-bg-color: #f5f5f7;
+    --dialog-fg-color: #1c1c1e;
+    --destructive-bg-color: #ffdad6;
+    --destructive-fg-color: #93000a;
+    --error-bg-color: #ffdad6;
+    --error-fg-color: #93000a;
+    --warning-bg-color: #fff4d6;
+    --warning-fg-color: #614700;
+    --success-bg-color: #d9f2e3;
+    --success-fg-color: #0b3d24;
+    --shade-color: rgba(0, 0, 0, 0.12);
+}

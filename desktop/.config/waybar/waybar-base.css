@@ -1,0 +1,125 @@
+/* Structure only. A palette defines the colours then imports this. */
+* {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  font-family: "IBM Plex Sans", "CaskaydiaMono Nerd Font Mono", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+window#waybar {
+  background: @bar_bg;
+  color: @bar_fg;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#custom-menu {
+  padding-left: 13px;
+  padding-right: 10px;
+  color: @menu_fg;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 17px;
+}
+
+#workspaces {
+  padding: 0;
+}
+
+#workspaces button {
+  min-width: 0;
+  min-height: 0;
+  margin: 0 5px;
+  padding: 0;
+  background: transparent;
+  color: transparent;
+  box-shadow: none;
+}
+
+#workspaces button label {
+  min-width: 6px;
+  min-height: 6px;
+  margin: 15px 0;
+  border-radius: 999px;
+  background: @dot_idle;
+  font-size: 0;
+  transition: min-width 180ms ease-out, background-color 180ms ease-out;
+}
+
+#workspaces button:hover label {
+  background: @dot_hover;
+}
+
+#workspaces button.active label,
+#workspaces button.focused label,
+#workspaces button.visible label {
+  min-width: 20px;
+  background: @dot_active;
+}
+
+#workspaces button.urgent label {
+  background: @urgent;
+}
+
+#custom-media,
+#custom-containers,
+#custom-microphone,
+#custom-smb,
+#custom-git,
+#custom-monitor,
+#custom-network,
+#pulseaudio,
+#clock {
+  padding: 0 12px;
+  color: @module_fg;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#custom-media {
+  font-family: "IBM Plex Sans", "CaskaydiaMono Nerd Font", sans-serif;
+}
+
+#custom-git:hover,
+#custom-monitor:hover,
+#clock:hover {
+  color: @module_fg_hover;
+}
+
+#image {
+  padding: 0 8px;
+}
+
+#custom-network {
+  min-width: 124px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+}
+
+#custom-smb.warning {
+  color: @urgent;
+}
+
+#tray {
+  padding: 0 8px;
+}
+
+#pulseaudio.muted {
+  color: @module_fg_muted;
+}
+
+#clock {
+  padding-right: 15px;
+}
+
+tooltip {
+  background: @tooltip_bg;
+  color: @tooltip_fg;
+  border: 1px solid @bar_edge;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px @bar_sheen;
+  padding: 8px;
+}

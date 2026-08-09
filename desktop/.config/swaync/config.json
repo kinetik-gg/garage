@@ -1,0 +1,111 @@
+{
+  "$schema": "/etc/xdg/swaync/configSchema.json",
+  "ignore-gtk-theme": true,
+  "positionX": "right",
+  "positionY": "top",
+  "layer": "overlay",
+  "control-center-layer": "top",
+  "layer-shell": true,
+  "layer-shell-cover-screen": true,
+  "cssPriority": "user",
+  "control-center-margin-top": 4,
+  "control-center-margin-right": 10,
+  "control-center-margin-bottom": 10,
+  "control-center-margin-left": 10,
+  "control-center-width": 390,
+  "control-center-height": 720,
+  "notification-window-width": 390,
+  "notification-2fa-action": true,
+  "notification-inline-replies": true,
+  "notification-body-image-height": 100,
+  "notification-body-image-width": 180,
+  "timeout": 5,
+  "timeout-low": 3,
+  "timeout-critical": 0,
+  "fit-to-screen": false,
+  "relative-timestamps": true,
+  "keyboard-shortcuts": true,
+  "notification-grouping": false,
+  "image-visibility": "when-available",
+  "transition-time": 180,
+  "hide-on-clear": false,
+  "hide-on-action": true,
+  "text-empty": "No Notifications",
+  "scripts": {},
+  "notification-visibility": {},
+  "widgets": [
+    "title",
+    "buttons-grid#connectivity",
+    "buttons-grid#display",
+    "volume",
+    "dnd",
+    "menubar#session",
+    "notifications"
+  ],
+  "widget-config": {
+    "notifications": {
+      "vexpand": true
+    },
+    "title": {
+      "text": "Notifications",
+      "clear-all-button": true,
+      "button-text": "Clear"
+    },
+    "buttons-grid#connectivity": {
+      "buttons-per-row": 2,
+      "actions": [
+        {
+          "label": "Wi-Fi",
+          "type": "toggle",
+          "command": "~/.local/bin/garage-connectivity-toggle wifi set",
+          "update-command": "~/.local/bin/garage-connectivity-toggle wifi status"
+        },
+        {
+          "label": "Bluetooth",
+          "type": "toggle",
+          "command": "~/.local/bin/garage-connectivity-toggle bluetooth set",
+          "update-command": "~/.local/bin/garage-connectivity-toggle bluetooth status"
+        }
+      ]
+    },
+    "buttons-grid#display": {
+      "buttons-per-row": 1,
+      "actions": [
+        {
+          "label": "Night Shift",
+          "type": "toggle",
+          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && ~/.config/hypr/scripts/night-shift-sync enable || ~/.config/hypr/scripts/night-shift-sync disable'",
+          "update-command": "~/.config/hypr/scripts/night-shift-sync status"
+        }
+      ]
+    },
+    "volume": {
+      "label": "Volume",
+      "show-per-app": true,
+      "show-per-app-icon": true,
+      "show-per-app-label": false,
+      "expand-per-app": false,
+      "empty-list-label": "No active audio",
+      "expand-button-label": "+",
+      "collapse-button-label": "−",
+      "animation-type": "slide_down",
+      "animation-duration": 180
+    },
+    "dnd": {
+      "text": "Do Not Disturb"
+    },
+    "menubar#session": {
+      "menu#session": {
+        "label": "Session",
+        "position": "right",
+        "animation-type": "slide_down",
+        "animation-duration": 180,
+        "actions": [
+          { "label": "Lock", "command": "loginctl lock-session" },
+          { "label": "Sleep", "command": "systemctl suspend" },
+          { "label": "Log Out", "command": "uwsm stop" }
+        ]
+      }
+    }
+  }
+}

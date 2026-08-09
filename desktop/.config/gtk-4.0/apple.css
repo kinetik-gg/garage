@@ -1,0 +1,69 @@
+/* Vanta GTK4/libadwaita palette.
+   Both schemes in one file: GTK loads gtk.css once per process, so a
+   per-scheme import would freeze the palette at launch. libadwaita
+   re-evaluates this media query when the portal's color-scheme changes. */
+:root {
+    --accent-color: #007aff;
+    --accent-bg-color: #007aff;
+    --accent-fg-color: #ffffff;
+    --window-bg-color: #f2f2f7;
+    --window-fg-color: #1c1c1e;
+    --view-bg-color: #ffffff;
+    --view-fg-color: #1c1c1e;
+    --headerbar-bg-color: #f5f5f7;
+    --headerbar-fg-color: #1c1c1e;
+    --headerbar-backdrop-color: #f2f2f7;
+    --sidebar-bg-color: #ebebf0;
+    --sidebar-fg-color: #1c1c1e;
+    --sidebar-backdrop-color: #f2f2f7;
+    --sidebar-border-color: rgba(0, 0, 0, 0.12);
+    --card-bg-color: #ffffff;
+    --card-fg-color: #1c1c1e;
+    --popover-bg-color: #ffffff;
+    --popover-fg-color: #1c1c1e;
+    --dialog-bg-color: #f5f5f7;
+    --dialog-fg-color: #1c1c1e;
+    --destructive-bg-color: #ffdad6;
+    --destructive-fg-color: #93000a;
+    --error-bg-color: #ffdad6;
+    --error-fg-color: #93000a;
+    --warning-bg-color: #fff4d6;
+    --warning-fg-color: #614700;
+    --success-bg-color: #d9f2e3;
+    --success-fg-color: #0b3d24;
+    --shade-color: rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --accent-color: #64aaff;
+        --accent-bg-color: #0a84ff;
+        --accent-fg-color: #ffffff;
+        --window-bg-color: #1c1c1e;
+        --window-fg-color: #d1d1d6;
+        --view-bg-color: #161617;
+        --view-fg-color: #d1d1d6;
+        --headerbar-bg-color: #242426;
+        --headerbar-fg-color: #f5f5f7;
+        --headerbar-backdrop-color: #1c1c1e;
+        --sidebar-bg-color: #202022;
+        --sidebar-fg-color: #d1d1d6;
+        --sidebar-backdrop-color: #1c1c1e;
+        --sidebar-border-color: rgba(255, 255, 255, 0.12);
+        --card-bg-color: #2c2c2e;
+        --card-fg-color: #d1d1d6;
+        --popover-bg-color: #2c2c2e;
+        --popover-fg-color: #f5f5f7;
+        --dialog-bg-color: #242426;
+        --dialog-fg-color: #f5f5f7;
+        --destructive-bg-color: #3a0000;
+        --destructive-fg-color: #ffffff;
+        --error-bg-color: #3a0000;
+        --error-fg-color: #ffffff;
+        --warning-bg-color: #2a220f;
+        --warning-fg-color: #d8d0b8;
+        --success-bg-color: #13231a;
+        --success-fg-color: #bfd0c5;
+        --shade-color: rgba(0, 0, 0, 0.45);
+    }
+}

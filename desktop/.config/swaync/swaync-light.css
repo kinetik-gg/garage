@@ -1,0 +1,20 @@
+:root {
+  --cc-bg: rgba(242, 242, 247, 0.94);
+  --noti-border-color: rgba(0, 0, 0, 0.12);
+  --noti-bg: 255, 255, 255;
+  --noti-bg-alpha: 0.96;
+  --noti-bg-darker: rgb(242, 242, 247);
+  --noti-bg-hover: rgb(236, 236, 241);
+  --noti-bg-focus: rgba(220, 220, 226, 0.70);
+  --noti-close-bg: rgba(0, 0, 0, 0.08);
+  --noti-close-bg-hover: rgba(0, 0, 0, 0.14);
+  --text-color: rgb(28, 28, 30);
+  --text-color-disabled: rgb(142, 142, 147);
+  --bg-selected: rgb(0, 122, 255);
+  --border: 1px solid var(--noti-border-color);
+  --border-radius: 14px;
+  --notification-shadow: none;
+  --font-size-body: 13px;
+  --font-size-summary: 13px;
+  font-family: "IBM Plex Sans", sans-serif;
+}

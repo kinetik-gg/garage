@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+cursor=$(hyprctl cursorpos -j)
+monitors=$(hyprctl monitors -j)
+
+output=$(jq -nr \
+    --argjson cursor "$cursor" \
+    --argjson monitors "$monitors" '
+        first(
+            $monitors[]
+            | select(
+                $cursor.x >= .x
+                and $cursor.x < (.x + (.width / .scale))
+                and $cursor.y >= .y
+                and $cursor.y < (.y + (.height / .scale))
+            )
+            | .name
+        ) // empty
+    ')
+
+[ -n "$output" ] || exit 1
+exec qs ipc -c garage call shell sessionOn "$output"
