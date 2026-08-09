@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Run the whole test suite. `python3 tests/run` from anywhere in the checkout.
+
+Standard library only, on purpose: this runs at every commit, on a fresh Arch
+install and inside the container rehearsal, and a test suite that needs
+installing is a test suite that gets skipped. There is no pytest here and
+nothing below wants one.
+
+Exit status is 0 only if every test passed or failed exactly as documented.
+An expectedFailure is not a failure -- it is a bug that has been written down,
+with the test that proves it fixed already in place. An *unexpected success* is
+loud: it means a documented bug is gone and the marker in the test file is now
+lying about the code.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import time
+import unittest
+
+
+TESTS_DIR = Path(__file__).resolve().parent
+
+
+class LineReporter(unittest.TestResult):
+    """One line per test, in the order they run, with a verdict on each."""
+
+    MARKS = {"ok": "ok  ", "FAIL": "FAIL", "ERROR": "ERR ",
+             "skip": "skip", "xfail": "xfail", "XPASS": "XPASS"}
+
+    def __init__(self, stream) -> None:
+        super().__init__()
+        self.stream = stream
+        self.lines: list[tuple[str, str, str]] = []
+        self.started = 0.0
+        self.unexpected_successes: list[str] = []
+
+    def name_of(self, test) -> str:
+        # module.Class.method, without the unittest repr's parentheses.
+        return f"{test.__class__.__module__}.{test.__class__.__name__}.{test._testMethodName}"
+
+    def record(self, test, verdict: str, detail: str = "") -> None:
+        name = self.name_of(test)
+        elapsed = (time.perf_counter() - self.started) * 1000
+        self.lines.append((verdict, name, detail))
+        self.stream.write(f"  {self.MARKS[verdict]}  {name}  ({elapsed:.0f}ms)\n")
+        self.stream.flush()
+
+    def startTest(self, test) -> None:
+        self.started = time.perf_counter()
+        super().startTest(test)
+
+    def addSuccess(self, test) -> None:
+        super().addSuccess(test)
+        self.record(test, "ok")
+
+    def addFailure(self, test, err) -> None:
+        super().addFailure(test, err)
+        self.record(test, "FAIL")
+
+    def addError(self, test, err) -> None:
+        super().addError(test, err)
+        self.record(test, "ERROR")
+
+    def addSkip(self, test, reason) -> None:
+        super().addSkip(test, reason)
+        self.record(test, "skip", reason)
+
+    def addExpectedFailure(self, test, err) -> None:
+        super().addExpectedFailure(test, err)
+        self.record(test, "xfail", "known bug, documented in the test")
+
+    def addUnexpectedSuccess(self, test) -> None:
+        super().addUnexpectedSuccess(test)
+        self.unexpected_successes.append(self.name_of(test))
+        self.record(test, "XPASS")
+
+
+def main(argv: list[str]) -> int:
+    stream = sys.stdout
+    # The test modules import `harness`, which sits beside them.
+    sys.path.insert(0, str(TESTS_DIR))
+    suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), pattern="test_*.py",
+                                                top_level_dir=str(TESTS_DIR))
+    if suite.countTestCases() == 0:
+        stream.write("no tests found\n")
+        return 1
+
+    stream.write(f"garage test suite -- {suite.countTestCases()} tests\n")
+    result = LineReporter(stream)
+    began = time.perf_counter()
+    suite.run(result)
+    seconds = time.perf_counter() - began
+
+    counted = {verdict: sum(1 for line in result.lines if line[0] == verdict)
+               for verdict in ("ok", "FAIL", "ERROR", "skip", "xfail", "XPASS")}
+    stream.write("\n")
+    for test, traceback in result.failures + result.errors:
+        stream.write(f"--- {result.name_of(test)}\n{traceback}\n")
+    if result.unexpected_successes:
+        stream.write(
+            "UNEXPECTED SUCCESS -- a test marked expectedFailure now passes.\n"
+            "The bug it documents appears to be fixed. Remove the "
+            "@unittest.expectedFailure marker and the comment naming the bug:\n")
+        for name in result.unexpected_successes:
+            stream.write(f"  {name}\n")
+        stream.write("\n")
+
+    summary = ", ".join(f"{count} {verdict}" for verdict, count in counted.items() if count)
+    ok = not (counted["FAIL"] or counted["ERROR"] or counted["XPASS"])
+    stream.write(f"{'PASS' if ok else 'FAIL'}: {summary} in {seconds:.2f}s\n")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
