@@ -94,14 +94,19 @@ window#waybar {
   padding: 0 8px;
 }
 
-#notifications {
+#custom-notifications,
+#custom-control-center {
+  color: @module_fg;
+  /* Nerd Font glyphs; IBM Plex must not claim the codepoints. */
+  font-family: "CaskaydiaMono Nerd Font", "IBM Plex Sans", sans-serif;
+  font-size: 15px;
   padding-left: 10px;
   padding-right: 10px;
 }
 
-#control-center {
-  padding-left: 10px;
-  padding-right: 4px;
+#custom-notifications:hover,
+#custom-control-center:hover {
+  color: @module_fg_hover;
 }
 
 #custom-network {

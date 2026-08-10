@@ -16,7 +16,7 @@
   "modules-center": [],
   // Parked: "custom/containers", "custom/git", "custom/monitor",
   //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
-  "modules-right": ["image#notifications", "image#control-center", "clock"],
+  "modules-right": ["custom/notifications", "custom/control-center", "clock"],
   "hyprland/workspaces": {
     "format": " ",
     "on-click": "activate",
@@ -27,22 +27,20 @@
     "on-click": "$HOME/.local/bin/garage-menu-toggle",
     "tooltip": false
   },
-  // The bell glyph, recoloured to the bar foreground by garage render-bar /
-  // render_theme() into generated/icons/bell.svg -- see activity-graph.py for
-  // the same trick applied to hand-drawn SVGs. Static path, not exec: the file
-  // only ever changes on a theme flip, which already reloads the bar wholesale.
-  "image#notifications": {
-    "path": "$HOME/.local/state/garage/generated/icons/bell.svg",
-    "size": 16,
+  // Font glyphs, NOT the image module. The image module is unusable here,
+  // measured three ways: `path` does no $HOME expansion, `exec` deadlocks bar
+  // construction, and any loadable image sends gdk-pixbuf's glycin IPC into a
+  // spin inside waybar (100% CPU, no bar ever configured) even though glycin
+  // loads the same file fine standalone. The shell's panels render the real
+  // Phosphor SVGs through Qt; the bar uses the Nerd Font's bell and sliders,
+  // the same mechanism as custom/menu's logo glyph.
+  "custom/notifications": {
+    "format": "\uf0f3",
     "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
     "tooltip": false
   },
-  // The sliders glyph, recoloured to the bar foreground by the same
-  // render-bar / render_theme() pass that produces bell.svg above, into
-  // generated/icons/sliders.svg. Static path, not exec, for the same reason.
-  "image#control-center": {
-    "path": "$HOME/.local/state/garage/generated/icons/sliders.svg",
-    "size": 16,
+  "custom/control-center": {
+    "format": "\uf1de",
     "on-click": "$HOME/.local/bin/garage-panel-toggle control-center",
     "tooltip": false
   },
