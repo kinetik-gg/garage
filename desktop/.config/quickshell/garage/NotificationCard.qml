@@ -45,6 +45,28 @@ ContinuousRectangle {
     readonly property string imageSource: live ? String(notification.image || "") : ""
     readonly property var actions: live ? notification.actions : []
 
+    // The freedesktop "default" action is what activating the notification
+    // itself means -- a browser focuses the tab that sent it. By convention the
+    // card body is its button: rendering it in the action row put an "Activate"
+    // pill on every web notification. The row below shows everything else.
+    readonly property var defaultAction: {
+        if (!card.live)
+            return null;
+        for (const action of card.actions) {
+            if (String(action.identifier) === "default")
+                return action;
+        }
+        return null;
+    }
+    readonly property var buttonActions: {
+        const rest = [];
+        for (const action of card.actions) {
+            if (String(action.identifier) !== "default")
+                rest.push(action);
+        }
+        return rest;
+    }
+
     // Shared between the toast's meta row and the centre card's title row, so
     // the two spellings of "when, and how to close" cannot drift apart.
     component TimeLabel: Text {
@@ -294,6 +316,23 @@ ContinuousRectangle {
         exitShift.x = 0;
     }
 
+    // The card body is the default action's button, per convention: clicking a
+    // banner or an expanded centre card activates it (a browser focuses the
+    // sending tab). First child on purpose -- every interactive element above
+    // (buttons, reply field, close) stacks over this and keeps its own clicks.
+    // Disabled while collapsed in a stack: that click belongs to the stack's
+    // expander underneath.
+    MouseArea {
+        anchors.fill: parent
+        enabled: card.defaultAction !== null && !card.collapsed && !card.exiting
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: {
+            // Invoking usually destroys the notification server-side; the model
+            // watchers reap the card, same as an action button press.
+            card.defaultAction.invoke();
+        }
+    }
+
     // Inner hairline, one inset px in from the outer one, the same double frame
     // the menus and the settings groups draw. insetRadius keeps the two concentric
     // at every corner radius setting.
@@ -465,11 +504,11 @@ ContinuousRectangle {
             Layout.fillWidth: true
             // Not off the top of a closed stack: a button there is a target the
             // click that was meant to open the stack would land on.
-            visible: !card.collapsed && card.actions.length > 0
+            visible: !card.collapsed && card.buttonActions.length > 0
             spacing: 6
 
             Repeater {
-                model: card.actions
+                model: card.buttonActions
 
                 SettingsButton {
                     required property var modelData
