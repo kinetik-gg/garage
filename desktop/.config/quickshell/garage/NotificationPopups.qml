@@ -28,14 +28,18 @@ Scope {
     // started even when nothing reports that it did.
     readonly property int exitGrace: 170
 
-    // Toast lifetimes. A sender that asks for a duration knows something the shell
-    // does not, so its request wins; expireTimeout is in seconds, and zero means
-    // the sender wants it to stay.
+    // Toast lifetimes. A sender that asks for a positive duration knows something
+    // the shell does not, so that request wins.
     //
-    // Critical notifications are sticky. That is the one place urgency changes
-    // behaviour: do-not-disturb still silences them (see NotificationDaemon), but
-    // a critical notification the user is allowed to see does not time out from
-    // under them.
+    // A zero expire timeout is spec for "never expire", and browsers send it on
+    // every web notification -- which turned each one into a banner that sat on
+    // screen until clicked. The popup is the announcement, the centre is the
+    // record: a timed-out toast collapses into the notification centre rather
+    // than being cleared, so nothing is lost by refusing the request. Only
+    // critical urgency keeps a sticky popup -- that is the one place urgency
+    // changes behaviour: do-not-disturb still silences them (see
+    // NotificationDaemon), but a critical notification the user is allowed to
+    // see does not time out from under them.
     function timeoutFor(notification) {
         if (notification.expireTimeout > 0)
             // Clamped to a minute. A popup is the corner of somebody's screen, and
@@ -43,8 +47,6 @@ Scope {
             // sending the wire's milliseconds where this property reports seconds.
             // Anything that genuinely has to stay is what the history is for.
             return Math.min(Math.max(notification.expireTimeout, 1), 60) * 1000;
-        if (notification.expireTimeout === 0)
-            return 0;
         if (notification.urgency === NotificationUrgency.Critical)
             return 0;
         if (notification.urgency === NotificationUrgency.Low)
