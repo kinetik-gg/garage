@@ -31,6 +31,15 @@ _darcs
 ^/\.config/kitty/theme\.conf$
 ^/\.config/micro/settings\.json$
 ^/\.config/btop/themes/vanta\.theme$
+# The palette itself, rendered from PALETTE in the backend for both appearances
+# on every theme render. Each toolkit's entry point above imports its palette by
+# name, so these are the files the one table actually reaches.
+^/\.config/gtk-3\.0/apple-(dark|light)\.css$
+^/\.config/gtk-4\.0/apple\.css$
+^/\.config/rofi/apple-(dark|light)\.rasi$
+^/\.config/swaync/swaync-(dark|light)\.css$
+^/\.config/swayosd/swayosd-(dark|light)\.css$
+^/\.config/qt6ct/colors/vanta(-light)?\.conf$
 ^/\.config/swayosd/config\.toml$
 ^/\.config/gtk-3\.0/bookmarks$
 ^/\.local/bin/__pycache__(/.*)?$

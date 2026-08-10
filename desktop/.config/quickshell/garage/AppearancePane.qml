@@ -8,15 +8,10 @@ Flickable {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
-    readonly property var accentNames: [
-        "blue", "teal", "green", "yellow", "orange", "red", "pink", "purple", "slate"
-    ]
-    readonly property var accentColors: ({
-        blue: "#3584e4", teal: "#2190a4", green: "#3a944a",
-        yellow: "#f6d32d", orange: "#ff7800", red: "#e01b24",
-        pink: "#d56199", purple: "#9141ac", slate: "#6f8396"
-    })
-
+    // The accents come from Theme, which is the shell's single copy of them.
+    // This pane kept its own list and its own hexes until the palette was
+    // consolidated; two copies in the same process meant the swatch row could
+    // offer a colour the rest of the shell would not draw.
     readonly property real borderSize: pane.controller.preference(
         "appearance", "border_size", 0)
     readonly property bool reduceMotion: pane.controller.preference(
@@ -66,14 +61,14 @@ Flickable {
                     spacing: 7
 
                     Repeater {
-                        model: pane.accentNames
+                        model: Theme.accentNames
 
                         Rectangle {
                             required property string modelData
                             width: 22
                             height: 22
                             radius: width / 2
-                            color: pane.accentColors[modelData]
+                            color: Theme.accentPalette[modelData]
                             border.width: pane.controller.preference(
                                 "appearance", "accent_color", "blue") === modelData ? 2 : 0
                             border.color: Theme.text

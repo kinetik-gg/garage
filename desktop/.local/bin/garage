@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import tomllib
 import uuid
@@ -235,14 +236,385 @@ CORNER_RADIUS_STALE = {old: new for old, new in CORNER_RADIUS_RENAMES.items()
 CORNER_POWER = 3.37
 
 
-# The active/inactive edge pair the palette draws a window border with. Shared
-# with the group borders below, which are the same idea one level in: a group's
-# tab strip already means "this edge is focused", so a bordered window that
-# spoke a different colour would read as a second, unrelated convention.
-BORDER_COLORS = {
-    "dark": ("rgba(666666ff)", "rgba(181818ff)"),
-    "light": ("rgba(b0b0b5ff)", "rgba(e5e5eaff)"),
+# ---------------------------------------------------------------------------
+# The palette
+#
+# One visual identity, one table. Every colour the desktop draws with is named
+# here once, per appearance, and every toolkit config that carries colour is
+# rendered from it by render_toolkits() -- GTK3, GTK4, Qt, rofi, swaync,
+# swayosd, waybar, kitty, btop and hyprlock. Nothing downstream holds a hex.
+#
+# Before this table the same identity was maintained by hand in thirteen files
+# across six languages, and it had already drifted: the Qt dark palette shared
+# exactly two colours with the GTK dark palette it was supposed to match, and
+# swaync's structural sheet carried dark-only literals that made notification
+# body text unreadable on a light desktop. A colour that exists in one place
+# cannot drift from itself.
+#
+# Values are either an opaque `#rrggbb` or a CSS `rgba(r, g, b, a)`. The two
+# forms are not interchangeable: the Qt and hyprlock renderers can only spell an
+# opaque colour, so a role they read has to be a hex. test_palette.py pins the
+# form, the key sets and every consumer that still keeps a copy (the shell's
+# QML, which cannot @import CSS).
+#
+# Naming: `bg*` are bodies from sunken to floating, `fg*` are text from loudest
+# to faintest, `line*` are 1px separators, `bevel_*` are Qt's four shading roles,
+# and `on_bg` is the colour that tints *onto* a body -- white on dark, black on
+# light -- which is what every hairline, sheen and hover is a fraction of.
+# ---------------------------------------------------------------------------
+PALETTE: dict[str, dict[str, str]] = {
+    "dark": {
+        # The tint direction, and the one colour that is never itself a body.
+        "on_bg": "#ffffff",
+        "accent_fg": "#ffffff",
+
+        # Bodies, sunken to floating.
+        "bg_sunken": "#161617",
+        "bg": "#1c1c1e",
+        "bg_alt2": "#202022",
+        "bg_sidebar": "#202022",
+        "bg_alt": "#242426",
+        "bg_raised": "#242426",
+        "bg_float": "#2c2c2e",
+        "bg_lifted": "#3a3a3c",
+        "bg_well": "#111113",
+        # The body a *floating* surface starts from, as opposed to a window's.
+        # The shell's panels, the bar and the OSD all sit on the compositor's
+        # glass rather than in a window, and take the same step of the ramp.
+        "body_base": "#1c1c1e",
+        # The fully opaque body, at the far end of the ramp from the window one.
+        # Two surfaces want it: the terminal, which paints its own body over the
+        # glass so text has maximum contrast whatever the compositor is doing,
+        # and the glass tint itself, which is this colour at 20%.
+        "body_opaque": "#1c1c1e",
+        "row_selected": "#2c2c2e",
+        # A drop shadow is black in both appearances; only its opacity moves.
+        "shadow_base": "#000000",
+        # The edge of a locked group. The two appearances disagree by a hair --
+        # #888888 here against #8e8e93 on light -- and the dark value is the one
+        # config/decorations.lua also carries as its static default, so the pair
+        # is preserved as it stands rather than unified from one side only.
+        "border_locked": "#888888",
+        "meter_track": "#2c2c2e",
+        "hover_solid": "#3a3a3c",
+
+        # Qt's four shading roles, which are read as a bevel around Button.
+        # Light is lighter than the body and Dark darker, in both appearances.
+        "bevel_light": "#3a3a3c",
+        "bevel_midlight": "#2c2c2e",
+        "bevel_mid": "#111113",
+        "bevel_dark": "#000000",
+        "bevel_faint": "#202022",
+
+        # Separators. line_faint is softer than line_box, not harder: btop draws
+        # a box edge and a divider inside it, and the divider is the quieter of
+        # the two in both appearances.
+        "line": "#3a3a3c",
+        "line_box": "#3a3a3c",
+        "line_faint": "#48484a",
+        # The window edge. Deliberately off the neutral ramp: a window border
+        # reads against the wallpaper, not against another surface.
+        "border_active": "#666666",
+        "border_inactive": "#181818",
+
+        # Text, loudest to faintest.
+        "fg_bright": "#f5f5f7",
+        "fg_strong": "#f5f5f7",
+        "fg": "#d1d1d6",
+        "fg_backdrop": "#bcbcbc",
+        "fg_secondary": "#a8a8ad",
+        "fg_muted": "#8e8e93",
+        "fg_placeholder": "#8e8e93",
+        "fg_disabled": "#6e6e73",
+        "fg_faint": "#6e6e73",
+        "fg_placeholder_dim": "#6e6e73",
+        "knob": "#e5e5e7",
+
+        # Accent and links. The accent itself is the appearance's own blue; the
+        # nine *choosable* accents are ACCENTS below, which is a different axis.
+        "accent": "#0a84ff",
+        "accent_soft": "#64aaff",
+        "link": "#64aaff",
+        "link_visited": "#5e5ce6",
+
+        # Signal colours, shared by both appearances: a temperature graph and a
+        # failed unlock mean the same thing whatever the desktop looks like.
+        "ok": "#32d74b",
+        "warn": "#ffd60a",
+        "danger": "#ff453a",
+        "info": "#5ac8fa",
+        "caution": "#ff9f0a",
+        "violet": "#af52de",
+
+        # Status pairs, for the toolkits that ask for a background as well.
+        "error_bg": "#3a0000",
+        "error_fg": "#ffffff",
+        "warning_bg": "#2a220f",
+        "warning_fg": "#d8d0b8",
+        "success_bg": "#13231a",
+        "success_fg": "#bfd0c5",
+
+        # Composited: a fraction of on_bg over whatever is behind it, or a
+        # translucent body that lets the glass through.
+        "hairline": "rgba(255, 255, 255, 0.12)",
+        "edge": "rgba(255, 255, 255, 0.16)",
+        "shade": "rgba(0, 0, 0, 0.45)",
+        "button_bg": "rgba(255, 255, 255, 0.07)",
+        "button_border": "rgba(255, 255, 255, 0.10)",
+        "button_hover": "rgba(255, 255, 255, 0.12)",
+        "close_bg": "rgba(255, 255, 255, 0.10)",
+        "close_bg_hover": "rgba(255, 255, 255, 0.16)",
+        "bar_dot": "#ffffff",
+        "bar_bg": "rgba(28, 28, 30, 0.42)",
+        "bar_edge": "rgba(0, 0, 0, 0.30)",
+        "bar_sheen": "rgba(255, 255, 255, 0.07)",
+        "tooltip_bg": "rgba(44, 44, 46, 0.90)",
+        "urgent": "rgba(255, 69, 58, 0.95)",
+        "panel_bg": "rgba(28, 28, 30, 0.94)",
+        "noti_bg": "rgba(44, 44, 46, 0.94)",
+        "focus_solid": "rgba(72, 72, 74, 0.70)",
+        "body_text": "rgba(245, 245, 247, 0.72)",
+        "osd_bg": "rgba(28, 28, 30, 0.94)",
+        "osd_fg": "rgba(245, 245, 247, 0.92)",
+        "osd_fg_muted": "rgba(245, 245, 247, 0.82)",
+        "osd_track": "rgba(245, 245, 247, 0.24)",
+        "osd_fill": "rgba(245, 245, 247, 0.90)",
+    },
+    "light": {
+        "on_bg": "#000000",
+        "accent_fg": "#ffffff",
+
+        "bg_sunken": "#ffffff",
+        "bg": "#f2f2f7",
+        "bg_alt2": "#f7f7fa",
+        "bg_sidebar": "#ebebf0",
+        "bg_alt": "#f2f2f7",
+        "bg_raised": "#f5f5f7",
+        "bg_float": "#ffffff",
+        "bg_lifted": "#d1d1d6",
+        "bg_well": "#ffffff",
+        "body_base": "#f5f5f7",
+        "body_opaque": "#ffffff",
+        "row_selected": "#d1d1d6",
+        "shadow_base": "#000000",
+        "border_locked": "#8e8e93",
+        "meter_track": "#e5e5ea",
+        "hover_solid": "#ececf1",
+
+        "bevel_light": "#ffffff",
+        "bevel_midlight": "#f7f7fa",
+        "bevel_mid": "#d1d1d6",
+        "bevel_dark": "#b0b0b5",
+        "bevel_faint": "#d8d8dd",
+
+        "line": "#c7c7cc",
+        "line_box": "#b0b0b5",
+        "line_faint": "#c7c7cc",
+        "border_active": "#b0b0b5",
+        "border_inactive": "#e5e5ea",
+
+        "fg_bright": "#0b0b0d",
+        "fg_strong": "#1c1c1e",
+        "fg": "#1c1c1e",
+        "fg_backdrop": "#3a3a3c",
+        "fg_secondary": "#45454a",
+        "fg_muted": "#6c6c70",
+        "fg_placeholder": "#8e8e93",
+        "fg_disabled": "#8a8a90",
+        "fg_faint": "#b0b0b5",
+        "fg_placeholder_dim": "#aeaeb2",
+        "knob": "#ffffff",
+
+        "accent": "#007aff",
+        "accent_soft": "#007aff",
+        "link": "#0060df",
+        "link_visited": "#5856d6",
+
+        "ok": "#32d74b",
+        "warn": "#ffd60a",
+        "danger": "#ff453a",
+        "info": "#5ac8fa",
+        "caution": "#ff9f0a",
+        "violet": "#af52de",
+
+        "error_bg": "#ffdad6",
+        "error_fg": "#93000a",
+        "warning_bg": "#fff4d6",
+        "warning_fg": "#614700",
+        "success_bg": "#d9f2e3",
+        "success_fg": "#0b3d24",
+
+        "hairline": "rgba(0, 0, 0, 0.12)",
+        "edge": "rgba(0, 0, 0, 0.12)",
+        "shade": "rgba(0, 0, 0, 0.12)",
+        "button_bg": "rgba(0, 0, 0, 0.07)",
+        "button_border": "rgba(0, 0, 0, 0.10)",
+        "button_hover": "rgba(0, 0, 0, 0.12)",
+        "close_bg": "rgba(0, 0, 0, 0.08)",
+        "close_bg_hover": "rgba(0, 0, 0, 0.14)",
+        "bar_dot": "#1c1c1e",
+        "bar_bg": "rgba(245, 245, 247, 0.42)",
+        "bar_edge": "rgba(0, 0, 0, 0.12)",
+        "bar_sheen": "rgba(255, 255, 255, 0.60)",
+        "tooltip_bg": "rgba(255, 255, 255, 0.95)",
+        "urgent": "rgba(255, 69, 58, 0.95)",
+        "panel_bg": "rgba(242, 242, 247, 0.94)",
+        "noti_bg": "rgba(255, 255, 255, 0.96)",
+        "focus_solid": "rgba(220, 220, 226, 0.70)",
+        "body_text": "rgba(28, 28, 30, 0.72)",
+        "osd_bg": "rgba(245, 245, 247, 0.94)",
+        "osd_fg": "rgba(28, 28, 30, 0.92)",
+        "osd_fg_muted": "rgba(28, 28, 30, 0.82)",
+        "osd_track": "rgba(28, 28, 30, 0.20)",
+        "osd_fill": "rgba(28, 28, 30, 0.85)",
+    },
 }
+
+
+# The nine accents the Appearance pane offers, in the order it draws the
+# swatches, with the hex each one is drawn as. A different axis from PALETTE:
+# the appearance decides the bodies and the text, this decides the one colour
+# the user gets to pick. The names are GNOME's, because push_accent() hands them
+# straight to org.gnome.desktop.interface accent-color, and the hexes are the
+# ones GNOME draws for them so a GTK app and the shell agree on what "teal" is.
+#
+# PREFERENCE_SCHEMA takes its accent members from this mapping, so adding one
+# here is the whole of adding an accent to the backend. The shell keeps its own
+# copy in Theme.qml and AppearancePane.qml -- QML cannot read a Python dict --
+# and test_palette.py pins both against this one.
+ACCENTS = {
+    "blue": "#3584e4",
+    "teal": "#2190a4",
+    "green": "#3a944a",
+    "yellow": "#f6d32d",
+    "orange": "#ff7800",
+    "red": "#e01b24",
+    "pink": "#d56199",
+    "purple": "#9141ac",
+    "slate": "#6f8396",
+}
+
+
+# The active/inactive edge pair the palette draws a window border with, in the
+# rgba(rrggbbaa) spelling Hyprland's parser wants. Shared with the group borders
+# in decorations.lua, which are the same idea one level in: a group's tab strip
+# already means "this edge is focused", so a bordered window that spoke a
+# different colour would read as a second, unrelated convention.
+BORDER_COLORS = {
+    scheme: (f'rgba({colors["border_active"].lstrip("#")}ff)',
+             f'rgba({colors["border_inactive"].lstrip("#")}ff)')
+    for scheme, colors in PALETTE.items()
+}
+
+
+# Which palette role each toolkit's own token names, in the order the generated
+# file writes them. Two lists rather than one because the two GTK generations do
+# not carry the same set: GTK3 needs the pre-libadwaita theme_* tokens adw-gtk3
+# still reads, and GTK4 needs the status pairs and the shade libadwaita draws
+# with. Neither list is padded out to the other -- a token a toolkit does not
+# define today is a token its stylesheet is currently getting from its own theme,
+# and defining it here would silently restyle the desktop.
+GTK3_TOKENS = (
+    ("accent_color", "accent_soft"),
+    ("accent_bg_color", "accent"),
+    ("accent_fg_color", "accent_fg"),
+    ("window_bg_color", "bg"),
+    ("window_fg_color", "fg"),
+    ("view_bg_color", "bg_sunken"),
+    ("view_fg_color", "fg"),
+    ("headerbar_bg_color", "bg_raised"),
+    ("headerbar_fg_color", "fg_strong"),
+    ("headerbar_backdrop_color", "bg"),
+    ("sidebar_bg_color", "bg_sidebar"),
+    ("sidebar_fg_color", "fg"),
+    ("sidebar_backdrop_color", "bg"),
+    ("sidebar_border_color", "hairline"),
+    ("popover_bg_color", "bg_float"),
+    ("popover_fg_color", "fg_strong"),
+    ("card_bg_color", "bg_float"),
+    ("card_fg_color", "fg"),
+    ("dialog_bg_color", "bg_raised"),
+    ("dialog_fg_color", "fg_strong"),
+    ("theme_bg_color", "bg"),
+    ("theme_fg_color", "fg"),
+    ("theme_base_color", "bg_sunken"),
+    ("theme_text_color", "fg"),
+    ("theme_selected_bg_color", "accent"),
+    ("theme_selected_fg_color", "accent_fg"),
+    ("theme_unfocused_bg_color", "bg"),
+    ("theme_unfocused_fg_color", "fg_muted"),
+    ("theme_unfocused_selected_bg_color", "bg_lifted"),
+    ("theme_unfocused_selected_fg_color", "fg_backdrop"),
+    ("destructive_bg_color", "error_bg"),
+    ("destructive_fg_color", "error_fg"),
+    ("error_bg_color", "error_bg"),
+    ("error_fg_color", "error_fg"),
+)
+GTK4_TOKENS = (
+    ("accent-color", "accent_soft"),
+    ("accent-bg-color", "accent"),
+    ("accent-fg-color", "accent_fg"),
+    ("window-bg-color", "bg"),
+    ("window-fg-color", "fg"),
+    ("view-bg-color", "bg_sunken"),
+    ("view-fg-color", "fg"),
+    ("headerbar-bg-color", "bg_raised"),
+    ("headerbar-fg-color", "fg_strong"),
+    ("headerbar-backdrop-color", "bg"),
+    ("sidebar-bg-color", "bg_sidebar"),
+    ("sidebar-fg-color", "fg"),
+    ("sidebar-backdrop-color", "bg"),
+    ("sidebar-border-color", "hairline"),
+    ("card-bg-color", "bg_float"),
+    ("card-fg-color", "fg"),
+    ("popover-bg-color", "bg_float"),
+    ("popover-fg-color", "fg_strong"),
+    ("dialog-bg-color", "bg_raised"),
+    ("dialog-fg-color", "fg_strong"),
+    ("destructive-bg-color", "error_bg"),
+    ("destructive-fg-color", "error_fg"),
+    ("error-bg-color", "error_bg"),
+    ("error-fg-color", "error_fg"),
+    ("warning-bg-color", "warning_bg"),
+    ("warning-fg-color", "warning_fg"),
+    ("success-bg-color", "success_bg"),
+    ("success-fg-color", "success_fg"),
+    ("shade-color", "shade"),
+)
+
+# Qt's palette is positional: twenty-two colours per state, in QPalette's own
+# ColorRole order, and qt6ct writes all three states or none. Each role names
+# the palette role it takes when the window is active, when it is not, and when
+# the widget is disabled -- which is how the light palette was already built by
+# hand, so rendering it from here reproduces that file exactly.
+#
+# Every role here has to resolve to an opaque hex: qt6ct's parser takes #rrggbb
+# and nothing else, so a composited role would be written out as the literal
+# string "rgba(...)" and the whole scheme would fail to load.
+QT_ROLES = (
+    ("WindowText", "fg", "fg_backdrop", "fg_faint"),
+    ("Button", "bg", "bg", "bg"),
+    ("Light", "bevel_light", "bevel_light", "bevel_light"),
+    ("Midlight", "bevel_midlight", "bevel_midlight", "bevel_midlight"),
+    ("Dark", "bevel_dark", "bevel_dark", "line"),
+    ("Mid", "bevel_mid", "bevel_mid", "bevel_faint"),
+    ("Text", "fg", "fg_backdrop", "fg_faint"),
+    ("BrightText", "accent_fg", "accent_fg", "accent_fg"),
+    ("ButtonText", "fg", "fg_backdrop", "fg_faint"),
+    ("Base", "bg_sunken", "bg_sunken", "bg_alt2"),
+    ("Window", "bg", "bg", "bg"),
+    ("Shadow", "line", "line", "bevel_faint"),
+    ("Highlight", "accent", "bg_lifted", "bg_lifted"),
+    ("HighlightedText", "accent_fg", "fg", "bg_alt2"),
+    ("Link", "accent", "accent", "fg_faint"),
+    ("LinkVisited", "link_visited", "link_visited", "fg_faint"),
+    ("AlternateBase", "bg_alt2", "bg_alt2", "bg"),
+    ("NoRole", "bg_sunken", "bg_sunken", "bg_sunken"),
+    ("ToolTipBase", "bg_float", "bg_float", "bg_alt2"),
+    ("ToolTipText", "fg", "fg", "fg_faint"),
+    ("PlaceholderText", "fg_placeholder", "fg_placeholder_dim", "line"),
+    ("Accent", "accent", "accent", "fg_faint"),
+)
 
 
 # The animation leaves config/animations.lua leaves switched on, with the
@@ -512,8 +884,10 @@ PREFERENCE_SCHEMA: dict[str, dict] = {
     # colours because the accent drives a whole generated palette, not one fill.
     "appearance.accent_color": {
         "default": "blue", "kind": "enum", "route": "accent",
-        "members": {"blue", "teal", "green", "yellow", "orange", "red", "pink",
-                    "purple", "slate"},
+        # From ACCENTS, so the offered names and the hexes drawn for them cannot
+        # come apart: an accent the pane can pick but the palette cannot draw
+        # would fall through to blue with nothing said.
+        "members": set(ACCENTS),
     },
     # Unchecked, and the schedule keys beside it are not: a non-bool here is
     # read through bool() by night_shift_active() and cannot fail, where a
@@ -1342,8 +1716,19 @@ def write_marker(path: Path, text: str) -> None:
     config files but invisible to an inotify watch registered on the original
     inode: the watcher follows the replaced file and never reports the change.
     Quickshell watches these markers, so they have to be truncated in place.
+
+    A symlink at the target is removed rather than followed, and that is not
+    hypothetical: every path under ~/.config that this checkout tracks is a stow
+    link back into the repository, so a file promoted from *tracked* to
+    *generated* -- as the whole palette was -- leaves a link behind on any
+    machine that has not restowed since. Opening it "w" would follow it and
+    truncate the tracked file, editing the repository from a theme switch.
+    `garage update` sweeps those links (dangling_repo_links), but a render can
+    reach the path first, and once is enough.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        path.unlink()
     with path.open("w", encoding="utf-8") as handle:
         handle.write(text)
         handle.flush()
@@ -1645,30 +2030,39 @@ hl.config({{
     scheme = resolve_theme(config)
     rounding = corner_rounding(config)
     group_active, group_inactive = BORDER_COLORS[scheme]
+
+    # hyprlang's own rgba(rrggbbaa) spelling, over the palette. The opacities
+    # below are the material's rather than the palette's -- they sit with the
+    # saturation and the frame weights, which are what makes the glass read as
+    # one material across both appearances.
+    def hypr(role: str, alpha: str = "ff") -> str:
+        return f'rgba({opaque(scheme, role).lstrip("#")}{alpha})'
+
+    group_locked = hypr("border_locked")
     if scheme == "light":
         # Reference light surfaces are near-opaque: a flat #f6f6f6 body with only
         # a hint of the desktop at the edges. Translucency at 0.5 over a saturated
         # wallpaper gives a milky coloured wash instead, and it wrecks text
         # contrast. The refraction still reads on the bevel, which is where the
         # material belongs on light.
-        tint, tint_opacity = "rgba(ffffffff)", 0.20
+        tint, tint_opacity = hypr("body_opaque"), 0.20
         saturation = 0.5
         frame_highlight, frame_border = 0.10, 0.05
         dispersion = 0.0
-        shadow, shadow_inactive = "rgba(00000026)", "rgba(00000014)"
-        group_locked = "rgba(8e8e93ff)"
+        shadow = hypr("shadow_base", "26")
+        shadow_inactive = hypr("shadow_base", "14")
         dim_strength = 0.08
     else:
         # Mirrors the light material so the two themes behave identically: same
         # tint strength, same desaturation, same frame weights, no dispersion.
         # Only the tint colour and the shadow differ, which is the part that is
         # genuinely theme-specific.
-        tint, tint_opacity = "rgba(1c1c1eff)", 0.20
+        tint, tint_opacity = hypr("body_opaque"), 0.20
         saturation = 0.5
         frame_highlight, frame_border = 0.10, 0.05
         dispersion = 0.0
-        shadow, shadow_inactive = "rgba(00000066)", "rgba(00000040)"
-        group_locked = "rgba(888888ff)"
+        shadow = hypr("shadow_base", "66")
+        shadow_inactive = hypr("shadow_base", "40")
         dim_strength = 0.08
 
     lua += f'''
@@ -2995,8 +3389,156 @@ def applied_scheme() -> str:
         return ""
 
 
+def rgb_parts(color: str) -> str:
+    """`r, g, b` from an opaque `#rrggbb`, for a CSS function that wants channels."""
+    value = color.lstrip("#")
+    return ", ".join(str(int(value[index:index + 2], 16)) for index in (0, 2, 4))
+
+
+def split_rgba(value: str) -> tuple[str, str]:
+    """A palette `rgba(r, g, b, a)` split into its channels and its alpha.
+
+    swaync's stylesheet asks for the two separately -- `--noti-bg` is a bare
+    triplet that `rgba()` is applied to with `--noti-bg-alpha` -- so the one
+    palette entry has to be taken apart rather than written out whole.
+    """
+    body = value[value.index("(") + 1:value.rindex(")")]
+    channels, _, alpha = body.rpartition(",")
+    return channels.strip(), alpha.strip()
+
+
+def opaque(scheme: str, role: str) -> str:
+    """A palette role that must be an opaque hex, with a real error if it is not.
+
+    The Qt and hyprlock renderers can only spell `#rrggbb`; handed a composited
+    role they would write the literal text `rgba(...)` into a file whose parser
+    takes neither, and Qt would silently fall back to Fusion's own grey. Better
+    to fail here, where the mapping table is, than on the next login.
+    """
+    value = PALETTE[scheme][role]
+    if not is_hex_color(value):
+        raise SettingsError(
+            f"palette role {role!r} is {value!r}, which is composited; "
+            "this toolkit can only be handed an opaque colour")
+    return value
+
+
+def gtk3_palette_css(scheme: str) -> str:
+    """The GTK3 palette adw-gtk3 reads, as @define-color over the palette."""
+    colors = PALETTE[scheme]
+    tokens = "".join(f"@define-color {token} {colors[role]};\n"
+                     for token, role in GTK3_TOKENS)
+    return f"/* Generated by garage: the {scheme} palette for GTK3. */\n{tokens}"
+
+
+def gtk4_palette_css() -> str:
+    """The GTK4/libadwaita palette, both appearances in one file.
+
+    GTK loads gtk.css once per process, so a per-scheme import would freeze the
+    palette a running app launched with. libadwaita re-evaluates the media query
+    when the portal's color-scheme changes, which is what push_theme() moves.
+    """
+    light = "".join(f"    --{token}: {PALETTE['light'][role]};\n"
+                    for token, role in GTK4_TOKENS)
+    dark = "".join(f"        --{token}: {PALETTE['dark'][role]};\n"
+                   for token, role in GTK4_TOKENS)
+    return f'''/* Generated by garage: both appearances, so a running app follows the portal
+   rather than freezing the palette it launched with. */
+:root {{
+{light}}}
+
+@media (prefers-color-scheme: dark) {{
+    :root {{
+{dark}    }}
+}}
+'''
+
+
+def rofi_palette_rasi(scheme: str) -> str:
+    """The launcher palette. rasi spells alpha as two hex digits on the colour."""
+    colors = PALETTE[scheme]
+    return f'''/* Generated by garage: the {scheme} palette for rofi. */
+* {{
+    background: {colors["bg_raised"]}e6;
+    selection: {colors["accent"]}d9;
+    border-color: {colors["on_bg"]}20;
+    foreground: {colors["fg"]}ff;
+    foreground-strong: {colors["fg_bright"]}ff;
+    foreground-muted: {colors["fg_muted"]}ff;
+    background-color: transparent;
+    text-color: @foreground;
+    font: "IBM Plex Sans 12";
+}}
+
+@import "apple-base.rasi"
+'''
+
+
+def swaync_palette_css(scheme: str) -> str:
+    """The notification palette. swaync's sheet is CSS custom properties."""
+    colors = PALETTE[scheme]
+    channels, alpha = split_rgba(colors["noti_bg"])
+    return f'''/* Generated by garage: the {scheme} palette for swaync. */
+:root {{
+  --cc-bg: {colors["panel_bg"]};
+  --noti-border-color: {colors["edge"]};
+  --noti-bg: {channels};
+  --noti-bg-alpha: {alpha};
+  --noti-bg-darker: {colors["bg_alt"]};
+  --noti-bg-hover: {colors["hover_solid"]};
+  --noti-bg-focus: {colors["focus_solid"]};
+  --noti-close-bg: {colors["close_bg"]};
+  --noti-close-bg-hover: {colors["close_bg_hover"]};
+  --text-color: {colors["fg_strong"]};
+  --text-color-body: {colors["body_text"]};
+  --text-color-disabled: {colors["fg_placeholder"]};
+  --bg-selected: {colors["accent"]};
+  --button-bg: {colors["button_bg"]};
+  --button-border: {colors["button_border"]};
+  --button-bg-hover: {colors["button_hover"]};
+  --border: 1px solid var(--noti-border-color);
+  --border-radius: 14px;
+  --notification-shadow: none;
+  --font-size-body: 13px;
+  --font-size-summary: 13px;
+  font-family: "IBM Plex Sans", sans-serif;
+}}
+'''
+
+
+def swayosd_palette_css(scheme: str) -> str:
+    """The volume/brightness OSD palette, as GTK named colours."""
+    colors = PALETTE[scheme]
+    return f'''/* Generated by garage: the {scheme} palette for swayosd. */
+@define-color osd_edge {colors["edge"]};
+@define-color osd_bg {colors["osd_bg"]};
+@define-color osd_fg {colors["osd_fg"]};
+@define-color osd_fg_muted {colors["osd_fg_muted"]};
+@define-color osd_track {colors["osd_track"]};
+@define-color osd_fill {colors["osd_fill"]};
+
+@import "swayosd-base.css";
+'''
+
+
+def qt_palette_conf(scheme: str) -> str:
+    """The Qt palette qt6ct loads, as three positional rows of twenty-two."""
+    rows = [f"{state}_colors=" + ", ".join(opaque(scheme, role[index])
+                                           for role in QT_ROLES)
+            for index, state in enumerate(("active", "inactive", "disabled"), start=1)]
+    # The role order is the file's only documentation of what each column is, and
+    # it is what makes a hand-read of this file possible at all.
+    names = textwrap.wrap(", ".join(role[0] for role in QT_ROLES) + ".",
+                          width=76, initial_indent="; ", subsequent_indent="; ")
+    header = [f"; Generated by garage: the {scheme} palette for Qt. Role order is",
+              "; QPalette::ColorRole, which is positional and cannot be reordered:",
+              *names]
+    return "\n".join([*header, "[ColorScheme]", *rows]) + "\n"
+
+
 def render_toolkits(scheme: str, *, root: Path | None = None) -> None:
     look = THEME_TOOLKITS[scheme]
+    colors = PALETTE[scheme]
     # The material still supplies the surface, but the terminal carries some body
     # of its own so text has something to sit on. Near-opaque would hide the
     # glass entirely, which is the trade to avoid.
@@ -3035,9 +3577,8 @@ gtk-xft-rgba=rgb
 
     # gtk.css itself has to be generated: the palette it imports is the thing
     # that changes, and GTK offers no way to redirect an @import at runtime.
-    palette = f'apple-{scheme}.css'
     write("gtk-3.0/gtk.css", f'''/* Generated by garage. */
-@import url("{palette}");
+@import url("apple-{scheme}.css");
 @import url("thunar.css");
 ''')
     # GTK4 carries both schemes in one file behind a prefers-color-scheme query,
@@ -3047,6 +3588,21 @@ gtk-xft-rgba=rgb
 @import url("apple.css");
 @import url("nautilus.css");
 ''')
+
+    # Both appearances' palette files are written on every render, not just the
+    # resolved one. Each toolkit's entry point above names its palette by scheme,
+    # and a render interrupted between the two would otherwise leave a stylesheet
+    # importing a file that is not there -- which in GTK's case is a silent
+    # failure that drops the whole palette, not an error anyone would see.
+    for appearance in SCHEMES:
+        write(f"gtk-3.0/apple-{appearance}.css", gtk3_palette_css(appearance))
+        write(f"rofi/apple-{appearance}.rasi", rofi_palette_rasi(appearance))
+        write(f"swaync/swaync-{appearance}.css", swaync_palette_css(appearance))
+        write(f"swayosd/swayosd-{appearance}.css", swayosd_palette_css(appearance))
+    write("gtk-4.0/apple.css", gtk4_palette_css())
+    for appearance in SCHEMES:
+        write(f"qt6ct/colors/{THEME_TOOLKITS[appearance]['qt_colors']}",
+              qt_palette_conf(appearance))
 
     # XSettings is what re-themes GTK3 and XWayland apps without restarting them.
     write("xsettingsd/xsettingsd.conf", f'''Net/ThemeName "{look["gtk"]}"
@@ -3083,19 +3639,16 @@ configuration {{
 ''')
 
     # Waybar uses Hyprland's native layer blur, with a light or dark translucent
-    # tint selected from the resolved theme.
-    bar_fg = "#ffffff" if scheme == "dark" else "#000000"
-    bar_shadow = "0 1px 2px rgba(0, 0, 0, 0.45)" if scheme == "dark" else "none"
-    bar_bg = "rgba(28, 28, 30, 0.42)" if scheme == "dark" else "rgba(245, 245, 247, 0.42)"
-    bar_edge = "rgba(0, 0, 0, 0.30)" if scheme == "dark" else "rgba(0, 0, 0, 0.12)"
-    bar_sheen = "rgba(255, 255, 255, 0.07)" if scheme == "dark" else "rgba(255, 255, 255, 0.60)"
-    solid = "rgba(44, 44, 46, 0.90)" if scheme == "dark" else "rgba(255, 255, 255, 0.95)"
-    solid_fg = "#f5f5f7" if scheme == "dark" else "#1c1c1e"
-    dot = "255, 255, 255" if bar_fg == "#ffffff" else "28, 28, 30"
+    # tint selected from the resolved theme. The bar's foreground is the tint
+    # direction itself -- white over the dark glass, black over the light --
+    # because it is read against the desktop rather than against a surface.
+    bar_fg = colors["on_bg"]
+    bar_shadow = f'0 1px 2px {colors["shade"]}' if scheme == "dark" else "none"
+    dot = rgb_parts(colors["bar_dot"])
     write("waybar/style.css", f'''/* Generated by garage. */
-@define-color bar_bg {bar_bg};
-@define-color bar_edge {bar_edge};
-@define-color bar_sheen {bar_sheen};
+@define-color bar_bg {colors["bar_bg"]};
+@define-color bar_edge {colors["bar_edge"]};
+@define-color bar_sheen {colors["bar_sheen"]};
 @define-color bar_fg {bar_fg};
 @define-color menu_fg {bar_fg};
 @define-color module_fg {bar_fg};
@@ -3104,9 +3657,9 @@ configuration {{
 @define-color dot_idle rgba({dot}, 0.45);
 @define-color dot_hover rgba({dot}, 0.65);
 @define-color dot_active rgba({dot}, 0.95);
-@define-color urgent rgba(255, 69, 58, 0.95);
-@define-color tooltip_bg {solid};
-@define-color tooltip_fg {solid_fg};
+@define-color urgent {colors["urgent"]};
+@define-color tooltip_bg {colors["tooltip_bg"]};
+@define-color tooltip_fg {colors["fg_strong"]};
 
 @import "waybar-base.css";
 
@@ -3125,108 +3678,96 @@ tooltip, tooltip * {{
 ''')
 
     # kitty paints its own background over the glass, so the terminal stays dark
-    # until this changes no matter what the compositor does.
-    kitty = {
-        "dark": dict(bg="#1c1c1e", fg="#d1d1d6", cursor="#f5f5f7", cursor_text="#1c1c1e",
-                     sel_bg="#0a84ff", sel_fg="#ffffff", url="#64aaff",
-                     active_border="#0a84ff", inactive_border="#3a3a3c",
-                     tab_afg="#f5f5f7", tab_abg="#3a3a3c",
-                     tab_ifg="#8e8e93", tab_ibg="#1c1c1e"),
-        "light": dict(bg="#ffffff", fg="#1c1c1e", cursor="#1c1c1e", cursor_text="#ffffff",
-                      sel_bg="#007aff", sel_fg="#ffffff", url="#0060df",
-                      active_border="#007aff", inactive_border="#c7c7cc",
-                      tab_afg="#1c1c1e", tab_abg="#d1d1d6",
-                      tab_ifg="#6c6c70", tab_ibg="#f2f2f7"),
-    }[scheme]
+    # until this changes no matter what the compositor does. term_bg is the one
+    # body that is not the window body: the terminal takes the highest-contrast
+    # step of the ramp so body text has as much of it as the appearance allows.
     write("kitty/theme.conf", f'''# Generated by garage.
 # Fully transparent: the glass underlay supplies the surface.
 background_opacity          {term_opacity:g}
-background                  {kitty["bg"]}
-foreground                  {kitty["fg"]}
-cursor                      {kitty["cursor"]}
-cursor_text_color           {kitty["cursor_text"]}
-selection_background        {kitty["sel_bg"]}
-selection_foreground        {kitty["sel_fg"]}
-url_color                   {kitty["url"]}
-active_border_color         {kitty["active_border"]}
-inactive_border_color       {kitty["inactive_border"]}
-active_tab_foreground       {kitty["tab_afg"]}
-active_tab_background       {kitty["tab_abg"]}
-inactive_tab_foreground     {kitty["tab_ifg"]}
-inactive_tab_background     {kitty["tab_ibg"]}
+background                  {colors["body_opaque"]}
+foreground                  {colors["fg"]}
+cursor                      {colors["fg_strong"]}
+cursor_text_color           {colors["body_opaque"]}
+selection_background        {colors["accent"]}
+selection_foreground        {colors["accent_fg"]}
+url_color                   {colors["link"]}
+active_border_color         {colors["accent"]}
+inactive_border_color       {colors["line"]}
+active_tab_foreground       {colors["fg_strong"]}
+active_tab_background       {colors["bg_lifted"]}
+inactive_tab_foreground     {colors["fg_muted"]}
+inactive_tab_background     {colors["bg"]}
 ''')
 
     # btop reads a named theme file once at startup, so the file's contents are
     # swapped rather than the config's color_theme -- that keeps btop.conf stowed.
-    btop = {
-        "dark": dict(fg="#d1d1d6", dim="#8e8e93", hi="#0a84ff", sel_bg="#2c2c2e",
-                     box="#3a3a3c", div="#48484a", meter="#2c2c2e"),
-        "light": dict(fg="#1c1c1e", dim="#6c6c70", hi="#007aff", sel_bg="#d1d1d6",
-                      box="#b0b0b5", div="#c7c7cc", meter="#e5e5ea"),
-    }[scheme]
+    # The gradients run through the signal colours, which are the same in both
+    # appearances: a CPU at 90 degrees is not a lighter shade of hot on a light
+    # desktop.
     write("btop/themes/vanta.theme", f'''# Generated by garage.
 # An empty main_bg keeps the terminal's own background, which is the glass.
 theme[main_bg]=""
-theme[main_fg]="{btop["fg"]}"
-theme[title]="{btop["fg"]}"
-theme[hi_fg]="{btop["hi"]}"
-theme[selected_bg]="{btop["sel_bg"]}"
-theme[selected_fg]="{btop["fg"]}"
-theme[inactive_fg]="{btop["dim"]}"
-theme[graph_text]="{btop["dim"]}"
-theme[meter_bg]="{btop["meter"]}"
-theme[proc_misc]="{btop["hi"]}"
-theme[cpu_box]="{btop["box"]}"
-theme[mem_box]="{btop["box"]}"
-theme[net_box]="{btop["box"]}"
-theme[proc_box]="{btop["box"]}"
-theme[div_line]="{btop["div"]}"
-theme[temp_start]="#32d74b"
-theme[temp_mid]="#ffd60a"
-theme[temp_end]="#ff453a"
-theme[cpu_start]="#32d74b"
-theme[cpu_mid]="#ffd60a"
-theme[cpu_end]="#ff453a"
-theme[free_start]="{btop["dim"]}"
+theme[main_fg]="{colors["fg"]}"
+theme[title]="{colors["fg"]}"
+theme[hi_fg]="{colors["accent"]}"
+theme[selected_bg]="{colors["row_selected"]}"
+theme[selected_fg]="{colors["fg"]}"
+theme[inactive_fg]="{colors["fg_muted"]}"
+theme[graph_text]="{colors["fg_muted"]}"
+theme[meter_bg]="{colors["meter_track"]}"
+theme[proc_misc]="{colors["accent"]}"
+theme[cpu_box]="{colors["line_box"]}"
+theme[mem_box]="{colors["line_box"]}"
+theme[net_box]="{colors["line_box"]}"
+theme[proc_box]="{colors["line_box"]}"
+theme[div_line]="{colors["line_faint"]}"
+theme[temp_start]="{colors["ok"]}"
+theme[temp_mid]="{colors["warn"]}"
+theme[temp_end]="{colors["danger"]}"
+theme[cpu_start]="{colors["ok"]}"
+theme[cpu_mid]="{colors["warn"]}"
+theme[cpu_end]="{colors["danger"]}"
+theme[free_start]="{colors["fg_muted"]}"
 theme[free_mid]=""
-theme[free_end]="{btop["fg"]}"
-theme[cached_start]="#5ac8fa"
+theme[free_end]="{colors["fg"]}"
+theme[cached_start]="{colors["info"]}"
 theme[cached_mid]=""
-theme[cached_end]="{btop["hi"]}"
-theme[available_start]="#ffd60a"
+theme[cached_end]="{colors["accent"]}"
+theme[available_start]="{colors["warn"]}"
 theme[available_mid]=""
-theme[available_end]="#ff9f0a"
-theme[used_start]="#32d74b"
-theme[used_mid]="#ffd60a"
-theme[used_end]="#ff453a"
-theme[download_start]="#5ac8fa"
+theme[available_end]="{colors["caution"]}"
+theme[used_start]="{colors["ok"]}"
+theme[used_mid]="{colors["warn"]}"
+theme[used_end]="{colors["danger"]}"
+theme[download_start]="{colors["info"]}"
 theme[download_mid]=""
-theme[download_end]="{btop["hi"]}"
-theme[upload_start]="#ff9f0a"
+theme[download_end]="{colors["accent"]}"
+theme[upload_start]="{colors["caution"]}"
 theme[upload_mid]=""
-theme[upload_end]="#ff453a"
-theme[process_start]="{btop["hi"]}"
+theme[upload_end]="{colors["danger"]}"
+theme[process_start]="{colors["accent"]}"
 theme[process_mid]=""
-theme[process_end]="#af52de"
+theme[process_end]="{colors["violet"]}"
 ''')
 
     write("micro/settings.json", json.dumps(
         {"colorscheme": "catppuccin-latte" if scheme == "light" else "catppuccin-macchiato"},
         indent=4) + "\n")
 
-    lock = {
-        "dark": dict(outer="rgba(ffffff26)", inner="rgba(1c1c1ed9)", font="rgb(f5f5f7)",
-                     placeholder="8e8e93", check="rgb(0a84ff)"),
-        "light": dict(outer="rgba(00000026)", inner="rgba(f2f2f7d9)", font="rgb(1c1c1e)",
-                      placeholder="6c6c70", check="rgb(007aff)"),
-    }[scheme]
+    # hyprlang spells a colour rgba(rrggbbaa) or rgb(rrggbb), with no #, and the
+    # placeholder is interpolated into Pango markup where it needs the bare hex.
+    def lock_color(role: str, alpha: str = "") -> str:
+        digits = opaque(scheme, role).lstrip("#")
+        return f"rgba({digits}{alpha})" if alpha else f"rgb({digits})"
+
     GENERATED.mkdir(parents=True, exist_ok=True)
     atomic_write(GENERATED / "hyprlock-theme.conf", f'''# Generated by garage.
-$outer_color = {lock["outer"]}
-$inner_color = {lock["inner"]}
-$font_color = {lock["font"]}
-$placeholder_hex = {lock["placeholder"]}
-$check_color = {lock["check"]}
+$outer_color = {lock_color("on_bg", "26")}
+$inner_color = {lock_color("bg", "d9")}
+$font_color = {lock_color("fg_strong")}
+$placeholder_hex = {opaque(scheme, "fg_muted").lstrip("#")}
+$check_color = {lock_color("accent")}
+$fail_color = {lock_color("danger")}
 ''')
 
     write("qt6ct/qt6ct.conf", f'''[Appearance]
@@ -3620,7 +4161,7 @@ def render_theme(config: dict) -> None:
     render_search_engine(config)
     # The bar's widgets draw their own SVG text, which no stylesheet reaches.
     # Publish the resolved theme foreground so they match Waybar's CSS.
-    write_marker(BAR_FG_FILE, ("#ffffff" if scheme == "dark" else "#000000") + "\n")
+    write_marker(BAR_FG_FILE, PALETTE[scheme]["on_bg"] + "\n")
     render_toolkits(scheme)
 
 

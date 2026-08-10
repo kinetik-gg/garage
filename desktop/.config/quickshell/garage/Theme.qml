@@ -127,11 +127,20 @@ QtObject {
     readonly property color scrim: dark ? "#40000000" : "#40000000"
     readonly property color knob: dark ? "#ffe5e5e7" : "#ffffffff"
 
+    // The nine choosable accents, and the shell's only copy of a palette that
+    // otherwise lives once in the backend's PALETTE/ACCENTS. QML can neither
+    // @import a stylesheet nor read a Python mapping, and the accent marker
+    // carries the *name* rather than the colour, so the hexes have to be here.
+    // tests/test_palette.py fails if they drift from ACCENTS.
     readonly property var accentPalette: ({
         blue: "#ff3584e4", teal: "#ff2190a4", green: "#ff3a944a",
         yellow: "#fff6d32d", orange: "#ffff7800", red: "#ffe01b24",
         pink: "#ffd56199", purple: "#ff9141ac", slate: "#ff6f8396"
     })
+    // The order the Appearance pane draws the swatch row in. Derived rather than
+    // listed a second time: an accent present in one and missing from the other
+    // is either a swatch with no colour or a colour nobody can pick.
+    readonly property var accentNames: Object.keys(accentPalette)
     property FileView accentFile: FileView {
         path: Quickshell.env("HOME") + "/.local/state/garage/generated/accent"
         printErrors: false

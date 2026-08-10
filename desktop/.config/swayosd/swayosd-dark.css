@@ -1,8 +1,0 @@
-@define-color osd_edge rgba(255, 255, 255, 0.16);
-@define-color osd_bg rgba(28, 28, 30, 0.94);
-@define-color osd_fg rgba(245, 245, 247, 0.92);
-@define-color osd_fg_muted rgba(245, 245, 247, 0.82);
-@define-color osd_track rgba(245, 245, 247, 0.24);
-@define-color osd_fill rgba(245, 245, 247, 0.90);
-
-@import "swayosd-base.css";
