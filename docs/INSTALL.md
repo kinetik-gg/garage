@@ -114,7 +114,10 @@ In order:
    `~/.garage-backup/<timestamp>/`, deletes stale links left behind by a Garage
    checkout that has since moved, and only then runs
    `stow --restow --no-folding desktop`. If `stow` still reports a conflict, the
-   run stops with the list rather than leaving your home half-linked.
+   run stops with the list rather than leaving your home half-linked. It then
+   runs `fc-cache` so the bundled fonts -- Phosphor, Plus Jakarta Sans, and
+   Geist Mono, linked into `~/.local/share/fonts` by the same stow pass -- are
+   ready for the bar (and everything else) at first login.
 7. **Writes the two per-user generated files** — `~/.config/swayosd/config.toml`
    and `~/.config/gtk-3.0/bookmarks`. These embed an absolute `$HOME`, so they
    are real files rather than links into the repository, and they are only
@@ -294,7 +297,8 @@ garage doctor
 Read-only, and safe to run at any time from anywhere, including a TTY after a
 login that did not come up. It prints one line per check and exits 1 if anything
 is actually wrong: the Hyprland version against the support floor, the key
-packages, the IBM Plex families as fontconfig sees them, every path this checkout
+packages, the bundled font families (Plus Jakarta Sans, Geist Mono) as fontconfig
+sees them, every path this checkout
 manages resolving from `$HOME` into it, dangling links left by a deleted file,
 the per-user units, the plugin ABI, the generated Lua fragments (each run through
 `luac -p`), and the preferences file.

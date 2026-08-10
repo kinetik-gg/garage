@@ -3433,7 +3433,7 @@ def rofi_palette_rasi(scheme: str) -> str:
     foreground-muted: {colors["fg_muted"]}ff;
     background-color: transparent;
     text-color: @foreground;
-    font: "IBM Plex Sans 12";
+    font: "Plus Jakarta Sans 12";
 }}
 
 @import "apple-base.rasi"
@@ -3485,7 +3485,7 @@ def render_toolkits(scheme: str, *, root: Path | None = None) -> None:
         # of these are small enough that a torn write is not a real risk.
         write_marker(base / relative, text)
 
-    shared = f'''gtk-font-name=IBM Plex Sans 11
+    shared = f'''gtk-font-name=Plus Jakarta Sans 11
 gtk-icon-theme-name={look["icons"]}
 gtk-cursor-theme-name=macOS
 gtk-cursor-theme-size=24
@@ -3539,7 +3539,7 @@ gtk-xft-rgba=rgb
 
     # XSettings is what re-themes GTK3 and XWayland apps without restarting them.
     write("xsettingsd/xsettingsd.conf", f'''Net/ThemeName "{look["gtk"]}"
-Gtk/FontName "IBM Plex Sans 11"
+Gtk/FontName "Plus Jakarta Sans 11"
 Net/IconThemeName "{look["icons"]}"
 Gtk/CursorThemeName "macOS"
 Net/EnableEventSounds 1
@@ -3707,7 +3707,7 @@ style=Fusion
 
 [Fonts]
 fixed="CaskaydiaMono Nerd Font Mono,10,-1,5,50,0,0,0,0,0"
-general="IBM Plex Sans,10,-1,5,50,0,0,0,0,0"
+general="Plus Jakarta Sans,10,-1,5,50,0,0,0,0,0"
 ''')
 
 
@@ -4834,11 +4834,11 @@ MINIMUM_HYPRLAND = "0.56.0"
 # bootstrap.sh and is not duplicated here -- `garage update` re-runs that list
 # through pacman anyway, which is a better check than repeating it.
 DOCTOR_PACKAGES = ("quickshell", "waybar", "hypridle", "hyprpaper", "kitty",
-                   "fish", "stow", "ttf-ibm-plex", "adw-gtk-theme")
+                   "fish", "stow", "adw-gtk-theme")
 
 # fc-list family names, not package names: a font can be installed and still not
 # be found by fontconfig, and every toolkit config asks for these two by family.
-DOCTOR_FONTS = ("IBM Plex Sans", "IBM Plex Mono")
+DOCTOR_FONTS = ("Plus Jakarta Sans", "Geist Mono")
 
 # The per-user units this checkout owns, plus the three it extends with a
 # drop-in, each with whether a live session should show it running.
@@ -5252,7 +5252,7 @@ def check_fonts() -> tuple[str, str, str]:
     missing = [name for name in DOCTOR_FONTS if name not in families]
     if missing:
         return ("fail", f"fontconfig cannot find: {', '.join(missing)}",
-                "sudo pacman -S --needed ttf-ibm-plex && fc-cache -f")
+                "stow -R desktop && fc-cache -f")
     return "ok", f"{', '.join(DOCTOR_FONTS)} present", ""
 
 

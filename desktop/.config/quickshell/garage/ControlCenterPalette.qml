@@ -22,14 +22,17 @@ PanelWindow {
     required property string targetScreenName
 
     signal dismissed()
-    // The session commands live in the shell, next to the session menu's own
-    // copy: which strings mean what is one table, and it is not this panel's.
-    signal sessionAction(string action)
-    signal openPreferences()
 
     // Grab arming, one turn late: a focus grab installed in the same turn the
     // surface is created is cleared by the click that opened it.
     property bool grabReady: false
+
+    // Suppresses the click-outside dismissal while another shell surface has
+    // taken the focus grab on purpose. The screenshot pill is the only thing
+    // that sets it: photographing this panel is the whole point of pressing the
+    // screenshot bind with it open, so the pill taking the grab must not be read
+    // as the user clicking somewhere else. See the grab at the foot of the file.
+    property bool holdOpen: false
 
     readonly property int contentMargin: 12
 
@@ -364,8 +367,10 @@ PanelWindow {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
                     value: centre.volume
+                    // The live value, not the committed one: the volume is meant
+                    // to follow the handle. Scrolling reports through moved() as
+                    // well, so the wheel needs nothing of its own here.
                     onMoved: centre.applyVolume(volumeSlider.value)
-                    onWheelAdjusted: adjusted => centre.applyVolume(adjusted)
                 }
 
                 Text {
@@ -380,82 +385,24 @@ PanelWindow {
                 }
             }
 
+            // The last thing in the panel. Lock, Sleep and Log Out used to sit
+            // below it, and System Preferences below them: the session menu owns
+            // the session commands and its own Preferences item, so both were a
+            // second copy of a menu one click away -- and the copy was the one
+            // that could log the user out from under a mis-aimed click on a
+            // volume slider.
             MediaCard {
                 Layout.fillWidth: true
-            }
-
-            MenuSeparator {}
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-
-                SettingsButton {
-                    Layout.fillWidth: true
-                    text: "Lock"
-                    iconSource: "icons/lock-simple.svg"
-                    ghost: true
-                    verticalPadding: 6
-                    horizontalPadding: 10
-                    onClicked: centre.sessionAction("lock")
-                }
-
-                SettingsButton {
-                    Layout.fillWidth: true
-                    text: "Sleep"
-                    iconSource: "icons/moon.svg"
-                    ghost: true
-                    verticalPadding: 6
-                    horizontalPadding: 10
-                    onClicked: centre.sessionAction("suspend")
-                }
-
-                SettingsButton {
-                    Layout.fillWidth: true
-                    text: "Log Out"
-                    iconSource: "icons/sign-out.svg"
-                    ghost: true
-                    verticalPadding: 6
-                    horizontalPadding: 10
-                    onClicked: centre.sessionAction("logout")
-                }
-            }
-
-            Item {
-                Layout.fillWidth: true
-                implicitHeight: 22
-
-                Text {
-                    id: preferencesLink
-                    anchors.left: parent.left
-                    anchors.leftMargin: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "System Preferences…"
-                    color: preferencesPointer.containsMouse ? Theme.text : Theme.textMuted
-                    font.family: Theme.sans
-                    font.pixelSize: 11
-                    renderType: Text.NativeRendering
-                }
-
-                MouseArea {
-                    id: preferencesPointer
-                    anchors.verticalCenter: preferencesLink.verticalCenter
-                    x: preferencesLink.x
-                    width: preferencesLink.width
-                    height: parent.height
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: centre.openPreferences()
-                }
             }
         }
     }
 
-    // The wheel handler in SettingsSlider assigns value directly, which destroys
-    // a declarative binding the first time it is used. Syncing from here keeps
-    // the slider following the sink afterwards -- pactl, a headset key, another
-    // shell surface -- instead of freezing on whatever the last scroll left. Not
-    // while the handle is held, so a drag is not fought by the round trip.
+    // A slider writes its own value as it is dragged or scrolled, which destroys
+    // the declarative binding above the first time it is touched. Syncing from here
+    // keeps the slider following the sink afterwards -- pactl, a headset key,
+    // another shell surface -- instead of freezing on whatever the last gesture
+    // left. Not while the handle is held, so a drag is not fought by the round
+    // trip.
     Connections {
         target: centre
         function onVolumeChanged() {
@@ -468,12 +415,34 @@ PanelWindow {
     // on-demand layer surface the keyboard when it opens -- without it the
     // Escape below would not be heard until the panel had been clicked.
     HyprlandFocusGrab {
+        id: grab
         active: centre.grabReady
         windows: [centre]
         onCleared: {
-            if (centre.grabReady)
-                centre.dismissed();
+            if (!centre.grabReady)
+                return;
+            // Hyprland keeps one grab at a time, so a surface that takes one
+            // clears this one whether or not the user clicked anywhere. While
+            // the screenshot pill holds it, letting go is not the same as being
+            // dismissed: the panel stays up and takes its grab back below.
+            if (centre.holdOpen)
+                return;
+            centre.dismissed();
         }
+    }
+
+    // Re-armed by hand rather than by the binding above: a cleared grab is a
+    // write to active from the compositor's side, and a written property has no
+    // binding left to re-evaluate. One turn late for the same reason it is armed
+    // late -- the click that dismissed the pill would otherwise clear the fresh
+    // grab and take this panel with it.
+    onHoldOpenChanged: {
+        if (centre.holdOpen || !centre.grabReady)
+            return;
+        Qt.callLater(() => {
+            grab.active = false;
+            grab.active = true;
+        });
     }
 
     Shortcut {

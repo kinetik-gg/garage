@@ -4,7 +4,7 @@ window#osd {
   border-radius: 14px;
   background: @osd_bg;
   color: @osd_fg;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 13px;
   font-weight: 500;
 }

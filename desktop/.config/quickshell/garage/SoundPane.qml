@@ -52,8 +52,7 @@ Flickable {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 150
                         value: pane.deviceValue(pane.controller.snapshot.audio.outputs, "volume", 0)
-                        onPressedChanged: if (!pressed) pane.controller.action("audio.output.volume", value)
-                        onWheelAdjusted: value => pane.controller.action("audio.output.volume", value)
+                        onCommitted: next => pane.controller.action("audio.output.volume", next)
                     }
                     SettingsButton {
                         anchors.verticalCenter: parent.verticalCenter
@@ -92,8 +91,7 @@ Flickable {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 150
                         value: pane.deviceValue(pane.controller.snapshot.audio.inputs, "volume", 0)
-                        onPressedChanged: if (!pressed) pane.controller.action("audio.input.volume", value)
-                        onWheelAdjusted: value => pane.controller.action("audio.input.volume", value)
+                        onCommitted: next => pane.controller.action("audio.input.volume", next)
                     }
                     SettingsButton {
                         anchors.verticalCenter: parent.verticalCenter

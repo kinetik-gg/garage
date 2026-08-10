@@ -263,7 +263,10 @@ packages=(
     btop fastfetch micro qt6ct qt6-wayland xsettingsd
     python python-pip python-pipx uv lua jq zenity file libnotify 7zip
     papirus-icon-theme adw-gtk-theme
-    noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-ibm-plex
+    # UI faces (Plus Jakarta Sans, Geist Mono) are bundled under
+    # desktop/.local/share/fonts, alongside Phosphor -- not Arch-packaged, and
+    # picked up by the post-stow fc-cache run below.
+    noto-fonts noto-fonts-cjk noto-fonts-emoji
     ttf-cascadia-mono-nerd awesome-terminal-fonts
     remmina freerdp sddm lm_sensors xdg-user-dirs desktop-file-utils pciutils
     spotify-launcher discord zed
@@ -520,6 +523,11 @@ STOW
     [[ -n $stow_output ]] && printf '%s\n' "$stow_output"
 fi
 record "linked the tracked configuration with stow --no-folding"
+
+# Refreshes the fontconfig cache so the bundled fonts -- Phosphor, Plus
+# Jakarta Sans, and Geist Mono, just linked into ~/.local/share/fonts by
+# stow -- are found at first login.
+run fc-cache
 
 # ---------------------------------------------------------------------------
 # Per-user generated files

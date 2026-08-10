@@ -13,15 +13,18 @@ ShellRoot {
 
     // Which transient surface is on screen, by name, or "" for none.
     //
-    // The transient surfaces -- the launcher, the screenshot pill, the session
-    // menu, the notification centre and the control centre -- are layer overlays
-    // that hold the keyboard or the pointer for as long as they are up, so no two
-    // of them can usefully be on screen together. Holding that as one name rather
-    // than a boolean per loader is what makes it true by construction: every loader
-    // binds to this, so activating one deactivates the rest with no cross-loader
-    // clears to keep in step. Those clears were written out at each entry point
-    // before, and were, in places, forgotten -- session() closed the screenshot
-    // pill and about() closed nothing.
+    // The transient surfaces -- the launcher, the session menu, the notification
+    // centre and the control centre -- are layer overlays that hold the keyboard
+    // or the pointer for as long as they are up, so no two of them can usefully be
+    // on screen together. Holding that as one name rather than a boolean per loader
+    // is what makes it true by construction: every loader binds to this, so
+    // activating one deactivates the rest with no cross-loader clears to keep in
+    // step. Those clears were written out at each entry point before, and were, in
+    // places, forgotten -- session() closed the screenshot pill and about() closed
+    // nothing.
+    //
+    // Deliberately not the screenshot pill, which used to be in here: see
+    // screenshotOpen below.
     //
     // Deliberately not the Preferences and About windows: those are
     // FloatingWindows the compositor stacks like any other application window,
@@ -34,8 +37,30 @@ ShellRoot {
     // able to appear over anything in this list.
     property string activeSurface: ""
 
+    // The screenshot pill, on a flag of its own rather than in activeSurface.
+    //
+    // Everything in that set closes everything else in it, and the pill was in it
+    // -- so pressing the screenshot bind with the notification centre or the
+    // control centre open dismissed the panel the user had opened the pill to
+    // photograph. The pill is the one surface whose purpose is what is already on
+    // screen, so it is the one surface that cannot be mutually exclusive with
+    // everything.
+    //
+    // It keeps the rest of its pairings: the launcher and the session menu hold
+    // the keyboard and are nothing to photograph, so they and the pill still close
+    // each other, and opening Preferences or About still dismisses it. Those
+    // pairings live in the four functions below rather than at each entry point.
+    property bool screenshotOpen: false
+
     function focusedScreenName() {
         return Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
+    }
+
+    // The surfaces the pill may share the screen with: the two panels worth
+    // taking a picture of. Both of them survive the pill's focus grab by holding
+    // themselves open through it -- see holdOpen on the loaders below.
+    function sharesScreenWithScreenshot(name) {
+        return name === "notificationCenter" || name === "controlCenter";
     }
 
     // configure() runs before the surface is shown, so the palette is created
@@ -44,6 +69,8 @@ ShellRoot {
     function openSurface(name, configure) {
         if (configure)
             configure();
+        if (!shell.sharesScreenWithScreenshot(name))
+            shell.screenshotOpen = false;
         shell.activeSurface = name;
     }
 
@@ -53,7 +80,15 @@ ShellRoot {
     function toggleSurface(name, configure) {
         if (configure)
             configure();
-        shell.activeSurface = shell.activeSurface === name ? "" : name;
+        if (shell.activeSurface === name) {
+            // Closing something is not opening anything, so the pill is left
+            // where it is rather than being taken down with the panel.
+            shell.activeSurface = "";
+            return;
+        }
+        if (!shell.sharesScreenWithScreenshot(name))
+            shell.screenshotOpen = false;
+        shell.activeSurface = name;
     }
 
     function closeSurface(name) {
@@ -61,10 +96,39 @@ ShellRoot {
             shell.activeSurface = "";
     }
 
-    // What a session action runs, in one place. The session menu and the control
-    // centre both name actions out of this table, so a string that means sleep in
-    // one cannot mean nothing at all in the other -- which is what a second copy
-    // of the map in the second caller would eventually have arranged.
+    // The pill closes whatever cannot share the screen with it, which is what
+    // being in activeSurface used to do for it.
+    function openScreenshot() {
+        if (!shell.sharesScreenWithScreenshot(shell.activeSurface))
+            shell.activeSurface = "";
+        shell.screenshotOpen = true;
+    }
+
+    // Run rather than detached, for its lifetime alone: slurp and grim take the
+    // keyboard themselves, which clears a panel's focus grab exactly as the pill's
+    // own grab does, so the panels have to hold themselves open until the capture
+    // is over. Detaching it left the centre being photographed dismissed by the
+    // tool photographing it.
+    function captureScreenshot(mode) {
+        const command = [
+            Quickshell.env("HOME") + "/.local/bin/garage-screenshot-copy",
+            mode
+        ];
+        if (captureProcess.running) {
+            // A capture already running is already what the panels are holding
+            // open for. Detach the second one rather than move that goalpost.
+            Quickshell.execDetached(command);
+            return;
+        }
+        captureProcess.command = command;
+        captureProcess.running = true;
+    }
+
+    // What a session action runs, in one place, named by the session menu -- the
+    // one surface that offers the session commands. The control centre offered a
+    // second copy of Lock, Sleep and Log Out through here until they were taken
+    // out of it; the table stays here rather than in SessionPalette so the next
+    // caller has somewhere to name them from instead of writing its own map.
     function runSessionAction(action) {
         const commands = {
             "reloadHyprland": ["hyprctl", "reload"],
@@ -84,8 +148,10 @@ ShellRoot {
         if (configure)
             configure();
         // Whatever transient raised this window goes with the click that raised
-        // it. The window itself is left alone by every other surface.
+        // it, the pill included. The window itself is left alone by every other
+        // surface.
         shell.activeSurface = "";
+        shell.screenshotOpen = false;
         loader.active = true;
     }
 
@@ -97,6 +163,7 @@ ShellRoot {
             return;
         }
         shell.activeSurface = "";
+        shell.screenshotOpen = false;
         loader.active = true;
     }
 
@@ -136,19 +203,25 @@ ShellRoot {
 
     LazyLoader {
         id: screenshotLoader
-        active: shell.activeSurface === "screenshot"
+        active: shell.screenshotOpen
 
         ScreenshotPalette {
             onModeSelected: mode => {
-                shell.closeSurface("screenshot");
-                Quickshell.execDetached([
-                    Quickshell.env("HOME") + "/.local/bin/garage-screenshot-copy",
-                    mode
-                ]);
+                // The pill goes first: it is a layer surface over the desktop, and
+                // grim would otherwise photograph it along with everything else.
+                shell.screenshotOpen = false;
+                shell.captureScreenshot(mode);
             }
 
-            onDismissed: shell.closeSurface("screenshot")
+            onDismissed: shell.screenshotOpen = false
         }
+    }
+
+    // The capture itself. Its lifetime is what the notification and control
+    // centres hold themselves open for, so it has to be a Process the shell can
+    // see rather than a detached command.
+    Process {
+        id: captureProcess
     }
 
     LazyLoader {
@@ -187,6 +260,10 @@ ShellRoot {
 
         NotificationCenterPalette {
             targetScreenName: shell.notificationScreenName
+            // Up for as long as the screenshot flow is: the pill's grab and then
+            // slurp's keyboard both clear this centre's focus grab, and neither is
+            // the user clicking away from it.
+            holdOpen: shell.screenshotOpen || captureProcess.running
             onDismissed: shell.closeSurface("notificationCenter")
         }
     }
@@ -197,24 +274,8 @@ ShellRoot {
 
         ControlCenterPalette {
             targetScreenName: shell.controlCenterScreenName
-
-            // The panel is gone before the command runs: sleeping or locking with
-            // a layer surface still holding the keyboard leaves it up over the
-            // lock screen, and the click that asked for it is over either way.
-            onSessionAction: action => {
-                shell.closeSurface("controlCenter");
-                shell.runSessionAction(action);
-            }
-
-            // Same route the session menu's own Preferences item takes, on the
-            // screen the panel is on rather than the focused one -- the pointer
-            // that opened this may be on a different monitor. openWindow() is
-            // what dismisses the panel, as it does for every other transient.
-            onOpenPreferences: shell.openWindow(preferencesLoader, () => {
-                shell.preferencesScreenName = shell.controlCenterScreenName;
-                shell.preferencesSection = "general";
-            })
-
+            // Same hold as the notification centre above, for the same reason.
+            holdOpen: shell.screenshotOpen || captureProcess.running
             onDismissed: shell.closeSurface("controlCenter")
         }
     }
@@ -273,11 +334,11 @@ ShellRoot {
         }
 
         function screenshot(): void {
-            shell.openSurface("screenshot");
+            shell.openScreenshot();
         }
 
         function closeScreenshot(): void {
-            shell.closeSurface("screenshot");
+            shell.screenshotOpen = false;
         }
 
         function session(): void {

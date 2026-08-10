@@ -167,10 +167,8 @@ Flickable {
                     to: 10
                     stepSize: 1
                     value: pane.borderSize
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "border_size", Math.round(value))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "border_size", Math.round(value))
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "border_size", Math.round(next))
                 }
             }
         }
@@ -205,10 +203,8 @@ Flickable {
                     to: 2
                     stepSize: 0.25
                     value: pane.motionSpeed
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "animation_speed", value)
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "animation_speed", value)
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "animation_speed", next)
                 }
             }
         }
@@ -263,10 +259,8 @@ Flickable {
                     to: 0.25
                     stepSize: 0.01
                     value: pane.controller.preference("appearance", "glass_transparency", 0.04)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "glass_transparency", value)
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "glass_transparency", value)
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "glass_transparency", next)
                 }
             }
 
@@ -299,10 +293,8 @@ Flickable {
                     to: 128
                     stepSize: 1
                     value: pane.controller.preference("appearance", "glass_edge_width", 24)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "glass_edge_width", Math.round(value))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "glass_edge_width", Math.round(value))
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "glass_edge_width", Math.round(next))
                 }
             }
 
@@ -317,10 +309,8 @@ Flickable {
                     to: 1
                     stepSize: 0.05
                     value: pane.controller.preference("appearance", "glass_refraction", 0.7)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "glass_refraction", value)
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "glass_refraction", value)
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "glass_refraction", next)
                 }
             }
 
@@ -333,10 +323,8 @@ Flickable {
                     to: 1
                     stepSize: 0.05
                     value: pane.controller.preference("appearance", "glass_clarity", 0.75)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "glass_clarity", value)
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "glass_clarity", value)
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "glass_clarity", next)
                 }
             }
 
@@ -349,10 +337,8 @@ Flickable {
                     to: 1
                     stepSize: 0.01
                     value: pane.controller.preference("appearance", "glass_highlight", 0.12)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "glass_highlight", value)
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "glass_highlight", value)
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "glass_highlight", next)
                 }
             }
         }
@@ -399,10 +385,8 @@ Flickable {
                     to: 10000
                     stepSize: 100
                     value: pane.controller.preference("appearance", "night_shift_temperature", 4500)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "appearance", "night_shift_temperature", Math.round(value))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "appearance", "night_shift_temperature", Math.round(value))
+                    onCommitted: next => pane.controller.setPreference(
+                        "appearance", "night_shift_temperature", Math.round(next))
                 }
             }
         }

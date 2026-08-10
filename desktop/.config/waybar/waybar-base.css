@@ -3,7 +3,7 @@
   border: none;
   border-radius: 0;
   min-height: 0;
-  font-family: "IBM Plex Sans", "CaskaydiaMono Nerd Font Mono", sans-serif;
+  font-family: "Plus Jakarta Sans", "CaskaydiaMono Nerd Font Mono", sans-serif;
   font-size: 13px;
   font-weight: 600;
 }
@@ -20,8 +20,8 @@ window#waybar {
   padding-left: 13px;
   padding-right: 10px;
   color: @menu_fg;
-  /* The label is a Nerd Font glyph; IBM Plex must not claim the codepoint. */
-  font-family: "CaskaydiaMono Nerd Font", "IBM Plex Sans", sans-serif;
+  /* The label is a Nerd Font glyph; Plus Jakarta Sans must not claim the codepoint. */
+  font-family: "CaskaydiaMono Nerd Font", "Plus Jakarta Sans", sans-serif;
   font-size: 17px;
 }
 
@@ -75,13 +75,13 @@ window#waybar {
 #clock {
   padding: 0 12px;
   color: @module_fg;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 13px;
   font-weight: 600;
 }
 
 #custom-media {
-  font-family: "IBM Plex Sans", "CaskaydiaMono Nerd Font", sans-serif;
+  font-family: "Plus Jakarta Sans", "CaskaydiaMono Nerd Font", sans-serif;
 }
 
 #custom-git:hover,
@@ -95,23 +95,26 @@ window#waybar {
 }
 
 #custom-notifications,
+#custom-launcher,
 #custom-control-center {
   color: @module_fg;
-  /* Nerd Font glyphs; IBM Plex must not claim the codepoints. */
-  font-family: "CaskaydiaMono Nerd Font", "IBM Plex Sans", sans-serif;
-  font-size: 15px;
+  /* Real Phosphor glyphs first; Nerd Font and Plus Jakarta Sans are fallbacks only,
+     they must not claim these codepoints. */
+  font-family: "Phosphor", "CaskaydiaMono Nerd Font", "Plus Jakarta Sans", sans-serif;
+  font-size: 16px;
   padding-left: 10px;
   padding-right: 10px;
 }
 
 #custom-notifications:hover,
+#custom-launcher:hover,
 #custom-control-center:hover {
   color: @module_fg_hover;
 }
 
 #custom-network {
   min-width: 124px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Geist Mono", monospace;
   font-weight: 600;
 }
 

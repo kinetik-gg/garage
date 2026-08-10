@@ -74,9 +74,13 @@ hl.layer_rule({
     match = { namespace = "^(garage-notification-center|garage-control-center)$" },
     animation = "slide right",
 })
+-- Toast popups only: they appear involuntarily and can carry message content,
+-- so they stay out of screen shares. The notification and control centers are
+-- opened deliberately, and the owner explicitly wants to be able to screenshot
+-- them, so they are left out of this rule.
 hl.layer_rule({
     name = "notification-screen-share-privacy",
-    match = { namespace = "^(garage-notifications|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(garage-notifications)$" },
     no_screen_share = true,
 })
 hl.layer_rule({

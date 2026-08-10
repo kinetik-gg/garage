@@ -16,7 +16,7 @@
   "modules-center": [],
   // Parked: "custom/containers", "custom/git", "custom/monitor",
   //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
-  "modules-right": ["custom/notifications", "custom/control-center", "clock"],
+  "modules-right": ["custom/notifications", "custom/launcher", "custom/control-center", "clock"],
   "hyprland/workspaces": {
     "format": " ",
     "on-click": "activate",
@@ -32,16 +32,25 @@
   // SVG and PNG alike, from a clean process, with paths that load fine
   // through gdk-pixbuf standalone -- and its `exec` variant deadlocks
   // construction outright. Until that is fixed upstream, no image of any
-  // kind can ride in this bar: the Arch logo, the bell and the toggle are
-  // Nerd Font glyphs, and the shell's panels render the real Phosphor SVGs
-  // through Qt where GTK is not involved.
+  // kind can ride in this bar: the bell, the launcher and the toggle are
+  // the real Phosphor icon font, bundled at desktop/.local/share/fonts
+  // (MIT, PHOSPHOR-LICENSE alongside it) and stowed into
+  // ~/.local/share/fonts where fontconfig finds it natively -- the same
+  // glyphs the shell's panels render as Phosphor SVGs through Qt where GTK
+  // is not involved. The Arch menu logo stays a Nerd Font glyph because
+  // Phosphor carries no brand logos.
   "custom/notifications": {
-    "format": "\uf0f3",
+    "format": "\ue0ce",
     "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
     "tooltip": false
   },
+  "custom/launcher": {
+    "format": "\ue30c",
+    "on-click": "$HOME/.local/bin/garage-launcher-toggle",
+    "tooltip": false
+  },
   "custom/control-center": {
-    "format": "\uf205",
+    "format": "\ue676",
     "on-click": "$HOME/.local/bin/garage-panel-toggle control-center",
     "tooltip": false
   },
@@ -124,7 +133,6 @@
   "include": ["$HOME/.local/state/garage/generated/waybar-clock.jsonc",
               "$HOME/.local/state/garage/generated/waybar-workspaces.jsonc"],
   "clock": {
-    "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
     "tooltip-format": "<tt>{calendar}</tt>"
   }
 }

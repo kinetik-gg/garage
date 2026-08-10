@@ -156,6 +156,6 @@ QtObject {
     readonly property color accentHover: dark ? Qt.lighter(accent, 1.12) : Qt.darker(accent, 1.12)
     readonly property color accentText: accentName === "yellow" ? "#ff1c1c1e" : "#ffffffff"
 
-    readonly property string sans: "IBM Plex Sans"
-    readonly property string mono: "IBM Plex Mono"
+    readonly property string sans: "Plus Jakarta Sans"
+    readonly property string mono: "Geist Mono"
 }

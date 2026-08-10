@@ -262,7 +262,7 @@ def render_svg(metric, state):
     width = LAYOUTS[metric]["width"]
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="22" viewBox="0 0 {width} 22">
   <style>
-    text {{ font-family: "IBM Plex Sans", sans-serif; font-size: 11.5px; font-weight: 600; fill: {THEME_FG}; fill-opacity: 1.0; }}
+    text {{ font-family: "Plus Jakarta Sans", sans-serif; font-size: 11.5px; font-weight: 600; fill: {THEME_FG}; fill-opacity: 1.0; }}
     .secondary {{ fill-opacity: 0.75; }}
   </style>
   {render_metric(metric, state)}
@@ -281,7 +281,7 @@ def render_all_svg(states):
     body = "\n  ".join(groups)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="22" viewBox="0 0 {width} 22">
   <style>
-    text {{ font-family: "IBM Plex Sans", sans-serif; font-size: 11.5px; font-weight: 600; fill: {THEME_FG}; fill-opacity: 1.0; }}
+    text {{ font-family: "Plus Jakarta Sans", sans-serif; font-size: 11.5px; font-weight: 600; fill: {THEME_FG}; fill-opacity: 1.0; }}
     .secondary {{ fill-opacity: 0.75; }}
   </style>
   {body}

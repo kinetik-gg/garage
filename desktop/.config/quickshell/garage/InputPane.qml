@@ -24,10 +24,8 @@ Flickable {
                     to: 1
                     stepSize: 0.05
                     value: pane.controller.preference("input", "pointer_sensitivity", 0)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "input", "pointer_sensitivity", Number(value.toFixed(2)))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "input", "pointer_sensitivity", Number(value.toFixed(2)))
+                    onCommitted: next => pane.controller.setPreference(
+                        "input", "pointer_sensitivity", Number(next.toFixed(2)))
                 }
             }
 
@@ -73,10 +71,8 @@ Flickable {
                     to: 60
                     stepSize: 1
                     value: pane.controller.preference("input", "repeat_rate", 25)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "input", "repeat_rate", Math.round(value))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "input", "repeat_rate", Math.round(value))
+                    onCommitted: next => pane.controller.setPreference(
+                        "input", "repeat_rate", Math.round(next))
                 }
             }
 
@@ -88,10 +84,8 @@ Flickable {
                     to: 1500
                     stepSize: 50
                     value: pane.controller.preference("input", "repeat_delay", 600)
-                    onPressedChanged: if (!pressed) pane.controller.setPreference(
-                        "input", "repeat_delay", Math.round(value))
-                    onWheelAdjusted: value => pane.controller.setPreference(
-                        "input", "repeat_delay", Math.round(value))
+                    onCommitted: next => pane.controller.setPreference(
+                        "input", "repeat_delay", Math.round(next))
                 }
             }
         }
