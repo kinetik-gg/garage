@@ -69,7 +69,12 @@ PanelWindow {
     // Exclusive rather than OnDemand: this is a typing surface, and the search
     // field has to have the keyboard the moment it appears rather than after a
     // click. The grab below is the dismissal gesture, not the way in.
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    // OnDemand, not Exclusive: an exclusive layer keyboard is held at the
+    // protocol level no matter where the pointer clicks, so the focus grab
+    // below would never clear and a click outside could never dismiss. With
+    // OnDemand the grab is what delivers the keyboard on open -- and what
+    // hands it back, dismissing us, when a click lands anywhere else.
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     // The search engine is resolved by garage and published as a
     // URL template, so the launcher does not have to know the engine list.
