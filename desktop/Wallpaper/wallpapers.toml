@@ -1,0 +1,460 @@
+# Canonical provenance and attribution manifest for Garage wallpapers.
+# These images are third-party assets and are not covered by Garage's MIT License.
+
+manifest_version = 1
+
+[license]
+name = "Unsplash License"
+url = "https://unsplash.com/license"
+terms_url = "https://unsplash.com/terms"
+checked_at = 2026-08-10
+attribution_required = false
+garage_license = false
+
+[[wallpaper]]
+id = "ZkzobNDayXo"
+file = "Dark/ZkzobNDayXo.jpg"
+appearance = "dark"
+title = "a black background with a pink and blue swirl"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-black-background-with-a-pink-and-blue-swirl-ZkzobNDayXo"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "665974db586c4f940c7c7c0bc059a7d9c7db75a77ffa47cf42722ccca18fe67a"
+
+[[wallpaper]]
+id = "fahoKISAg08"
+file = "Dark/fahoKISAg08.jpg"
+appearance = "dark"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-fahoKISAg08"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "0c11af0104ab2f4f6cfec781715d48d101dc8551e2903ab59bc327eb39d0d2be"
+
+[[wallpaper]]
+id = "gjf6lzfPROk"
+file = "Dark/gjf6lzfPROk.jpg"
+appearance = "dark"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-gjf6lzfPROk"
+source_width = 5887
+source_height = 3925
+downloaded_at = 2026-08-10
+sha256 = "9caf7047a6b4801cbacff785eebfa1fa61ecd66510366a725f50738ff190ae43"
+
+[[wallpaper]]
+id = "uGd6aKkvHnk"
+file = "Dark/uGd6aKkvHnk.jpg"
+appearance = "dark"
+title = "a black and blue background with curves"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-black-and-blue-background-with-curves-uGd6aKkvHnk"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "eb42dce7c9f0b1e46c6a6c9500cb56152c1a88edf1b5bc0ecf71c53f172120c4"
+
+[[wallpaper]]
+id = "UKSC-TQE7TA"
+file = "Dark/UKSC-TQE7TA.jpg"
+appearance = "dark"
+title = "a close up of a cell phone with a black background"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-cell-phone-with-a-black-background-UKSC-TQE7TA"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "f36fbe4baf7ed9447aaa9950463454603189d2025ddc5431e97cf8ff11d9abc6"
+
+[[wallpaper]]
+id = "5RZM_GW1DpU"
+file = "Dark/5RZM_GW1DpU.jpg"
+appearance = "dark"
+title = "a close up of a black background with curves"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-black-background-with-curves-5RZM_GW1DpU"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "88ad080a0e5297b0cde4619ad0dc2be841c62b3a8d4e2d558f8013b27e45831d"
+
+[[wallpaper]]
+id = "ggykb5c7oeQ"
+file = "Dark/ggykb5c7oeQ.jpg"
+appearance = "dark"
+title = "an abstract black background with curved curves"
+creator_name = "Andrew Kliatskyi"
+creator_username = "kirp"
+creator_url = "https://unsplash.com/@kirp"
+source_url = "https://unsplash.com/photos/an-abstract-black-background-with-curved-curves-ggykb5c7oeQ"
+source_width = 3840
+source_height = 2160
+downloaded_at = 2026-08-10
+sha256 = "8a0149b03f4eb7bce22704063493c3e956bcab96043abcef62d59bbb481b9113"
+
+[[wallpaper]]
+id = "-e_thdWzgis"
+file = "Dark/-e_thdWzgis.jpg"
+appearance = "dark"
+title = "a close up of a cell phone with a black background"
+creator_name = "Andrew Kliatskyi"
+creator_username = "kirp"
+creator_url = "https://unsplash.com/@kirp"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-cell-phone-with-a-black-background--e_thdWzgis"
+source_width = 3840
+source_height = 2160
+downloaded_at = 2026-08-10
+sha256 = "0af4f809cfdea9b574a6617275622a1d7444a7a006bbd6a2c1eed43bdbb32da9"
+
+[[wallpaper]]
+id = "px-d44bbe7o"
+file = "Dark/px-d44bbe7o.jpg"
+appearance = "dark"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-px-d44bbe7o"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "6544f28df02ce13158e4ba70ed516413199ea594601e2848fb0a2ed3bc8d50c0"
+
+[[wallpaper]]
+id = "DQ2lqx_6RD0"
+file = "Dark/DQ2lqx_6RD0.jpg"
+appearance = "dark"
+title = "a black and red background with a curved design"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-black-and-red-background-with-a-curved-design-DQ2lqx_6RD0"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "c0fabada75b513f137114a810c0ca70e8dff2e7892e013f5d9d73e45caac55b4"
+
+[[wallpaper]]
+id = "GycPY2LU2Ew"
+file = "Dark/GycPY2LU2Ew.jpg"
+appearance = "dark"
+title = "a black and red abstract background with curves"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-black-and-red-abstract-background-with-curves-GycPY2LU2Ew"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "68fe999fcbd88ef2a5acd0a42d1054fa6445d9d572d2755ccf6ae3d735cedcbb"
+
+[[wallpaper]]
+id = "knP9Ai8srDc"
+file = "Dark/knP9Ai8srDc.jpg"
+appearance = "dark"
+title = "Abstract blue and black flowing curves"
+creator_name = "tyrone biggums"
+creator_username = "trapper123"
+creator_url = "https://unsplash.com/@trapper123"
+source_url = "https://unsplash.com/photos/abstract-blue-and-black-flowing-curves-knP9Ai8srDc"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "5baa67dd6fd8f817bd15c05f6ab10659f286c47f81255dbfbac7463196299629"
+
+[[wallpaper]]
+id = "0ka7JYtQhfM"
+file = "Dark/0ka7JYtQhfM.jpg"
+appearance = "dark"
+title = "a close up of a blue and purple background"
+creator_name = "Simon Nilsen"
+creator_username = "simonkefas"
+creator_url = "https://unsplash.com/@simonkefas"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-blue-and-purple-background-0ka7JYtQhfM"
+source_width = 5376
+source_height = 3584
+downloaded_at = 2026-08-10
+sha256 = "4a0207d2e61990055dddaf37a3af06f877b6fa1e04bbfcdb7b460de47e76b021"
+
+[[wallpaper]]
+id = "zzwLS5Sk0Vs"
+file = "Dark/zzwLS5Sk0Vs.jpg"
+appearance = "dark"
+title = "Abstract blue light curves on black background"
+creator_name = "Akif Waseem"
+creator_username = "akif_waseem"
+creator_url = "https://unsplash.com/@akif_waseem"
+source_url = "https://unsplash.com/photos/abstract-blue-light-curves-on-black-background-zzwLS5Sk0Vs"
+source_width = 7680
+source_height = 4320
+downloaded_at = 2026-08-10
+sha256 = "3040b4c24dea926f66bc47ddfe72b52c0b1a4d56a672607d46573ed559379982"
+
+[[wallpaper]]
+id = "rMRT4hF-Fsg"
+file = "Dark/rMRT4hF-Fsg.jpg"
+appearance = "dark"
+title = "a blue abstract background with wavy lines"
+creator_name = "Martin Martz"
+creator_username = "martz90"
+creator_url = "https://unsplash.com/@martz90"
+source_url = "https://unsplash.com/photos/a-blue-abstract-background-with-wavy-lines-rMRT4hF-Fsg"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "fa483457b07b5bfb268cf2b4468e50f3265f39817f6ae385959a666e28e038a7"
+
+[[wallpaper]]
+id = "Vc1KXF3TF9g"
+file = "Dark/Vc1KXF3TF9g.jpg"
+appearance = "dark"
+title = "a close up of a black object with a black background"
+creator_name = "Philip Oroni"
+creator_username = "philipsfuture"
+creator_url = "https://unsplash.com/@philipsfuture"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-black-object-with-a-black-background-Vc1KXF3TF9g"
+source_width = 4500
+source_height = 3000
+downloaded_at = 2026-08-10
+sha256 = "22a59163e68d768b00b4480f4c9146fa2aae030b499529ea9e76fbdf51337ee2"
+
+[[wallpaper]]
+id = "YRmJld3FxxQ"
+file = "Light/YRmJld3FxxQ.jpg"
+appearance = "light"
+title = "Abstract blue and white flowing fabric texture"
+creator_name = "gautam sharma"
+creator_username = "gautamsh"
+creator_url = "https://unsplash.com/@gautamsh"
+source_url = "https://unsplash.com/photos/abstract-blue-and-white-flowing-fabric-texture-YRmJld3FxxQ"
+source_width = 3840
+source_height = 2160
+downloaded_at = 2026-08-10
+sha256 = "94e5fc76a49cf34ca29fb0a65f37d437cea9dd84df36c639a6fdf2cbd35add12"
+
+[[wallpaper]]
+id = "F0yDf-GBjMQ"
+file = "Light/F0yDf-GBjMQ.jpg"
+appearance = "light"
+title = "purple wavy wallpaper"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/purple-wavy-wallpaper-F0yDf-GBjMQ"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "4c2d377afb13f7b667769d2ad2893787aff2cf0ffda405a3c3794b8f5fffc04f"
+
+[[wallpaper]]
+id = "7FqOISWr5V0"
+file = "Light/7FqOISWr5V0.jpg"
+appearance = "light"
+title = "a computer generated image of a pink and purple wave"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-computer-generated-image-of-a-pink-and-purple-wave-7FqOISWr5V0"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "5e21989553c85b7c5eed9514e33b33f858894e54efb9053cd843651f032be69b"
+
+[[wallpaper]]
+id = "iA4O2vAnieg"
+file = "Light/iA4O2vAnieg.jpg"
+appearance = "light"
+title = "a pink abstract background with curved shapes"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-pink-abstract-background-with-curved-shapes-iA4O2vAnieg"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "5b0cf4cded0696902ed93a524fae4c3b9af67e99238474735d90c51da9178b69"
+
+[[wallpaper]]
+id = "WEjv3BMP2ik"
+file = "Light/WEjv3BMP2ik.jpg"
+appearance = "light"
+title = "a close up view of a white fabric"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-view-of-a-white-fabric-WEjv3BMP2ik"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "134b8009d45752c41aad0227bffa6362cf3acb5f6e2e789fe2677d238aa13aaa"
+
+[[wallpaper]]
+id = "vmTs5om50gg"
+file = "Light/vmTs5om50gg.jpg"
+appearance = "light"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-vmTs5om50gg"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "d6fa2af3f1a18cba8a27b19a79201558ee58e29fd75912ee42aac6e85f16d458"
+
+[[wallpaper]]
+id = "Slf8QxaFIWw"
+file = "Light/Slf8QxaFIWw.jpg"
+appearance = "light"
+title = "an abstract white background with a curved curve"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/an-abstract-white-background-with-a-curved-curve-Slf8QxaFIWw"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "72810354baaf9742c728166fd1ceb4d0d1b3d3963eeafaedb59caadf291659d8"
+
+[[wallpaper]]
+id = "848z7lbCjoo"
+file = "Light/848z7lbCjoo.jpg"
+appearance = "light"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-848z7lbCjoo"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "7104b73832c643f87f9e39473ea9209f300bacdd77726844460ccb6e7f35d850"
+
+[[wallpaper]]
+id = "4VdoPS8p5dw"
+file = "Light/4VdoPS8p5dw.jpg"
+appearance = "light"
+title = "a close up of a white sheet of paper"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-white-sheet-of-paper-4VdoPS8p5dw"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "431c060f81b70217e685bb59f58140000eaba67b2d63d1bca35ed51c01d27adb"
+
+[[wallpaper]]
+id = "kXpKQSlrlis"
+file = "Light/kXpKQSlrlis.jpg"
+appearance = "light"
+title = "a close up of a blue and white background"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-blue-and-white-background-kXpKQSlrlis"
+source_width = 8336
+source_height = 5557
+downloaded_at = 2026-08-10
+sha256 = "fef3b3fb4ea5898bdff3e0943cf0e08be7fa23ebdc530d62fb791c84b3072a2f"
+
+[[wallpaper]]
+id = "fZTKBU8OqXk"
+file = "Light/fZTKBU8OqXk.jpg"
+appearance = "light"
+title = "Swirling, light blue ribbons create an abstract design."
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/swirling-light-blue-ribbons-create-an-abstract-design-fZTKBU8OqXk"
+source_width = 9000
+source_height = 6000
+downloaded_at = 2026-08-10
+sha256 = "c101d76c222e84fb1531a5e08461c521a9e73995054e5edb04021c108849120b"
+
+[[wallpaper]]
+id = "kj8_P9d5tpo"
+file = "Light/kj8_P9d5tpo.jpg"
+appearance = "light"
+title = "background pattern"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/background-pattern-kj8_P9d5tpo"
+source_width = 6000
+source_height = 4000
+downloaded_at = 2026-08-10
+sha256 = "26d7d98d2903567da3e774688c33b61c290aa6d588c30c9df002d253efff63bf"
+
+[[wallpaper]]
+id = "Kkg2viCy5vs"
+file = "Light/Kkg2viCy5vs.jpg"
+appearance = "light"
+title = "flowing green abstract waves"
+creator_name = "Philip Oroni"
+creator_username = "philipsfuture"
+creator_url = "https://unsplash.com/@philipsfuture"
+source_url = "https://unsplash.com/photos/flowing-green-abstract-waves-Kkg2viCy5vs"
+source_width = 3840
+source_height = 2160
+downloaded_at = 2026-08-10
+sha256 = "929eecc22a9e9e6d2f75333e596babf1cc8d5ed50da0eb88973bcc063957f7eb"
+
+[[wallpaper]]
+id = "zUtEPOCm5q0"
+file = "Light/zUtEPOCm5q0.jpg"
+appearance = "light"
+title = "A stack of books sitting on top of a table"
+creator_name = "Solen Feyissa"
+creator_username = "solenfeyissa"
+creator_url = "https://unsplash.com/@solenfeyissa"
+source_url = "https://unsplash.com/photos/a-stack-of-books-sitting-on-top-of-a-table-zUtEPOCm5q0"
+source_width = 5760
+source_height = 3240
+downloaded_at = 2026-08-10
+sha256 = "7ca2ffc274c2d341a41da76e6cb17a21d1f1aa312f700b3f0c109764a9e2db65"
+
+[[wallpaper]]
+id = "5B9MvwxyGfg"
+file = "Light/5B9MvwxyGfg.jpg"
+appearance = "light"
+title = "A close up of a pink and white wall"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-pink-and-white-wall-5B9MvwxyGfg"
+source_width = 9000
+source_height = 6000
+downloaded_at = 2026-08-10
+sha256 = "7799db474541e68cbdf3a64e962a870f076da4f1e0ae747b16c9e68f168e3ee9"
+
+[[wallpaper]]
+id = "lbsXDwbe6Ds"
+file = "Light/lbsXDwbe6Ds.jpg"
+appearance = "light"
+title = "a close up of a book with many lines on it"
+creator_name = "Pawel Czerwinski"
+creator_username = "pawel_czerwinski"
+creator_url = "https://unsplash.com/@pawel_czerwinski"
+source_url = "https://unsplash.com/photos/a-close-up-of-a-book-with-many-lines-on-it-lbsXDwbe6Ds"
+source_width = 8400
+source_height = 5600
+downloaded_at = 2026-08-10
+sha256 = "5bfe275d1a301cc7e4e5d517bb9383c85b41488094a2035da30c34f569ac1274"
