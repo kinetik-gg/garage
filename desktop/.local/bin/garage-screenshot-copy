@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# slurp must run as an interruptible background child, never inside a command
+# substitution: a substitution is the script's foreground work, and bash defers
+# signal traps until foreground work finishes -- so the shell's capture timeout
+# (shell.qml's wedge guard, 120s) would kill this wrapper while slurp kept the
+# screen grabbed. Measured: a forgotten region pick sat for six minutes and
+# disarmed outside-click dismissal shell-wide. Backgrounding + wait lets the
+# TERM through to slurp immediately.
+pick() {
+    local out_file=$1
+    shift
+    "$@" > "$out_file" &
+    local pid=$!
+    trap 'kill -TERM '"$pid"' 2>/dev/null || true' TERM INT
+    local rc=0
+    wait "$pid" || rc=$?
+    trap - TERM INT
+    return "$rc"
+}
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
 case "${1:-}" in
     region)
-        geometry="$(slurp)" || exit 0
+        pick "$tmp" slurp || exit 0
+        geometry="$(<"$tmp")"
         grim -g "$geometry" - | wl-copy --type image/png
         ;;
     monitor)
-        output="$(slurp -o -r -f '%o')" || exit 0
+        pick "$tmp" slurp -o -r -f '%o' || exit 0
+        output="$(<"$tmp")"
         if [[ -z "$output" ]]; then
             notify-send --urgency=critical --expire-time=2400 "Screenshot failed" "No monitor was selected."
             exit 1
@@ -26,7 +50,8 @@ case "${1:-}" in
             notify-send --urgency=normal --expire-time=2400 "Screenshot" "No visible windows to capture."
             exit 0
         fi
-        geometry="$(slurp -r <<< "$windows")" || exit 0
+        pick "$tmp" slurp -r <<< "$windows" || exit 0
+        geometry="$(<"$tmp")"
         grim -g "$geometry" - | wl-copy --type image/png
         ;;
     *)

@@ -30,7 +30,11 @@ ColumnLayout {
 
     property var points: []
     property var secondaryPoints: []
-    property color accent: Theme.accent
+    // Passed straight through to GraphChart, whose default is already the
+    // monochrome treatment the whole panel uses -- see the note on `ink` there.
+    // Named the same as the property it feeds so a reader does not have to work
+    // out which colour of the two this one is.
+    property color ink: Theme.text
     property bool active: false
     property string idleLabel: "collecting…"
     property real graphHeight: 40
@@ -81,7 +85,7 @@ ColumnLayout {
         Layout.preferredHeight: row.graphHeight
         points: row.points
         secondaryPoints: row.secondaryPoints
-        accent: row.accent
+        ink: row.ink
         active: row.active
         idleLabel: row.idleLabel
     }

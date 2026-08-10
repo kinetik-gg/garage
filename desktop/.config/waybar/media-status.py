@@ -23,6 +23,13 @@ METADATA_FORMAT = SEPARATOR.join(
         "{{mpris:artUrl}}",
     )
 )
+# The room between the player glyph and the track. Two en spaces rather than
+# ASCII ones, and inside the icons' own span: the glyph is drawn a size up, so a
+# gap in the default size read as almost nothing next to it -- these scale with
+# the glyph -- and a fixed-width space cannot be collapsed by anything between
+# here and the label. It is the gap the bar's own modules keep from each other.
+ICON_GAP = "\u2002\u2002"
+
 _browser_titles_cache = (0.0, "")
 
 
@@ -142,8 +149,12 @@ def render(preferred=""):
         tooltip_sections.append("\n".join(lines))
     if len(players) > 1:
         tooltip_sections.insert(0, f"{len(players)} players currently playing")
+    # No glyph, no span and no gap: an unrecognised player would otherwise put
+    # the gap on the bar with nothing in front of it.
+    icon_run = (f'<span font_size="large" rise="-1500">{icons}{ICON_GAP}</span>'
+                if icons.strip() else "")
     return payload(
-        f'<span font_size="large" rise="-1500">{icons}</span>   {html.escape(details)}',
+        f'{icon_run}{html.escape(details)}',
         html.escape("\n\n".join(tooltip_sections)),
         "multiple" if len(players) > 1 else primary["style"],
         primary["player"],

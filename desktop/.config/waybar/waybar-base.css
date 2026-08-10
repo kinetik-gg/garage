@@ -91,6 +91,15 @@ window#waybar {
   font-family: "Plus Jakarta Sans", "CaskaydiaMono Nerd Font", sans-serif;
 }
 
+/* The AI strip is one Phosphor sparkle -- the quota figures are in its tooltip
+   and the AI palette -- so it wants the icon trio's stack and size rather than
+   the text modules' above: real Phosphor first, at the bell's optical size. The
+   colour and the padding it shares with the text modules stay as they are. */
+#custom-ai-usage {
+  font-family: "Phosphor", "CaskaydiaMono Nerd Font", "Plus Jakarta Sans", sans-serif;
+  font-size: 16px;
+}
+
 #custom-git:hover,
 #custom-monitor:hover,
 #custom-ai-usage:hover,

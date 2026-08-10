@@ -2,20 +2,27 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// The bar spectrum drawn under MediaPalette's transport. cava has no QML
-// binding of its own, so this drives it as a subprocess: a generated raw-
-// format config is written to $XDG_RUNTIME_DIR and handed to `cava -p`,
-// which streams ascii frames back over stdout that SplitParser cuts into
-// lines and this file turns into bar heights.
+// The spectrum drawn behind MediaPalette's transport. cava has no QML binding of
+// its own, so this drives it as a subprocess: a generated raw-format config is
+// written to $XDG_RUNTIME_DIR and handed to `cava -p`, which streams ascii
+// frames back over stdout that SplitParser cuts into lines and this file turns
+// into one point per frequency band.
 //
-// The generated config is mono and asks cava for half as many bars as are
-// drawn: the row here mirrors that single half outward from the centre, low
-// frequencies together in the middle and highs at the two ends, rather than
-// asking cava's own `channels = stereo` output to do the mirroring itself.
-// Halving here rather than there keeps the bar count this file asks cava
-// for equal to the bar count it actually draws on each side, so a frame
-// with the wrong number of values is a bug in this file rather than a
-// mismatch between two independent halving decisions.
+// Drawn as a GraphChart, not as bars. The panel sits next to an activity monitor
+// full of GraphCharts and this is the same kind of picture -- a series of
+// normalised 0..100 values across a fixed frame -- so it is the same component,
+// which also means it inherits the monochrome treatment (see `ink` in
+// GraphChart) rather than carrying a second opinion about how a graph looks.
+//
+// The bar row this replaced mirrored one half of the spectrum outward from the
+// centre, lows in the middle and highs at the two ends. Measured on real music
+// that read as a narrow cluster of movement in the middle with dead space to
+// either side, because the outer bands were the 5-10 kHz end where music has
+// almost no energy: the mirror put the quiet bands where there was the most room
+// for them. So the mirror is gone -- low frequency at the left edge, high at the
+// right, one continuous line across the whole width -- and the band range is
+// capped below cava's 10 kHz default so the bands that do exist are bands that
+// move.
 Item {
     id: visualizer
 
@@ -23,52 +30,43 @@ Item {
     // useful to draw when nobody can see it, and a hidden panel is not a
     // reason to keep a capture process open on the default sink's monitor.
     property bool running: false
-    property color barColor: Theme.accent
 
-    readonly property real barWidth: 3
-    readonly property real barGap: 2
+    // Monochrome, like the activity graphs: the same foreground token, and the
+    // GraphChart below separates its fill from its stroke by opacity alone. This
+    // used to be `barColor`, defaulted from Theme.accent, and it was the accent
+    // the owner asked out of the visualiser.
+    property color ink: Theme.text
 
-    // Bars per side, fitted to the component's own width. cava is asked for
-    // exactly this many; twice that many are drawn.
-    readonly property int halfBars: Math.max(4,
-        Math.floor(visualizer.width / (2 * (visualizer.barWidth + visualizer.barGap))))
+    // Frequency bands, which are the points of the line. Fixed rather than
+    // fitted to the width the way the old bar row's count was: a line has no
+    // per-point width to fit, and the count is now a statement about the audio
+    // -- how finely the audible range is cut -- rather than about pixels. 48
+    // across ~350px is a point every 7px, which the round joins draw as a
+    // continuous curve, and it stays well inside cava's own floor of 43 Hz of
+    // bandwidth per band over the range below.
+    readonly property int bandCount: 48
 
-    readonly property int totalBars: visualizer.halfBars * 2
+    // The range the bands are cut from. cava's own default upper bound is
+    // 10 kHz, and the top third of a spectrum drawn to it never moves for
+    // music -- which is what left the old row's edges dead. 6 kHz still holds
+    // every harmonic that carries a mix and spreads the energy that exists
+    // across the whole width instead of the middle of it. The lower bound goes
+    // under the default so a kick drum is a band rather than the edge of one.
+    readonly property int lowerCutoffHz: 30
+    readonly property int higherCutoffHz: 6000
 
-    readonly property real barsWidth: visualizer.totalBars * visualizer.barWidth
-        + Math.max(0, visualizer.totalBars - 1) * visualizer.barGap
-
-    readonly property real barsOrigin: (visualizer.width - visualizer.barsWidth) / 2
-
-    // One frame, 0..1 per bar, low frequency first. Replaced wholesale on
-    // every line from cava rather than mutated in place: the Repeater below
-    // reads through levelForBar() on every delegate, and a mutated array
-    // does not notify either of them.
+    // One frame, already in GraphChart's 0..100 units, lowest frequency first.
+    // Replaced wholesale on every line from cava rather than mutated in place:
+    // a mutated array does not notify, so the path bound to it would go stale.
     property var levels: []
-
-    function levelAt(index) {
-        return index >= 0 && index < visualizer.levels.length
-            ? visualizer.levels[index] : 0;
-    }
-
-    // Bar `index` in the drawn, mirrored row back to its position in the one
-    // half cava actually renders: the left side counts down to the centre,
-    // the right side counts up from it, and index halfBars - 1 on the left
-    // is the same source bar as index 0 on the right -- both are the lowest
-    // frequency, which is what makes the seam in the middle read as one
-    // continuous shape rather than two spectra glued together.
-    function levelForBar(index) {
-        const half = visualizer.halfBars;
-        const sourceIndex = index < half ? (half - 1 - index) : (index - half);
-        return visualizer.levelAt(sourceIndex);
-    }
 
     readonly property string configPath:
         (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/garage-cava.conf"
 
     // Raw ascii output, one line per frame: `v1;v2;...;vN;` (a trailing
-    // delimiter, no leading one), values 0-100. Verified standalone against
-    // this exact config: `cava -p` on it produces one line every ~33 ms with
+    // delimiter, no leading one), values 0-100 -- which is GraphChart's range
+    // exactly, so a frame needs clamping but no rescaling. Verified standalone
+    // against this config: `cava -p` on it produces one line every ~33 ms with
     // as many semicolon-separated values as `bars` asks for.
     function configText(bars) {
         return "[general]\n"
@@ -76,6 +74,8 @@ Item {
             + "bars = " + bars + "\n"
             + "autosens = 1\n"
             + "sensitivity = 100\n"
+            + "lower_cutoff_freq = " + visualizer.lowerCutoffHz + "\n"
+            + "higher_cutoff_freq = " + visualizer.higherCutoffHz + "\n"
             + "\n"
             + "[input]\n"
             + "source = auto\n"
@@ -105,10 +105,9 @@ Item {
     // this Process reach the real cava instead of leaving it behind as an
     // orphaned child of a shell that already exited.
     function start() {
-        const bars = visualizer.halfBars;
         const path = visualizer.configPath;
         const script = "cat > " + JSON.stringify(path) + " <<'GARAGE_CAVA_CFG'\n"
-            + visualizer.configText(bars)
+            + visualizer.configText(visualizer.bandCount)
             + "GARAGE_CAVA_CFG\n"
             + "exec cava -p " + JSON.stringify(path) + "\n";
         cavaProcess.command = ["sh", "-c", script];
@@ -124,16 +123,6 @@ Item {
             visualizer.start();
         else
             visualizer.stop();
-    }
-
-    // The panel that hosts this does not get resized once mapped, so a live
-    // change of halfBars is not expected in practice -- but if width ever
-    // moved, the bar count cava was asked for would silently stop matching
-    // what is drawn, so the pipeline is restarted onto the new count rather
-    // than left stretching stale data across it.
-    onHalfBarsChanged: {
-        if (cavaProcess.running)
-            visualizer.start();
     }
 
     // The hard guard the brief calls for: however this item goes away --
@@ -157,39 +146,35 @@ Item {
                 if (text === "")
                     return;
                 const parts = text.split(";").filter(part => part !== "");
-                const bars = visualizer.halfBars;
-                const next = new Array(bars);
-                for (let index = 0; index < bars; ++index) {
+                const bands = visualizer.bandCount;
+                const next = new Array(bands);
+                for (let index = 0; index < bands; ++index) {
                     const raw = index < parts.length ? parseInt(parts[index], 10) : 0;
-                    next[index] = Math.max(0, Math.min(1, (isNaN(raw) ? 0 : raw) / 100));
+                    next[index] = Math.max(0, Math.min(100, isNaN(raw) ? 0 : raw));
                 }
                 visualizer.levels = next;
             }
         }
     }
 
-    Repeater {
-        model: visualizer.totalBars
-
-        Rectangle {
-            id: bar
-            required property int index
-
-            readonly property real level: visualizer.levelForBar(bar.index)
-
-            x: visualizer.barsOrigin + bar.index * (visualizer.barWidth + visualizer.barGap)
-            y: visualizer.height - height
-            width: visualizer.barWidth
-            height: Math.max(2, bar.level * visualizer.height)
-            radius: visualizer.barWidth / 2
-            color: visualizer.barColor
-
-            // The cava side already smooths (noise_reduction = 77 above);
-            // this smooths the frame-to-frame jump on top of that so a
-            // ~30 fps feed still reads as motion rather than a strobe.
-            Behavior on height {
-                NumberAnimation { duration: 90; easing.type: Easing.OutQuad }
-            }
-        }
+    // Edge to edge: the line's x axis is the whole component, so whatever width
+    // the palette gives this is the width the spectrum spans. There is no
+    // centred inner row any more, which is the other half of the dead-edges fix.
+    //
+    // No midline and no baseline. In the monitor those two hairlines are the
+    // frame a 0..100 reading is measured against; here the series is a spectrum
+    // rather than a percentage of anything, and a fixed rule drawn across the
+    // panel behind the artwork and the transport is furniture the media panel
+    // has no use for. Same for the idle label: a silent sink is not an error to
+    // report, it is a flat line, and before the first frame it is nothing.
+    GraphChart {
+        id: spectrum
+        anchors.fill: parent
+        points: visualizer.levels
+        ink: visualizer.ink
+        active: true
+        midlineOpacity: 0
+        baselineOpacity: 0
+        idleLabel: ""
     }
 }

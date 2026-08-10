@@ -2,7 +2,8 @@
 """AI subscription usage widget data source, via Tokscale.
 
 Modes:
-  --bar    Compact waybar custom-module payload (return-type json).
+  --bar    Waybar custom-module payload (return-type json). The text is one
+           Phosphor glyph; every figure is in the tooltip.
   --json   Popover payload: subscriptions usage + today's token/cost totals.
   --probe  Locate the tokscale CLI; exit 0 + path, or exit 1 + reason.
 
@@ -24,6 +25,19 @@ from zoneinfo import ZoneInfo
 
 
 HOME = Path.home()
+
+# The bar module is this one glyph -- Phosphor's "sparkle" -- and nothing else.
+# The percentages and reset days it used to spell out ("OAI 99% 6D ANT 89% 7D")
+# were four numbers nobody reads at a glance, and they are still a hover away in
+# the tooltip below and a click away in the AI palette. The codepoint is
+# Phosphor's own private-use assignment, verified present in the bundled
+# desktop/.local/share/fonts/Phosphor.ttf, and waybar-base.css puts "Phosphor"
+# first in this module's font stack so nothing else can claim it. Written as an
+# escape, the way config.jsonc spells the bell and the launcher: a private-use
+# glyph pasted into source is invisible in a diff and one careless editor away
+# from being lost.
+SPARKLE = "\ue6a2"
+
 TOKSCALE_CANDIDATES = [HOME / ".local/share/tokscale/node_modules/.bin/tokscale"]
 CACHE_DIR = HOME / ".cache/garage-ai-usage"
 CACHE_FILE = CACHE_DIR / "usage.json"
@@ -177,15 +191,18 @@ def build_bar_output(tokscale):
     claude_plan = claude.get("plan", "unknown plan")
 
     if not payload:
+        # Still the glyph, not "AI —": the module is an icon now, and a strip that
+        # changes shape when a subprocess fails is a worse signal than the tooltip
+        # saying so. The class is there for a palette that wants to dim it.
         return {
-            "text": "AI —",
+            "text": SPARKLE,
             "tooltip": "Tokscale subscription usage unavailable",
             "class": "unavailable",
         }
 
     freshness = " (cached)" if stale else ""
     return {
-        "text": f"OAI {codex_remaining} {codex_reset_days}   ANT {claude_remaining} {claude_reset_days}",
+        "text": SPARKLE,
         "tooltip": (
             f"OAI / Codex ({codex_plan})\n"
             f"  Weekly: {codex_remaining} remaining ({codex_reset_days})\n"

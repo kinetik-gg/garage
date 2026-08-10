@@ -135,6 +135,76 @@ class BaseSheetOwnsNoSpacing(BackendTestCase):
                               "stopped applying")
 
 
+class BarGlyphs(unittest.TestCase):
+    """The Phosphor glyphs the bar's strips and its AI module are made of.
+
+    The strips label themselves with an icon rather than the words CPU / MEM /
+    TEMP, and the AI module is one sparkle rather than four numbers. Both are
+    couplings nothing else checks: a strip's icon name has to have path data in
+    the collector *and* a house asset the popovers can draw, and the AI glyph is
+    only a glyph if the module's font stack asks for Phosphor first -- otherwise
+    Plus Jakarta Sans claims the private-use codepoint and the bar shows tofu.
+    """
+
+    METRICS = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-metrics"
+    AI_USAGE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-ai-usage"
+    SHELL_ICONS = REPO_ROOT / "desktop" / ".config" / "quickshell" / "garage" / "icons"
+
+    def literal(self, path: Path, name: str):
+        """A module-level literal assignment, read without importing the script."""
+        import ast
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == name
+                            for t in node.targets)):
+                return ast.literal_eval(node.value)
+        self.fail(f"{name} not found in {path.name}")
+
+    def test_every_strip_icon_has_path_data_and_a_house_asset(self) -> None:
+        layouts = self.literal(self.METRICS, "LAYOUTS")
+        icons = self.literal(self.METRICS, "ICON_PATHS")
+        for widget, layout in layouts.items():
+            with self.subTest(widget=widget):
+                name = layout["icon"]
+                self.assertIn(name, icons,
+                              "the strip names an icon the collector cannot draw")
+                asset = self.SHELL_ICONS / f"{name}.svg"
+                self.assertTrue(asset.exists(),
+                                f"{name}.svg is missing from the shell's icons, so "
+                                "the popovers cannot draw the strip's own glyph")
+                svg = asset.read_text(encoding="utf-8")
+                # Same coordinates in both places, or the transform in
+                # render_widget() would be scaling from the wrong box.
+                self.assertIn('viewBox="0 0 256 256"', svg)
+                self.assertIn(icons[name], svg,
+                              "the asset and the embedded path have drifted apart")
+
+    def test_the_network_strip_is_the_one_with_no_graph(self) -> None:
+        # The owner's call, and the reason its width is what it is: two throughput
+        # figures and no line. render_widget() keys off the absence of the width.
+        layouts = self.literal(self.METRICS, "LAYOUTS")
+        self.assertNotIn("graph_width", layouts["network"])
+        for widget in ("cpu", "memory", "temp", "disk", "gpu"):
+            with self.subTest(widget=widget):
+                self.assertIn("graph_width", layouts[widget])
+
+    def test_the_ai_module_is_one_private_use_glyph_and_asks_for_phosphor(self) -> None:
+        sparkle = self.literal(self.AI_USAGE, "SPARKLE")
+        self.assertEqual(1, len(sparkle), "the AI module is a single glyph")
+        self.assertTrue(0xE000 <= ord(sparkle) <= 0xF8FF,
+                        "an icon font glyph lives in the private use area")
+        source = self.AI_USAGE.read_text(encoding="utf-8")
+        self.assertNotIn("OAI {", source,
+                         "the OAI/ANT summary belongs in the tooltip, not the bar")
+        rule = re.search(r"#custom-ai-usage \{([^}]*)\}",
+                         BASE_CSS.read_text(encoding="utf-8"))
+        self.assertIsNotNone(rule, "the AI module has no font rule of its own")
+        family = re.search(r"font-family:\s*([^;]+);", rule.group(1))
+        self.assertTrue(family.group(1).strip().startswith('"Phosphor"'),
+                        "Phosphor has to come first or another font claims the "
+                        f"codepoint: {family.group(1)}")
+
+
 class BarWidgetFragment(BackendTestCase):
     """The toggle matrix, read off the fragment the bar actually loads."""
 
@@ -252,7 +322,7 @@ class BarWidgetFragment(BackendTestCase):
                 self.assertIn(f"bar.monitor_{name}", self.garage.PREFERENCE_SCHEMA)
 
     def test_the_height_is_published_and_the_strip_sizes_are_the_svg_widths(self) -> None:
-        # waybar's image `size` boxes the LARGEST dimension: a 112x22 strip at
+        # waybar's image `size` boxes the LARGEST dimension: an 82x22 strip at
         # size 22 renders 22px wide (measured -- the strips shrank to
         # illegibility). Natural rendering means size == the SVG's width, per
         # widget, independent of bar height.

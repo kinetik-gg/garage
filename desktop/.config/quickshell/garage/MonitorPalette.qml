@@ -654,7 +654,16 @@ PanelWindow {
                                         height: Math.max(1,
                                             parent.height * parent.load / 100)
                                         radius: 1
-                                        color: Theme.accent
+                                        // Monochrome like every graph above it,
+                                        // and for the same reason: the accent
+                                        // said nothing about a core's load that
+                                        // its height was not already saying, and
+                                        // it was the one coloured thing left in
+                                        // the panel. The well behind it is
+                                        // Theme.hoverStrong, which is this same
+                                        // white at 9% -- so the pair is one
+                                        // colour at two opacities.
+                                        color: Theme.text
                                         opacity: 0.85
                                     }
                                 }

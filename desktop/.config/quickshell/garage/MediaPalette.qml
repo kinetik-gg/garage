@@ -24,8 +24,24 @@ import QtQuick.Layouts
 // DismissCatcher already stands down for the screenshot capture
 // (`armed: !(... || captureProcess.running)`). Wiring holdOpen into that
 // check is next wave's job; this file only has to raise it truthfully.
+//
+// `id: media`, and it may not go back to being `id: palette`. QQuickItem has
+// carried a `palette` property of its own since Qt 6.0, and inside a nested
+// component -- a Repeater or Component delegate, which is compiled as its own
+// unit with its own creation context -- the identifier resolution order puts
+// the delegate item's own properties ahead of the enclosing document's ids. So
+// every `palette.*` in the transport delegate below resolved to a QQuickPalette
+// instead of to this window: `palette.allows(role)` threw, `available` kept its
+// default of false, the delegate's MouseArea was `enabled: false`, and the
+// clicks fell straight through it to the panel-filling MouseArea that eats the
+// gaps -- three transport buttons that were dim and did nothing. Nothing was
+// wrong with the delegate; it was named at the wrong object. Reproduced and
+// fixed under qmltestrunner: the same delegate reading `card.*` (MediaCard's
+// name, which clashes with nothing) received the click, and so does this one now.
+// Ids in the same document are unaffected, which is why the seek bar always
+// worked and this looked like a stacking problem rather than a naming one.
 PanelWindow {
-    id: palette
+    id: media
 
     required property string targetScreenName
 
@@ -43,7 +59,7 @@ PanelWindow {
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
             const candidate = Quickshell.screens[index];
-            if (candidate.name === palette.targetScreenName)
+            if (candidate.name === media.targetScreenName)
                 return candidate;
         }
         return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
@@ -59,33 +75,33 @@ PanelWindow {
     property var selectedPlayer: null
 
     function autoPlayer() {
-        for (const candidate of palette.players) {
+        for (const candidate of media.players) {
             if (candidate.isPlaying)
                 return candidate;
         }
-        return palette.players.length > 0 ? palette.players[0] : null;
+        return media.players.length > 0 ? media.players[0] : null;
     }
 
     readonly property var player: {
-        if (palette.selectedPlayer !== null
-            && palette.players.indexOf(palette.selectedPlayer) !== -1)
-            return palette.selectedPlayer;
-        return palette.autoPlayer();
+        if (media.selectedPlayer !== null
+            && media.players.indexOf(media.selectedPlayer) !== -1)
+            return media.selectedPlayer;
+        return media.autoPlayer();
     }
 
-    readonly property bool isPlaying: palette.player !== null && palette.player.isPlaying
-    readonly property string artUrl: palette.player
-        ? String(palette.player.trackArtUrl || "") : ""
+    readonly property bool isPlaying: media.player !== null && media.player.isPlaying
+    readonly property string artUrl: media.player
+        ? String(media.player.trackArtUrl || "") : ""
 
     readonly property string title: {
-        if (!palette.player)
+        if (!media.player)
             return "";
-        const track = String(palette.player.trackTitle || "").trim();
-        return track !== "" ? track : String(palette.player.identity || "Media");
+        const track = String(media.player.trackTitle || "").trim();
+        return track !== "" ? track : String(media.player.identity || "Media");
     }
 
-    readonly property string artist: palette.player
-        ? String(palette.player.trackArtist || "").trim() : ""
+    readonly property string artist: media.player
+        ? String(media.player.trackArtist || "").trim() : ""
 
     // The seek bar's own live position. Mpris positionChanged does not fire
     // on a steady tick during playback -- most players only emit it on a
@@ -96,24 +112,24 @@ PanelWindow {
     property real displayPosition: 0
 
     function dispatch(role) {
-        if (!palette.player)
+        if (!media.player)
             return;
         if (role === "previous")
-            palette.player.previous();
+            media.player.previous();
         else if (role === "next")
-            palette.player.next();
+            media.player.next();
         else
-            palette.player.togglePlaying();
+            media.player.togglePlaying();
     }
 
     function allows(role) {
-        if (!palette.player)
+        if (!media.player)
             return false;
         if (role === "previous")
-            return palette.player.canGoPrevious;
+            return media.player.canGoPrevious;
         if (role === "next")
-            return palette.player.canGoNext;
-        return palette.player.canTogglePlaying;
+            return media.player.canGoNext;
+        return media.player.canTogglePlaying;
     }
 
     function playerLabel(candidate) {
@@ -128,11 +144,11 @@ PanelWindow {
         return minutes + ":" + (secs < 10 ? "0" : "") + secs;
     }
 
-    onPlayerChanged: palette.displayPosition = palette.player ? palette.player.position : 0
+    onPlayerChanged: media.displayPosition = media.player ? media.player.position : 0
 
-    screen: palette.targetScreen()
+    screen: media.targetScreen()
     implicitWidth: 360
-    implicitHeight: Math.max(1, body.implicitHeight + palette.contentMargin * 2)
+    implicitHeight: Math.max(1, body.implicitHeight + media.contentMargin * 2)
     color: "transparent"
     focusable: true
     aboveWindows: true
@@ -149,14 +165,14 @@ PanelWindow {
     WlrLayershell.namespace: "garage-media"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
-    // Reattached automatically as palette.player changes identity: Mpris
+    // Reattached automatically as media.player changes identity: Mpris
     // positions do move between events (a seek from another client, a track
     // boundary), and this is what keeps the bar honest between polls.
     Connections {
-        target: palette.player
+        target: media.player
         function onPositionChanged() {
             if (!seekSlider.pressed)
-                palette.displayPosition = palette.player.position;
+                media.displayPosition = media.player.position;
         }
     }
 
@@ -164,8 +180,8 @@ PanelWindow {
         interval: 500
         repeat: true
         triggeredOnStart: true
-        running: palette.visible && palette.isPlaying && !seekSlider.pressed
-        onTriggered: palette.displayPosition = palette.player ? palette.player.position : 0
+        running: media.visible && media.isPlaying && !seekSlider.pressed
+        onTriggered: media.displayPosition = media.player ? media.player.position : 0
     }
 
     ContinuousRectangle {
@@ -198,6 +214,12 @@ PanelWindow {
             borderColor: Theme.frameInner
         }
 
+        // The panel eats the clicks that land in the gaps between its controls
+        // rather than leaving them unhandled. Declared before everything below
+        // it, so it is the lowest thing in the panel and the last offered a
+        // click -- which is also how it came to swallow the transport's clicks
+        // for as long as those buttons were disabled. See the note on `id: media`
+        // at the top of the file.
         MouseArea {
             anchors.fill: parent
         }
@@ -207,6 +229,10 @@ PanelWindow {
         // clip on the panel's corners clips it too, and bound to the
         // window's own visibility so nothing here samples audio while the
         // palette is not on screen.
+        //
+        // Left and right to the panel's own edges: this is a line graph across
+        // the full content width now, not a centred row of bars, and the whole
+        // point of the change is that the frequency axis spans the panel.
         CavaVisualizer {
             id: visualizer
             anchors.left: parent.left
@@ -215,7 +241,7 @@ PanelWindow {
             anchors.margins: 1
             height: parent.height * 0.72
             opacity: 0.4
-            running: palette.visible
+            running: media.visible
         }
 
         ColumnLayout {
@@ -223,14 +249,14 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: palette.contentMargin
+            anchors.margins: media.contentMargin
             spacing: 10
 
             Text {
                 Layout.fillWidth: true
                 Layout.topMargin: 10
                 Layout.bottomMargin: 10
-                visible: palette.player === null
+                visible: media.player === null
                 horizontalAlignment: Text.AlignHCenter
                 text: "No player"
                 color: Theme.textMuted
@@ -241,7 +267,7 @@ PanelWindow {
 
             RowLayout {
                 Layout.fillWidth: true
-                visible: palette.player !== null
+                visible: media.player !== null
                 spacing: 12
 
                 // The art, rounded by masking rather than clipping -- the
@@ -257,7 +283,7 @@ PanelWindow {
                     Image {
                         id: art
                         anchors.fill: parent
-                        source: palette.artUrl
+                        source: media.artUrl
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         sourceSize.width: 128
@@ -277,7 +303,7 @@ PanelWindow {
 
                     OpacityMask {
                         anchors.fill: art
-                        visible: palette.artUrl !== "" && art.status === Image.Ready
+                        visible: media.artUrl !== "" && art.status === Image.Ready
                         source: art
                         maskSource: artMask
                         cached: true
@@ -301,7 +327,7 @@ PanelWindow {
                     ColorOverlay {
                         anchors.fill: artFallback
                         source: artFallback
-                        visible: palette.artUrl === "" || art.status !== Image.Ready
+                        visible: media.artUrl === "" || art.status !== Image.Ready
                         color: Theme.iconWellGlyph
                         cached: true
                     }
@@ -316,7 +342,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: palette.title
+                        text: media.title
                         color: Theme.text
                         font.family: Theme.sans
                         font.pixelSize: 15
@@ -327,8 +353,8 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        visible: palette.artist !== ""
-                        text: palette.artist
+                        visible: media.artist !== ""
+                        text: media.artist
                         color: Theme.textMuted
                         font.family: Theme.sans
                         font.pixelSize: 12
@@ -345,23 +371,23 @@ PanelWindow {
             // already this control.
             SettingsSegmented {
                 Layout.fillWidth: true
-                visible: palette.players.length > 1
-                model: palette.players.map(palette.playerLabel)
-                currentIndex: Math.max(0, palette.players.indexOf(palette.player))
-                onActivated: index => palette.selectedPlayer = palette.players[index]
+                visible: media.players.length > 1
+                model: media.players.map(media.playerLabel)
+                currentIndex: Math.max(0, media.players.indexOf(media.player))
+                onActivated: index => media.selectedPlayer = media.players[index]
             }
 
             RowLayout {
                 Layout.fillWidth: true
-                visible: palette.player !== null
+                visible: media.player !== null
                 spacing: 8
-                enabled: palette.player !== null && palette.player.canSeek
+                enabled: media.player !== null && media.player.canSeek
                 opacity: enabled ? 1 : 0.4
 
                 Text {
                     Layout.preferredWidth: 32
-                    text: palette.formatTime(
-                        seekSlider.pressed ? seekSlider.value : palette.displayPosition)
+                    text: media.formatTime(
+                        seekSlider.pressed ? seekSlider.value : media.displayPosition)
                     color: Theme.textMuted
                     font.family: Theme.mono
                     font.pixelSize: 11
@@ -372,23 +398,23 @@ PanelWindow {
                     id: seekSlider
                     Layout.fillWidth: true
                     from: 0
-                    to: Math.max(1, palette.player && palette.player.lengthSupported
-                        ? palette.player.length : 1)
-                    value: palette.displayPosition
+                    to: Math.max(1, media.player && media.player.lengthSupported
+                        ? media.player.length : 1)
+                    value: media.displayPosition
                     // The far end of the drag alone, not every frame of it:
                     // a seek is one Mpris call, not one per pixel crossed.
                     onCommitted: value => {
-                        if (palette.player)
-                            palette.player.position = value;
+                        if (media.player)
+                            media.player.position = value;
                     }
                 }
 
                 Text {
                     Layout.preferredWidth: 32
                     horizontalAlignment: Text.AlignRight
-                    text: palette.formatTime(
-                        palette.player && palette.player.lengthSupported
-                            ? palette.player.length : 0)
+                    text: media.formatTime(
+                        media.player && media.player.lengthSupported
+                            ? media.player.length : 0)
                     color: Theme.textMuted
                     font.family: Theme.mono
                     font.pixelSize: 11
@@ -403,7 +429,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: 2
-                visible: palette.player !== null
+                visible: media.player !== null
                 spacing: 16
 
                 Repeater {
@@ -416,8 +442,8 @@ PanelWindow {
                         readonly property string glyphSource: control.modelData === "previous"
                             ? "icons/skip-back.svg"
                             : control.modelData === "next" ? "icons/skip-forward.svg"
-                            : palette.isPlaying ? "icons/pause.svg" : "icons/play.svg"
-                        readonly property bool available: palette.allows(control.modelData)
+                            : media.isPlaying ? "icons/pause.svg" : "icons/play.svg"
+                        readonly property bool available: media.allows(control.modelData)
 
                         Layout.preferredWidth: 36
                         Layout.preferredHeight: 36
@@ -456,7 +482,7 @@ PanelWindow {
                             enabled: control.available
                             cursorShape: control.available
                                 ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: palette.dispatch(control.modelData)
+                            onClicked: media.dispatch(control.modelData)
                         }
                     }
                 }
@@ -466,6 +492,6 @@ PanelWindow {
 
     Shortcut {
         sequence: "Escape"
-        onActivated: palette.dismissed()
+        onActivated: media.dismissed()
     }
 }

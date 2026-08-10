@@ -2608,12 +2608,12 @@ def render_bar_workspaces(config: dict) -> None:
 # enough for its worst-case value. These mirror LAYOUTS[...]["width"] in
 # garage-metrics; tests/test_bar.py parses that script and fails on drift.
 METRIC_STRIP_WIDTHS = {
-    "cpu": 112,
-    "memory": 115,
-    "temp": 120,
-    "disk": 118,
-    "gpu": 140,
-    "network": 146,
+    "cpu": 82,
+    "memory": 82,
+    "temp": 76,
+    "disk": 91,
+    "gpu": 124,
+    "network": 127,
 }
 
 

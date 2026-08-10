@@ -80,7 +80,7 @@ WIDGETS = ("cpu", "memory", "network", "temp", "disk", "gpu")
 
 # 120 points at the bar's 2s interval is four minutes of history -- long enough
 # that a compile or a game launch is still on screen when you look up, short
-# enough that the strip is 44px wide and still readable.
+# enough that the strip's graph is 22px wide and still readable.
 POINTS = 120
 
 # Two callers can overlap: waybar's tick and a manual run, or a tick that ran
@@ -125,20 +125,97 @@ THEME_FG = _theme_fg()
 # Layouts
 #
 # 22px tall to match the bar's other modules, laid out left to right as
-# label / graph / value / extra. Only the widgets with a genuine second number
-# carry an `extra` column, and only the widgets with a genuine second series
-# draw one -- network (up under down) and GPU (VRAM under load). The widths are
-# chosen so the longest value each widget can produce still fits: "100%" for
-# the percentages, "↓999K" for network, "3.4G" for disk.
+# icon / graph / value / extra. The first column used to be the metric's name in
+# text -- CPU, MEM, TEMP -- and is a Phosphor glyph now, from the same icon set
+# the bar's bell and the shell's buttons already draw, so the width the strip
+# spends on saying which metric it is goes to the numbers instead.
+#
+# Only the widgets with a genuine second number carry an `extra` column, and only
+# the widgets with a genuine second series draw one -- GPU, VRAM under load.
+# Network has no graph at all: it is an icon and two throughput figures, because
+# one log-scaled line shared by up and down said less than the figures beside it,
+# and a widget carrying two numbers is the one that can least afford the room.
+#
+# The geometry is arithmetic rather than taste. The icon box is ICON_SIZE wide at
+# x=0, every column starts 6px after the one before it ends, and each width is the
+# last column's x plus the widest string that column can hold, rounded up, plus
+# 1px so the final glyph is not clipped at the viewBox edge. The x values are
+# spelled out below rather than computed because LAYOUTS has to stay a literal:
+# tests/test_bar.py reads this table out of the source to pin the bar's own copy
+# of the widths, and a table built from arithmetic is a table it cannot read.
+# Measured in the strip's own face, Plus Jakarta Sans 600 at 11.5px: "100%" 33px,
+# "100°" 27px, "999.9M" 42px, "24.0G" 36px, "↓999.9M" 50px. The one string that
+# runs a character past that is a rate in the 1000-1023 MiB/s band, "1023.9M",
+# which was over the old widths too; 7px of permanent emptiness in every strip is
+# the worse side of that trade.
 # ---------------------------------------------------------------------------
 
+# The icon box. ICON_SIZE is a little taller than the text's cap height on
+# purpose: at 14px in a 22px strip the glyph reads as a label at a glance. And
+# ICON_OPACITY is the `.secondary` fill the strip's own second number uses, which
+# is what keeps the icon a label rather than the thing the eye lands on first.
+ICON_SIZE = 14
+ICON_OPACITY = "0.75"
+
 LAYOUTS = {
-    "cpu": {"label": "CPU", "width": 112, "graph_x": 30, "graph_width": 44, "value_x": 80},
-    "memory": {"label": "MEM", "width": 115, "graph_x": 32, "graph_width": 44, "value_x": 82},
-    "temp": {"label": "TEMP", "width": 120, "graph_x": 38, "graph_width": 44, "value_x": 88},
-    "disk": {"label": "SSD", "width": 118, "graph_x": 30, "graph_width": 44, "value_x": 80},
-    "gpu": {"label": "GPU", "width": 140, "graph_x": 30, "graph_width": 44, "value_x": 80, "extra_x": 108},
-    "network": {"label": "NET", "width": 146, "graph_x": 30, "graph_width": 40, "value_x": 76, "extra_x": 112},
+    "cpu": {"icon": "cpu", "width": 82, "graph_x": 20, "graph_width": 22, "value_x": 48},
+    "memory": {"icon": "memory", "width": 82, "graph_x": 20, "graph_width": 22, "value_x": 48},
+    "temp": {"icon": "thermometer-simple", "width": 76, "graph_x": 20, "graph_width": 22, "value_x": 48},
+    "disk": {"icon": "hard-drives", "width": 91, "graph_x": 20, "graph_width": 22, "value_x": 48},
+    "gpu": {"icon": "graphics-card", "width": 124, "graph_x": 20, "graph_width": 22, "value_x": 48, "extra_x": 87},
+    "network": {"icon": "arrows-down-up", "width": 127, "value_x": 20, "extra_x": 76},
+}
+
+# The glyphs themselves, as the `d` of the single path each icon in Phosphor's
+# regular weight is drawn with, on Phosphor's own 256x256 box. Held here rather
+# than read from the shell's icons/ directory so a strip still draws on a machine
+# where only this script is installed; the same six paths are checked in there as
+# house assets, in that directory's format, so the popovers can draw them too.
+# Source: github.com/phosphor-icons/core, assets/regular, MIT.
+ICON_PATHS = {
+    "cpu": (
+        "M152,96H104a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V104A8,8,0,0,0,152,96Zm-8,"
+        "48H112V112h32Zm88,0H216V112h16a8,8,0,0,0,0-16H216V56a16,16,0,0,0-16-16H160V24a8,8,0,0,"
+        "0-16,0V40H112V24a8,8,0,0,0-16,0V40H56A16,16,0,0,0,40,56V96H24a8,8,0,0,0,0,16H40v32H24a8,"
+        "8,0,0,0,0,16H40v40a16,16,0,0,0,16,16H96v16a8,8,0,0,0,16,0V216h32v16a8,8,0,0,0,16,"
+        "0V216h40a16,16,0,0,0,16-16V160h16a8,8,0,0,0,0-16Zm-32,56H56V56H200v95.87s0,.09,0,.13,0,"
+        ".09,0,.13V200Z"
+    ),
+    "memory": (
+        "M232,56H24A16,16,0,0,0,8,72V200a8,8,0,0,0,16,0V184H40v16a8,8,0,0,0,16,0V184H72v16a8,8,0,"
+        "0,0,16,0V184h16v16a8,8,0,0,0,16,0V184h16v16a8,8,0,0,0,16,0V184h16v16a8,8,0,0,0,16,"
+        "0V184h16v16a8,8,0,0,0,16,0V184h16v16a8,8,0,0,0,16,0V72A16,16,0,0,0,232,56ZM24,"
+        "72H232v96H24Zm88,80a8,8,0,0,0,8-8V96a8,8,0,0,0-8-8H48a8,8,0,0,0-8,8v48a8,8,0,0,0,8,"
+        "8ZM56,104h48v32H56Zm88,48h64a8,8,0,0,0,8-8V96a8,8,0,0,0-8-8H144a8,8,0,0,0-8,8v48A8,8,0,"
+        "0,0,144,152Zm8-48h48v32H152Z"
+    ),
+    "thermometer-simple": (
+        "M136,153V88a8,8,0,0,0-16,0v65a32,32,0,1,0,16,0Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,128,"
+        "200Zm40-66V48a40,40,0,0,0-80,0v86a64,64,0,1,0,80,0Zm-40,98a48,48,0,0,1-27.42-87.4A8,8,0,"
+        "0,0,104,138V48a24,24,0,0,1,48,0v90a8,8,0,0,0,3.42,6.56A48,48,0,0,1,128,232Z"
+    ),
+    "hard-drives": (
+        "M208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,"
+        "0,208,136Zm0,64H48V152H208v48Zm0-160H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,"
+        "16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208v48ZM192,80a12,12,0,1,1-12-12A12,12,"
+        "0,0,1,192,80Zm0,96a12,12,0,1,1-12-12A12,12,0,0,1,192,176Z"
+    ),
+    "graphics-card": (
+        "M232,48H16a8,8,0,0,0-8,8V208a8,8,0,0,0,16,0V192H40v16a8,8,0,0,0,16,0V192H72v16a8,8,0,0,"
+        "0,16,0V192h16v16a8,8,0,0,0,16,0V192H232a16,16,0,0,0,16-16V64A16,16,0,0,0,232,48Zm0,"
+        "128H24V64H232Zm-56-16a40,40,0,1,0-40-40A40,40,0,0,0,176,160Zm-24-40a23.74,23.74,0,0,1,"
+        "2.35-10.34l32,32A23.74,23.74,0,0,1,176,144,24,24,0,0,1,152,120Zm48,0a23.74,23.74,0,0,"
+        "1-2.35,10.34l-32-32A23.74,23.74,0,0,1,176,96,24,24,0,0,1,200,120ZM80,160a40,40,0,1,"
+        "0-40-40A40,40,0,0,0,80,160ZM56,120a23.74,23.74,0,0,1,2.35-10.34l32,32A23.74,23.74,0,0,1,"
+        "80,144,24,24,0,0,1,56,120Zm48,0a23.74,23.74,0,0,1-2.35,10.34l-32-32A23.74,23.74,0,0,1,"
+        "80,96,24,24,0,0,1,104,120Z"
+    ),
+    "arrows-down-up": (
+        "M117.66,170.34a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,"
+        "11.32-11.32L72,188.69V48a8,8,0,0,1,16,0V188.69l18.34-18.35A8,8,0,0,1,117.66,"
+        "170.34Zm96-96-32-32a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32L168,67.31V208a8,8,0,"
+        "0,0,16,0V67.31l18.34,18.35a8,8,0,0,0,11.32-11.32Z"
+    ),
 }
 
 GRAPH_TOP = 3
@@ -873,8 +950,21 @@ def _coordinates(history: list[float], graph_x: float, graph_width: float) -> li
     return coordinates
 
 
-def render_widget(widget: str, state: dict) -> str:
-    layout = LAYOUTS[widget]
+def _render_icon(layout: dict) -> str:
+    """The metric's Phosphor glyph, scaled out of its 256 box and centred.
+
+    One transform rather than pre-scaled path data: the arithmetic stays visible
+    and ICON_SIZE remains the only number to change if the strip's height ever
+    does. Colour and opacity are attributes on the group, like the graph's
+    strokes -- the stylesheet in render_svg() speaks for the text only.
+    """
+    top = (22 - ICON_SIZE) / 2
+    return (f'<g transform="translate(0 {top:g}) scale({ICON_SIZE / 256:.6f})" '
+            f'fill="{THEME_FG}" fill-opacity="{ICON_OPACITY}">'
+            f'<path d="{ICON_PATHS[layout["icon"]]}"/></g>')
+
+
+def _render_graph(layout: dict, state: dict) -> str:
     graph_x = layout["graph_x"]
     graph_width = layout["graph_width"]
 
@@ -901,19 +991,30 @@ def render_widget(widget: str, state: dict) -> str:
         )
 
     opacity = "0.92" if state.get("active") else "0.62"
+
+    midline = GRAPH_TOP + GRAPH_HEIGHT / 2
+    return f'''<path d="M {graph_x} {midline:.1f} H {graph_x + graph_width}" stroke="{THEME_FG}" stroke-opacity="0.10" stroke-width="1"/>
+  <path d="M {graph_x} {GRAPH_BOTTOM} H {graph_x + graph_width}" stroke="{THEME_FG}" stroke-opacity="0.16" stroke-width="1"/>
+  <path d="{area}" fill="{THEME_FG}" fill-opacity="0.08"/>
+  <polyline points="{points}" fill="none" stroke="{THEME_FG}" stroke-opacity="{opacity}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>{secondary}'''
+
+
+def render_widget(widget: str, state: dict) -> str:
+    """Icon, then the graph if the widget has one, then its numbers.
+
+    A widget without `graph_width` draws no graph -- that is network, whose two
+    figures are the whole of what it has to say.
+    """
+    layout = LAYOUTS[widget]
     display = html.escape(str(state.get("display", "--")))
     extra = html.escape(str(state.get("extra", "")))
     extra_text = ""
     if extra and "extra_x" in layout:
         extra_text = f'\n  <text x="{layout["extra_x"]}" y="15.5" class="secondary">{extra}</text>'
 
-    midline = GRAPH_TOP + GRAPH_HEIGHT / 2
-    return f'''<path d="M {graph_x} {midline:.1f} H {graph_x + graph_width}" stroke="{THEME_FG}" stroke-opacity="0.10" stroke-width="1"/>
-  <path d="M {graph_x} {GRAPH_BOTTOM} H {graph_x + graph_width}" stroke="{THEME_FG}" stroke-opacity="0.16" stroke-width="1"/>
-  <path d="{area}" fill="{THEME_FG}" fill-opacity="0.08"/>
-  <polyline points="{points}" fill="none" stroke="{THEME_FG}" stroke-opacity="{opacity}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>{secondary}
-  <text x="0" y="15.5">{layout["label"]}</text>
-  <text x="{layout["value_x"]}" y="15.5">{display}</text>{extra_text}'''
+    graph = f"{_render_graph(layout, state)}\n  " if "graph_width" in layout else ""
+    return f'''{_render_icon(layout)}
+  {graph}<text x="{layout["value_x"]}" y="15.5">{display}</text>{extra_text}'''
 
 
 def render_svg(widget: str, state: dict) -> str:

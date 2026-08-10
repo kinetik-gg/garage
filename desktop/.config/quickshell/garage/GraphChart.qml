@@ -29,10 +29,15 @@ Item {
     // VRAM under GPU load. Same reasoning, same numbers, as the bar's history2.
     property var secondaryPoints: []
 
-    // The user's accent by default, overridable per instance so a panel that
-    // wants to colour one metric differently can, without every graph in the
-    // shell hardcoding a hex.
-    property color accent: Theme.accent
+    // The one colour every part of a graph is drawn in. Monochrome on purpose:
+    // this used to default to Theme.accent, and an activity panel tinted with
+    // the user's accent read as though the colour meant something -- it does
+    // not, every strip here is the same kind of number. So a graph is the
+    // shell's own foreground token (white on the dark scheme, near-black on the
+    // light one) and the five opacities below are the only thing that separates
+    // fill from stroke from axis. Overridable per instance, but no call site in
+    // the shell needs to: the default is the treatment.
+    property color ink: Theme.text
 
     // The bar dims a strip whose metric is idle rather than hiding it, so a row
     // of graphs reads at a glance as "this one is doing something". Same two
@@ -48,6 +53,10 @@ Item {
     property real strokeWidth: 1.4
     property real secondaryStrokeWidth: 1.1
     property real fillOpacity: 0.08
+    // The second series' stroke. Named alongside the rest rather than left as a
+    // literal in the ShapePath below, because with one colour for the whole
+    // chart these five numbers are the entire visual language of it.
+    property real secondaryOpacity: 0.34
     property real midlineOpacity: 0.10
     property real baselineOpacity: 0.16
 
@@ -135,7 +144,7 @@ Item {
         anchors.right: parent.right
         y: Math.round(chart.plotTop + chart.plotHeight / 2)
         height: 1
-        color: chart.accent
+        color: chart.ink
         opacity: chart.midlineOpacity
     }
 
@@ -144,7 +153,7 @@ Item {
         anchors.right: parent.right
         y: Math.round(chart.plotBottom)
         height: 1
-        color: chart.accent
+        color: chart.ink
         opacity: chart.baselineOpacity
     }
 
@@ -156,7 +165,7 @@ Item {
 
         // Fill first, so the stroke draws over its top edge rather than under it.
         ShapePath {
-            fillColor: Qt.rgba(chart.accent.r, chart.accent.g, chart.accent.b,
+            fillColor: Qt.rgba(chart.ink.r, chart.ink.g, chart.ink.b,
                 chart.fillOpacity)
             strokeColor: "transparent"
             strokeWidth: 0
@@ -165,7 +174,7 @@ Item {
 
         ShapePath {
             fillColor: "transparent"
-            strokeColor: Qt.rgba(chart.accent.r, chart.accent.g, chart.accent.b,
+            strokeColor: Qt.rgba(chart.ink.r, chart.ink.g, chart.ink.b,
                 chart.strokeOpacity)
             strokeWidth: chart.strokeWidth
             capStyle: ShapePath.RoundCap
@@ -175,7 +184,8 @@ Item {
 
         ShapePath {
             fillColor: "transparent"
-            strokeColor: Qt.rgba(chart.accent.r, chart.accent.g, chart.accent.b, 0.34)
+            strokeColor: Qt.rgba(chart.ink.r, chart.ink.g, chart.ink.b,
+                chart.secondaryOpacity)
             strokeWidth: chart.secondaryStrokeWidth
             capStyle: ShapePath.RoundCap
             joinStyle: ShapePath.RoundJoin

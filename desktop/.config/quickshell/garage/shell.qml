@@ -288,6 +288,48 @@ ShellRoot {
         id: captureProcess
     }
 
+    // The wedge guard on that lifetime.
+    //
+    // Measured on this machine: region capture was opened, slurp sat waiting for
+    // a drag that never came, and it went unnoticed for over six minutes. The
+    // catcher's `armed` expression above stands down for the whole time
+    // captureProcess is running -- which is correct, slurp's own clicks are not
+    // the user clicking away -- so for those six minutes click-outside dismissal
+    // was dead shell-wide: the launcher, both centres and all three bar panels
+    // could only be closed with Escape, and nothing on screen said why. One
+    // forgotten selection disables a gesture in six unrelated surfaces.
+    //
+    // So the stand-down is given a ceiling rather than being made conditional:
+    // `armed` is untouched, and this puts a bound on how long it can be false.
+    // Two minutes is far past any real region drag and far short of the six
+    // minutes that were measured.
+    //
+    // SIGTERM through Process's own signal(), then `running = false`, which is
+    // Quickshell's terminate-then-kill path for anything that ignores it and is
+    // also the property `armed` reads -- so clearing it is what actually gives
+    // the shell its click-outside gesture back.
+    //
+    // What this does not promise: signal() reaches one pid, and the command is
+    // the garage-screenshot-copy wrapper, which runs slurp as a foreground child
+    // in a command substitution. bash defers a signal until that child returns,
+    // so a slurp already sitting there may outlive the wrapper as an orphan and
+    // still have to be dismissed with Escape. That is the tool being ignored; the
+    // shell-wide dead dismissal is the part that was doing damage to five other
+    // surfaces, and this ends it. Reaching the child as well means the wrapper
+    // trapping and forwarding, which is that script's job, not this file's.
+    Timer {
+        id: captureWedgeGuard
+        interval: 120000
+        repeat: false
+        running: captureProcess.running
+        onTriggered: {
+            if (!captureProcess.running)
+                return;
+            captureProcess.signal(15);
+            captureProcess.running = false;
+        }
+    }
+
     LazyLoader {
         id: sessionLoader
         active: shell.activeSurface === "session"

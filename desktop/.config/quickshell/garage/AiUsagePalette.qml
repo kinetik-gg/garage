@@ -35,6 +35,15 @@ PanelWindow {
     property var subscriptions: []
     property var today: null
 
+    // The clock the reset lines are measured against, as a property so they are
+    // bindings on it rather than one-shot reads of Date.now(). The payload above
+    // is fetched once per open and never refreshed, which is the right policy
+    // for a quota -- but "in 2h 40m" is a statement about now rather than about
+    // the payload, and a panel left up on a second monitor would otherwise still
+    // be claiming it half an hour later. Half a minute is finer than the minute
+    // the line is printed to.
+    property real now: Date.now()
+
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
             const candidate = Quickshell.screens[index];
@@ -63,19 +72,55 @@ PanelWindow {
         return (typeof value === "number") ? Math.round(value) + "%" : "—";
     }
 
-    // A day count rather than a clock time: the popover has no room for a
-    // timezone-qualified timestamp, and "resets in 6 days" is the number a
-    // quota bar actually gets read for. garage-ai-usage's own --bar tooltip
-    // makes the same call (see reset_days() in that script).
+    // tokscale's resets_at, verbatim out of the payload: garage-ai-usage's
+    // --json mode passes the provider list straight through (build_json_output),
+    // so this is whatever ISO-8601 string tokscale wrote -- with a Z, with a
+    // numeric offset, or with no zone designator at all, all three of which the
+    // script's own reset()/reset_days() handle.
+    //
+    // A naive timestamp is the one case where JS and the script disagree:
+    // `new Date("2026-08-12T07:00:00")` is *local* time by ES2015, while
+    // garage-ai-usage assumes UTC for the same string. The Z is appended here so
+    // the palette and the bar cannot report two different reset moments for one
+    // quota.
+    function resetMoment(iso) {
+        const text = String(iso).trim();
+        const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(text);
+        return new Date(zoned ? text : text + "Z");
+    }
+
+    // How long is left, at the granularity the number is actually useful at.
+    //
+    // This used to be a day count and nothing else, and it was wrong in the one
+    // case that matters: a session quota resetting in a couple of hours ceils to
+    // one day and read "resets in 1 day", which is a whole working session of
+    // wrong. Inside 24 hours the answer is a clock time -- the thing you plan
+    // around -- with the remaining hours and minutes after it, because a bare
+    // "07:00" does not say whether that is soon or tomorrow morning. Past 24
+    // hours the clock time stops meaning anything a week out, so day granularity
+    // stays: "resets in 6 days".
     function formatReset(iso) {
         if (!iso)
             return "not reported";
-        const at = new Date(iso);
+        const at = usage.resetMoment(iso);
         if (isNaN(at.getTime()))
             return String(iso);
-        const days = Math.max(0, Math.ceil((at.getTime() - Date.now()) / 86400000));
-        if (days <= 0)
-            return "resets today";
+
+        const remaining = at.getTime() - usage.now;
+        if (remaining <= 0)
+            return "resets now";
+
+        const clock = "resets " + Qt.formatDateTime(at, "HH:mm");
+        if (remaining < 3600000)
+            return clock + " · in " + Math.max(1, Math.ceil(remaining / 60000)) + "m";
+        if (remaining < 86400000) {
+            const hours = Math.floor(remaining / 3600000);
+            const minutes = Math.floor((remaining % 3600000) / 60000);
+            return clock + " · in " + hours + "h"
+                + (minutes > 0 ? " " + minutes + "m" : "");
+        }
+
+        const days = Math.ceil(remaining / 86400000);
         return "resets in " + days + (days === 1 ? " day" : " days");
     }
 
@@ -134,6 +179,15 @@ PanelWindow {
         running: true
         stdout: StdioCollector { onStreamFinished: usage.loadPayload(text) }
         stderr: StdioCollector {}
+    }
+
+    // Advances `usage.now`, which is the only thing the reset lines re-read.
+    // Nothing is fetched on this tick -- see the note on `now` above.
+    Timer {
+        interval: 30000
+        repeat: true
+        running: usage.visible
+        onTriggered: usage.now = Date.now()
     }
 
     ContinuousRectangle {
@@ -306,12 +360,22 @@ PanelWindow {
                                             radius: height
                                             color: Theme.hoverStrong
 
+                                            // One colour at two opacities, not
+                                            // two colours: the well behind this
+                                            // is Theme.hoverStrong, which is
+                                            // this same foreground white at 9%.
+                                            // The accent that used to fill this
+                                            // implied a status the number does
+                                            // not have -- every provider's bar
+                                            // was the same blue whether it read
+                                            // 4% or 96%.
                                             ContinuousRectangle {
                                                 width: parent.width * Math.max(0, Math.min(1,
                                                     (metricRow.modelData.remaining_percent || 0) / 100))
                                                 height: parent.height
                                                 radius: parent.radius
-                                                color: Theme.accent
+                                                color: Theme.text
+                                                opacity: 0.9
                                             }
                                         }
 
