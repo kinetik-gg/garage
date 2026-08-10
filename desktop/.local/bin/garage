@@ -53,9 +53,9 @@ from zoneinfo import available_timezones
 #      to come back: fragment, then `hyprctl reload`. The binds and the rules
 #      have to return together, or a key would address a layout that is gone.
 #
-#   3. Rereads on a signal -- waybar, kitty, swaync. Write the file the process
-#      already reads, then signal it: SIGUSR2 is waybar's full reload (config and
-#      every include), SIGUSR1 is kitty's. No restart, so no visible gap.
+#   3. Rereads on a signal -- waybar, kitty. Write the file the process already
+#      reads, then signal it: SIGUSR2 is waybar's full reload (config and every
+#      include), SIGUSR1 is kitty's. No restart, so no visible gap.
 #
 #   4. Reads once at startup -- hypridle, hyprpaper's fit_mode, the C library's
 #      LANG. There is no reload to ask for, so the unit is restarted (or, for
@@ -241,15 +241,15 @@ CORNER_POWER = 3.37
 #
 # One visual identity, one table. Every colour the desktop draws with is named
 # here once, per appearance, and every toolkit config that carries colour is
-# rendered from it by render_toolkits() -- GTK3, GTK4, Qt, rofi, swaync,
-# swayosd, waybar, kitty, btop and hyprlock. Nothing downstream holds a hex.
+# rendered from it by render_toolkits() -- GTK3, GTK4, Qt, rofi, swayosd,
+# waybar, kitty, btop and hyprlock. Nothing downstream holds a hex.
 #
 # Before this table the same identity was maintained by hand in thirteen files
 # across six languages, and it had already drifted: the Qt dark palette shared
 # exactly two colours with the GTK dark palette it was supposed to match, and
-# swaync's structural sheet carried dark-only literals that made notification
-# body text unreadable on a light desktop. A colour that exists in one place
-# cannot drift from itself.
+# the notification daemon we replaced carried a structural sheet with dark-only
+# literals that made notification body text unreadable on a light desktop. A
+# colour that exists in one place cannot drift from itself.
 #
 # Values are either an opaque `#rrggbb` or a CSS `rgba(r, g, b, a)`. The two
 # forms are not interchangeable: the Qt and hyprlock renderers can only spell an
@@ -273,7 +273,6 @@ PALETTE: dict[str, dict[str, str]] = {
         "bg": "#1c1c1e",
         "bg_alt2": "#202022",
         "bg_sidebar": "#202022",
-        "bg_alt": "#242426",
         "bg_raised": "#242426",
         "bg_float": "#2c2c2e",
         "bg_lifted": "#3a3a3c",
@@ -296,7 +295,6 @@ PALETTE: dict[str, dict[str, str]] = {
         # is preserved as it stands rather than unified from one side only.
         "border_locked": "#888888",
         "meter_track": "#2c2c2e",
-        "hover_solid": "#3a3a3c",
 
         # Qt's four shading roles, which are read as a bevel around Button.
         # Light is lighter than the body and Dark darker, in both appearances.
@@ -359,21 +357,12 @@ PALETTE: dict[str, dict[str, str]] = {
         "hairline": "rgba(255, 255, 255, 0.12)",
         "edge": "rgba(255, 255, 255, 0.16)",
         "shade": "rgba(0, 0, 0, 0.45)",
-        "button_bg": "rgba(255, 255, 255, 0.07)",
-        "button_border": "rgba(255, 255, 255, 0.10)",
-        "button_hover": "rgba(255, 255, 255, 0.12)",
-        "close_bg": "rgba(255, 255, 255, 0.10)",
-        "close_bg_hover": "rgba(255, 255, 255, 0.16)",
         "bar_dot": "#ffffff",
         "bar_bg": "rgba(28, 28, 30, 0.42)",
         "bar_edge": "rgba(0, 0, 0, 0.30)",
         "bar_sheen": "rgba(255, 255, 255, 0.07)",
         "tooltip_bg": "rgba(44, 44, 46, 0.90)",
         "urgent": "rgba(255, 69, 58, 0.95)",
-        "panel_bg": "rgba(28, 28, 30, 0.94)",
-        "noti_bg": "rgba(44, 44, 46, 0.94)",
-        "focus_solid": "rgba(72, 72, 74, 0.70)",
-        "body_text": "rgba(245, 245, 247, 0.72)",
         "osd_bg": "rgba(28, 28, 30, 0.94)",
         "osd_fg": "rgba(245, 245, 247, 0.92)",
         "osd_fg_muted": "rgba(245, 245, 247, 0.82)",
@@ -388,7 +377,6 @@ PALETTE: dict[str, dict[str, str]] = {
         "bg": "#f2f2f7",
         "bg_alt2": "#f7f7fa",
         "bg_sidebar": "#ebebf0",
-        "bg_alt": "#f2f2f7",
         "bg_raised": "#f5f5f7",
         "bg_float": "#ffffff",
         "bg_lifted": "#d1d1d6",
@@ -399,7 +387,6 @@ PALETTE: dict[str, dict[str, str]] = {
         "shadow_base": "#000000",
         "border_locked": "#8e8e93",
         "meter_track": "#e5e5ea",
-        "hover_solid": "#ececf1",
 
         "bevel_light": "#ffffff",
         "bevel_midlight": "#f7f7fa",
@@ -447,21 +434,12 @@ PALETTE: dict[str, dict[str, str]] = {
         "hairline": "rgba(0, 0, 0, 0.12)",
         "edge": "rgba(0, 0, 0, 0.12)",
         "shade": "rgba(0, 0, 0, 0.12)",
-        "button_bg": "rgba(0, 0, 0, 0.07)",
-        "button_border": "rgba(0, 0, 0, 0.10)",
-        "button_hover": "rgba(0, 0, 0, 0.12)",
-        "close_bg": "rgba(0, 0, 0, 0.08)",
-        "close_bg_hover": "rgba(0, 0, 0, 0.14)",
         "bar_dot": "#1c1c1e",
         "bar_bg": "rgba(245, 245, 247, 0.42)",
         "bar_edge": "rgba(0, 0, 0, 0.12)",
         "bar_sheen": "rgba(255, 255, 255, 0.60)",
         "tooltip_bg": "rgba(255, 255, 255, 0.95)",
         "urgent": "rgba(255, 69, 58, 0.95)",
-        "panel_bg": "rgba(242, 242, 247, 0.94)",
-        "noti_bg": "rgba(255, 255, 255, 0.96)",
-        "focus_solid": "rgba(220, 220, 226, 0.70)",
-        "body_text": "rgba(28, 28, 30, 0.72)",
         "osd_bg": "rgba(245, 245, 247, 0.94)",
         "osd_fg": "rgba(28, 28, 30, 0.92)",
         "osd_fg_muted": "rgba(28, 28, 30, 0.82)",
@@ -3438,18 +3416,6 @@ def rgb_parts(color: str) -> str:
     return ", ".join(str(int(value[index:index + 2], 16)) for index in (0, 2, 4))
 
 
-def split_rgba(value: str) -> tuple[str, str]:
-    """A palette `rgba(r, g, b, a)` split into its channels and its alpha.
-
-    swaync's stylesheet asks for the two separately -- `--noti-bg` is a bare
-    triplet that `rgba()` is applied to with `--noti-bg-alpha` -- so the one
-    palette entry has to be taken apart rather than written out whole.
-    """
-    body = value[value.index("(") + 1:value.rindex(")")]
-    channels, _, alpha = body.rpartition(",")
-    return channels.strip(), alpha.strip()
-
-
 def opaque(scheme: str, role: str) -> str:
     """A palette role that must be an opaque hex, with a real error if it is not.
 
@@ -3514,38 +3480,6 @@ def rofi_palette_rasi(scheme: str) -> str:
 }}
 
 @import "apple-base.rasi"
-'''
-
-
-def swaync_palette_css(scheme: str) -> str:
-    """The notification palette. swaync's sheet is CSS custom properties."""
-    colors = PALETTE[scheme]
-    channels, alpha = split_rgba(colors["noti_bg"])
-    return f'''/* Generated by garage: the {scheme} palette for swaync. */
-:root {{
-  --cc-bg: {colors["panel_bg"]};
-  --noti-border-color: {colors["edge"]};
-  --noti-bg: {channels};
-  --noti-bg-alpha: {alpha};
-  --noti-bg-darker: {colors["bg_alt"]};
-  --noti-bg-hover: {colors["hover_solid"]};
-  --noti-bg-focus: {colors["focus_solid"]};
-  --noti-close-bg: {colors["close_bg"]};
-  --noti-close-bg-hover: {colors["close_bg_hover"]};
-  --text-color: {colors["fg_strong"]};
-  --text-color-body: {colors["body_text"]};
-  --text-color-disabled: {colors["fg_placeholder"]};
-  --bg-selected: {colors["accent"]};
-  --button-bg: {colors["button_bg"]};
-  --button-border: {colors["button_border"]};
-  --button-bg-hover: {colors["button_hover"]};
-  --border: 1px solid var(--noti-border-color);
-  --border-radius: 14px;
-  --notification-shadow: none;
-  --font-size-body: 13px;
-  --font-size-summary: 13px;
-  font-family: "IBM Plex Sans", sans-serif;
-}}
 '''
 
 
@@ -3640,7 +3574,6 @@ gtk-xft-rgba=rgb
     for appearance in SCHEMES:
         write(f"gtk-3.0/apple-{appearance}.css", gtk3_palette_css(appearance))
         write(f"rofi/apple-{appearance}.rasi", rofi_palette_rasi(appearance))
-        write(f"swaync/swaync-{appearance}.css", swaync_palette_css(appearance))
         write(f"swayosd/swayosd-{appearance}.css", swayosd_palette_css(appearance))
     write("gtk-4.0/apple.css", gtk4_palette_css())
     for appearance in SCHEMES:
@@ -3658,11 +3591,6 @@ Xft/Antialias 1
 Xft/Hinting 1
 Xft/HintStyle "hintslight"
 Xft/RGBA "rgb"
-''')
-
-    write("swaync/style.css", f'''/* Generated by garage. */
-@import url("swaync-{scheme}.css");
-@import url("swaync-base.css");
 ''')
 
     write("rofi/config.rasi", f'''/* Generated by garage. */
@@ -4250,9 +4178,6 @@ def push_theme(config: dict) -> None:
     # GTK3 and XWayland apps re-theme when xsettingsd rereads its config.
     run(["systemctl", "--user", "reload-or-restart", "xsettingsd.service"])
 
-    # swaync reloads its stylesheet in place.
-    run(["swaync-client", "-rs"])
-
     # waybar rereads its stylesheet on SIGUSR2, kitty its whole config on SIGUSR1.
     run(["pkill", "-USR2", "-x", "waybar"])
     run(["pkill", "-USR1", "-x", "kitty"])
@@ -4598,12 +4523,6 @@ def audio_snapshot() -> dict:
     }
 
 
-def notification_snapshot() -> dict:
-    result = run(["swaync-client", "-D"])
-    text = result.stdout.strip().lower()
-    return {"available": result.returncode == 0, "dnd": text in {"true", "1", "enabled", "on"}}
-
-
 def input_snapshot() -> dict:
     devices = json_command(["hyprctl", "devices", "-j"], {})
     return {"hasTouchpad": bool(devices.get("touch", [])) or any(
@@ -4686,12 +4605,11 @@ def make_snapshot() -> dict:
         "workspaces": workspaces_snapshot(preferences, displays),
         "keybindings": keybindings_snapshot(load_keybindings()),
         "audio": audio_snapshot(),
-        "notifications": notification_snapshot(),
         "dateTime": datetime_snapshot(),
         "region": region_snapshot(),
         "inputCapabilities": input_snapshot(),
         "capabilities": {name: shutil.which(name) is not None for name in (
-            "hyprctl", "hyprpaper", "hyprsunset", "pactl", "swaync-client", "hypridle"
+            "hyprctl", "hyprpaper", "hyprsunset", "pactl", "hypridle"
         )},
         "error": error,
     }
@@ -4883,10 +4801,6 @@ def action(name: str, value: object | None) -> None:
         run(["pactl", "set-default-sink", str(value)], check=True)
     elif name == "audio.input.default":
         run(["pactl", "set-default-source", str(value)], check=True)
-    elif name == "notifications.dnd":
-        run(["swaync-client", "-dn" if value else "-df"], check=True)
-    elif name == "notifications.clear":
-        run(["swaync-client", "-C"], check=True)
     elif name == "glass.reset":
         # Under PREFERENCES_LOCK, exactly like `set`: this is another whole-file
         # read-modify-write, and the pane can fire it while a slider elsewhere in

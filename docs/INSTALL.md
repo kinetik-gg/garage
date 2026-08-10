@@ -101,7 +101,7 @@ In order:
    its list against the repositories and reports the whole set of missing names
    at once rather than failing partway through an install.
 3. **Installs the package set** — Hyprland and its portals, Quickshell, Waybar,
-   Kitty, Fish, Rofi, SwayNC, SwayOSD, PipeWire, the GNOME apps it uses, fonts,
+   Kitty, Fish, Rofi, SwayOSD, PipeWire, the GNOME apps it uses, fonts,
    and the Node/Rust/C++ toolchains. NVIDIA packages are added automatically
    when NVIDIA hardware is detected.
 4. **Enables system services**: NetworkManager, Bluetooth, Docker, and SDDM — so
@@ -122,9 +122,10 @@ In order:
 8. **Picks a window material your GPU can afford** (see below). On a machine
    with a discrete GPU it writes nothing at all.
 9. **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset,
-   the polkit agent, SwayNC, SwayOSD, cliphist, xsettingsd, the Garage shell,
+   the polkit agent, SwayOSD, cliphist, xsettingsd, the Garage shell,
    the plugin ABI check, and the theme and Night Shift timers — and masks
-   `dunst.service` so D-Bus cannot activate it ahead of SwayNC. Nothing is
+   `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's
+   notification daemon. Nothing is
    *started*: every unit is wanted by `graphical-session.target` (or
    `timers.target`) and comes up at your first graphical login.
 10. **Installs the Pure Fish prompt** at a pinned tag and the stable Rust

@@ -80,7 +80,7 @@ comments that already explain why each is shaped the way it is.
 - Rofi launcher
 - Waybar status bar
 - Quickshell shell (settings UI, launcher, control panels)
-- SwayNC Control Center and notifications
+- Native notification center and control center (Quickshell + Glass)
 - SwayOSD volume and brightness feedback
 - ABI-pinned Hyprland plugins (Glass and `hyprexpo`)
 - Spotify, Discord, and Zed

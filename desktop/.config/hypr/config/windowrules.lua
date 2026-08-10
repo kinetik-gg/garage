@@ -64,22 +64,19 @@ hl.window_rule({
 -- Translucent shell surfaces use compositor blur behind their own alpha.
 hl.layer_rule({
     name = "apple-dark-shell-blur",
-    match = { namespace = "^(waybar|notifications|rofi|swaync-control-center|swaync-notification-window|garage-notifications|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
 })
 hl.layer_rule({
     name = "control-center-slide",
-    -- Rollback window until Wave 4: swaync's own namespace stays in the match
-    -- alongside the shell's replacement so either surface still slides in
-    -- correctly if one wave has to be reverted without the other.
-    match = { namespace = "^(swaync-control-center|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(garage-notification-center|garage-control-center)$" },
     animation = "slide right",
 })
 hl.layer_rule({
     name = "notification-screen-share-privacy",
-    match = { namespace = "^(swaync-control-center|swaync-notification-window|garage-notifications|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(garage-notifications|garage-notification-center|garage-control-center)$" },
     no_screen_share = true,
 })
 hl.layer_rule({

@@ -24,7 +24,6 @@ _darcs
 ^/\.config/qt6ct/qt6ct\.conf$
 ^/\.config/gtk-3\.0/gtk\.css$
 ^/\.config/gtk-4\.0/gtk\.css$
-^/\.config/swaync/style\.css$
 ^/\.config/rofi/config\.rasi$
 ^/\.config/waybar/style\.css$
 ^/\.config/swayosd/style\.css$
@@ -37,7 +36,6 @@ _darcs
 ^/\.config/gtk-3\.0/apple-(dark|light)\.css$
 ^/\.config/gtk-4\.0/apple\.css$
 ^/\.config/rofi/apple-(dark|light)\.rasi$
-^/\.config/swaync/swaync-(dark|light)\.css$
 ^/\.config/swayosd/swayosd-(dark|light)\.css$
 ^/\.config/qt6ct/colors/vanta(-light)?\.conf$
 ^/\.config/swayosd/config\.toml$

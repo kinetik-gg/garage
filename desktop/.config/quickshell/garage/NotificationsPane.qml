@@ -19,11 +19,9 @@ Flickable {
             SettingsRow {
                 title: "Do Not Disturb"
                 description: "Silence banners while keeping notifications in Notification Center."
-                rowEnabled: pane.controller.snapshot.notifications.available
                 SettingsSwitch {
-                    checked: pane.controller.snapshot.notifications.dnd
-                    enabled: pane.controller.snapshot.notifications.available
-                    onToggled: value => pane.controller.action("notifications.dnd", value)
+                    checked: NotificationDaemon.dnd
+                    onToggled: value => NotificationDaemon.setDnd(value)
                 }
             }
 
@@ -31,21 +29,17 @@ Flickable {
 
             SettingsRow {
                 title: "Notification History"
-                description: "Remove all notifications currently stored by SwayNC."
-                rowEnabled: pane.controller.snapshot.notifications.available
+                description: "Remove all notifications currently stored."
                 SettingsButton {
                     text: "Clear All"
-                    enabled: pane.controller.snapshot.notifications.available
-                    onClicked: pane.controller.action("notifications.clear")
+                    onClicked: NotificationDaemon.clearAll()
                 }
             }
         }
 
         Text {
             Layout.fillWidth: true
-            text: pane.controller.snapshot.notifications.available
-                ? "Notifications are managed by SwayNC."
-                : "The notification service is unavailable."
+            text: "Notifications are handled by the Garage shell."
             color: Theme.textMuted
             font.family: Theme.sans
             font.pixelSize: 11

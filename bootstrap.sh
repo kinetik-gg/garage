@@ -255,7 +255,7 @@ packages=(
     hyprland uwsm xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
     hypridle hyprlock hyprpaper hyprpolkitagent hyprsunset
     waybar quickshell rofi kitty fish fisher
-    swaync swayosd cliphist wl-clipboard playerctl
+    swayosd cliphist wl-clipboard playerctl
     grim slurp satty hyprpicker
     networkmanager bluez bluez-utils
     pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol
@@ -777,9 +777,11 @@ step "Enabling the per-user services"
 # re-read them before enable can resolve their [Install] sections.
 run systemctl --user daemon-reload
 
-# The vanilla Arch Hyprland profile may pull in Dunst. This desktop uses SwayNC
-# as both the notification daemon and the control center, so stop D-Bus from
-# activating Dunst first. Not load-bearing: Dunst may not be installed at all.
+# The vanilla Arch Hyprland profile may pull in Dunst. This desktop uses the
+# Garage shell as both the notification daemon and the control center, so stop
+# D-Bus from activating Dunst first: it must never race the shell for the
+# org.freedesktop.Notifications name. Not load-bearing: Dunst may not be
+# installed at all.
 run systemctl --user mask dunst.service || true
 
 user_units=(
@@ -788,7 +790,6 @@ user_units=(
     hypridle.service  # + ExecStartPre=garage render-idle
     hyprsunset.service
     hyprpolkitagent.service
-    swaync.service
     swayosd.service
     cliphist.service
     cliphist-image.service

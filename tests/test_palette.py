@@ -52,11 +52,11 @@ QML_COLOR = re.compile(r'"#((?:[0-9a-fA-F]{2})?)([0-9a-fA-F]{6})"')
 
 # The structural sheets, which the palette is imported *ahead of*. A colour that
 # appears in one of these is a colour that cannot follow the appearance: it was
-# swaync's `.body` rule that made notification text unreadable on a light
-# desktop, because the base sheet named a dark-only literal directly.
+# the notification daemon we replaced whose `.body` rule made notification text
+# unreadable on a light desktop, because its base sheet named a dark-only
+# literal directly.
 STRUCTURAL_SHEETS = (
     CONFIG / "waybar" / "waybar-base.css",
-    CONFIG / "swaync" / "swaync-base.css",
     CONFIG / "swayosd" / "swayosd-base.css",
     CONFIG / "rofi" / "apple-base.rasi",
 )
@@ -71,8 +71,6 @@ PALETTE_FILES = (
     "gtk-4.0/apple.css",
     "rofi/apple-dark.rasi",
     "rofi/apple-light.rasi",
-    "swaync/swaync-dark.css",
-    "swaync/swaync-light.css",
     "swayosd/swayosd-dark.css",
     "swayosd/swayosd-light.css",
     "qt6ct/colors/vanta.conf",
@@ -357,16 +355,6 @@ class RenderedPaletteFiles(BackendTestCase):
             with self.subTest(color=name):
                 self.assertIn(name, defined)
 
-    def test_the_notification_palette_defines_every_variable_the_sheet_reads(self) -> None:
-        base = (CONFIG / "swaync" / "swaync-base.css").read_text(encoding="utf-8")
-        for scheme in self.garage.SCHEMES:
-            palette = (self.out / f"swaync/swaync-{scheme}.css").read_text(
-                encoding="utf-8")
-            declared = set(re.findall(r"(--[\w-]+):", palette))
-            for name in set(re.findall(r"var\((--[\w-]+)\)", base)):
-                with self.subTest(scheme=scheme, variable=name):
-                    self.assertIn(name, declared)
-
 
 class StructuralSheetsCarryNoColour(unittest.TestCase):
     """The sheets the palette is imported ahead of hold no colour of their own."""
@@ -378,8 +366,21 @@ class StructuralSheetsCarryNoColour(unittest.TestCase):
             with self.subTest(sheet=path.name):
                 self.assertEqual(found, [], (
                     "a literal colour here cannot follow the appearance: it is "
-                    "the same rule that left swaync's notification body text "
-                    "near-white on a light desktop"))
+                    "the same rule that left the old notification daemon's body "
+                    "text near-white on a light desktop"))
+
+
+class NoSwayncResidue(unittest.TestCase):
+    """swaync is gone: the shell is the notification daemon now.
+
+    A stray reference here is not cosmetic -- it is either a render path still
+    writing a file nothing reads, or an action still shelling out to a binary
+    the system no longer has, and both fail silently rather than loudly.
+    """
+
+    def test_the_backend_names_no_swaync_anything(self) -> None:
+        source = BACKEND_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("swaync", source)
 
 
 class ShellPaletteCopies(BackendTestCase):
