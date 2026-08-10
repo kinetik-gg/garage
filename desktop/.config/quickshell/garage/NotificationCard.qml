@@ -35,6 +35,52 @@ ContinuousRectangle {
     readonly property string imageSource: live ? String(notification.image || "") : ""
     readonly property var actions: live ? notification.actions : []
 
+    // Shared between the toast's meta row and the centre card's title row, so
+    // the two spellings of "when, and how to close" cannot drift apart.
+    component TimeLabel: Text {
+        text: card.timeLabel(NotificationDaemon.now)
+        color: Theme.textMuted
+        font.family: Theme.sans
+        font.pixelSize: 11
+        renderType: Text.NativeRendering
+    }
+
+    component CloseButton: ContinuousRectangle {
+        implicitWidth: 20
+        implicitHeight: 20
+        radius: Theme.controlRadius
+        color: closeArea.containsMouse ? Theme.hoverStrong : "transparent"
+
+        Image {
+            id: closeGlyphImage
+            anchors.centerIn: parent
+            width: 12
+            height: 12
+            source: "icons/x.svg"
+            sourceSize.width: 24
+            sourceSize.height: 24
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            visible: false
+        }
+
+        ColorOverlay {
+            anchors.fill: closeGlyphImage
+            source: closeGlyphImage
+            color: closeArea.containsMouse ? Theme.text : Theme.textMuted
+            cached: true
+        }
+
+        MouseArea {
+            id: closeArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: card.closeRequested()
+        }
+    }
+
     // Inline reply. Only off a toast: a popup times out under the pointer, and a
     // text field that can disappear mid-sentence is a trap. This field is the
     // whole reason NotificationDaemon advertises the capability at all.
@@ -208,11 +254,12 @@ ContinuousRectangle {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
+            // Toast only. In the centre the group header already carries the app
+            // identity, so this whole row would hold nothing but the time and
+            // the close button floating over dead space -- those ride on the
+            // title row there instead.
+            visible: card.compact
 
-            // The app icon and name, on a toast only: in the centre the group
-            // header directly above the card already says which app sent it, and
-            // repeating it on every row of the group is noise. Invisible items
-            // are left out of a layout, so this costs no space there.
             Item {
                 Layout.preferredWidth: 18
                 Layout.preferredHeight: 18
@@ -267,60 +314,11 @@ ContinuousRectangle {
                 renderType: Text.NativeRendering
             }
 
-            // Takes the space the app name gave up, so the time and the close
-            // button stay at the right edge of a centre card.
-            Item {
-                Layout.fillWidth: true
-                visible: !card.compact
-            }
-
-            Text {
-                // Re-read on the shell's minute tick, which is the whole reason
-                // the daemon owns a clock: a timer per card would wake the
-                // process once for every visible row.
-                text: card.timeLabel(NotificationDaemon.now)
-                color: Theme.textMuted
-                font.family: Theme.sans
-                font.pixelSize: 11
-                renderType: Text.NativeRendering
-            }
-
-            ContinuousRectangle {
-                implicitWidth: 20
-                implicitHeight: 20
-                radius: Theme.controlRadius
-                color: closePointer.containsMouse ? Theme.hoverStrong : "transparent"
-
-                Image {
-                    id: closeGlyph
-                    anchors.centerIn: parent
-                    width: 12
-                    height: 12
-                    source: "icons/x.svg"
-                    sourceSize.width: 24
-                    sourceSize.height: 24
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    antialiasing: true
-                    mipmap: true
-                    visible: false
-                }
-
-                ColorOverlay {
-                    anchors.fill: closeGlyph
-                    source: closeGlyph
-                    color: closePointer.containsMouse ? Theme.text : Theme.textMuted
-                    cached: true
-                }
-
-                MouseArea {
-                    id: closePointer
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: card.closeRequested()
-                }
-            }
+            // Re-read on the shell's minute tick, which is the whole reason
+            // the daemon owns a clock: a timer per card would wake the
+            // process once for every visible row.
+            TimeLabel {}
+            CloseButton {}
         }
 
         RowLayout {
@@ -348,19 +346,38 @@ ContinuousRectangle {
                 Layout.fillWidth: true
                 spacing: 2
 
-                Text {
-                    id: summaryText
+                // The centre card's title row: summary on the left, time and
+                // close at the right edge -- the meta row above is toast-only,
+                // so without this a centre card led with floating chrome.
+                RowLayout {
                     Layout.fillWidth: true
-                    text: card.live ? String(card.notification.summary || "") : ""
-                    visible: summaryText.text !== ""
-                    color: Theme.text
-                    font.family: Theme.sans
-                    font.pixelSize: 13
-                    font.weight: Font.Bold
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: card.compact ? 2 : 4
-                    elide: Text.ElideRight
-                    renderType: Text.NativeRendering
+                    spacing: 8
+                    visible: !card.compact || summaryText.text !== ""
+
+                    Text {
+                        id: summaryText
+                        Layout.fillWidth: true
+                        text: card.live ? String(card.notification.summary || "") : ""
+                        visible: summaryText.text !== ""
+                        color: Theme.text
+                        font.family: Theme.sans
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: card.compact ? 2 : 4
+                        elide: Text.ElideRight
+                        renderType: Text.NativeRendering
+                    }
+
+                    TimeLabel {
+                        visible: !card.compact
+                        Layout.alignment: Qt.AlignTop
+                    }
+
+                    CloseButton {
+                        visible: !card.compact
+                        Layout.alignment: Qt.AlignTop
+                    }
                 }
 
                 Text {
