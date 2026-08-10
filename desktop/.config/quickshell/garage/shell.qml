@@ -101,6 +101,14 @@ ShellRoot {
         }
     }
 
+    // The notification service, and the only surface in the shell that is not
+    // loaded on demand. Everything else here is opened by the user, so it can wait
+    // until they ask; a notification server has to be on the bus before anything
+    // sends to it, and nothing in a LazyLoader exists until something activates it.
+    // Reaching NotificationDaemon from here is also what brings the singleton --
+    // and with it org.freedesktop.Notifications -- up with the shell.
+    NotificationPopups {}
+
     // Whether the shell's own launcher is switched on. SUPER+Space already asks
     // the same marker through its wrapper; this closes the other routes in, so
     // nothing can open a launcher the user turned off.
@@ -198,6 +206,36 @@ ShellRoot {
             screenshotLoader.active = false;
             sessionLoader.active = false;
             aboutLoader.active = true;
+        }
+    }
+
+    // A handler of its own rather than more functions on "shell": these are the
+    // notification service's controls, and the callers are different -- garage for
+    // the preferences switch, hyprlock and the recorder for the inhibitors.
+    IpcHandler {
+        target: "notifications"
+        property bool dnd: NotificationDaemon.dnd
+
+        function setDnd(value: bool): void {
+            NotificationDaemon.setDnd(value);
+        }
+
+        function toggleDnd(): void {
+            NotificationDaemon.toggleDnd();
+        }
+
+        // Named holds, so a caller that arms twice cannot leave the shell silent
+        // by releasing once.
+        function inhibit(name: string): void {
+            NotificationDaemon.addInhibitor(name);
+        }
+
+        function release(name: string): void {
+            NotificationDaemon.removeInhibitor(name);
+        }
+
+        function clear(): void {
+            NotificationDaemon.clearAll();
         }
     }
 }

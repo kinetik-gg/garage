@@ -64,7 +64,7 @@ hl.window_rule({
 -- Translucent shell surfaces use compositor blur behind their own alpha.
 hl.layer_rule({
     name = "apple-dark-shell-blur",
-    match = { namespace = "^(waybar|notifications|rofi|swaync-control-center|swaync-notification-window|garage-screenshot|garage-session-menu)$" },
+    match = { namespace = "^(waybar|notifications|rofi|swaync-control-center|swaync-notification-window|garage-notifications|garage-screenshot|garage-session-menu)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
@@ -76,7 +76,7 @@ hl.layer_rule({
 })
 hl.layer_rule({
     name = "notification-screen-share-privacy",
-    match = { namespace = "^(swaync-control-center|swaync-notification-window)$" },
+    match = { namespace = "^(swaync-control-center|swaync-notification-window|garage-notifications)$" },
     no_screen_share = true,
 })
 hl.layer_rule({
