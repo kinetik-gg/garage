@@ -11,18 +11,22 @@ ShellRoot {
     property string notificationScreenName: ""
     property string controlCenterScreenName: ""
     property string launcherScreenName: ""
+    property string monitorScreenName: ""
+    property string mediaScreenName: ""
+    property string aiUsageScreenName: ""
 
     // Which transient surface is on screen, by name, or "" for none.
     //
     // The transient surfaces -- the launcher, the session menu, the notification
-    // centre and the control centre -- are layer overlays that hold the keyboard
-    // or the pointer for as long as they are up, so no two of them can usefully be
-    // on screen together. Holding that as one name rather than a boolean per loader
-    // is what makes it true by construction: every loader binds to this, so
-    // activating one deactivates the rest with no cross-loader clears to keep in
-    // step. Those clears were written out at each entry point before, and were, in
-    // places, forgotten -- session() closed the screenshot pill and about() closed
-    // nothing.
+    // centre, the control centre and the three panels the bar's own modules open
+    // (the activity monitor, the now-playing panel and the AI usage panel) -- are
+    // layer overlays that hold the keyboard or the pointer for as long as they are
+    // up, so no two of them can usefully be on screen together. Holding that as
+    // one name rather than a boolean per loader is what makes it true by
+    // construction: every loader binds to this, so activating one deactivates the
+    // rest with no cross-loader clears to keep in step. Those clears were written
+    // out at each entry point before, and were, in places, forgotten -- session()
+    // closed the screenshot pill and about() closed nothing.
     //
     // Deliberately not the screenshot pill, which used to be in here: see
     // screenshotOpen below.
@@ -57,11 +61,13 @@ ShellRoot {
         return Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
     }
 
-    // The surfaces the pill may share the screen with: the two panels worth
-    // taking a picture of. Both of them stay up through the capture, which is
+    // The surfaces the pill may share the screen with: the panels worth
+    // taking a picture of. All of them stay up through the capture, which is
     // what disarming the dismiss catcher below is for.
     function sharesScreenWithScreenshot(name) {
-        return name === "notificationCenter" || name === "controlCenter";
+        return name === "notificationCenter" || name === "controlCenter"
+            || name === "monitorPalette" || name === "mediaPalette"
+            || name === "aiPalette";
     }
 
     // The surfaces whose click-outside dismissal the shared catcher owns.
@@ -73,7 +79,28 @@ ShellRoot {
     function catchesOutsideClicks(name) {
         return name === "launcher"
             || name === "notificationCenter"
-            || name === "controlCenter";
+            || name === "controlCenter"
+            || name === "monitorPalette"
+            || name === "mediaPalette"
+            || name === "aiPalette";
+    }
+
+    // Whether a palette that is up has asked not to be dismissed out from under
+    // a gesture still in progress.
+    //
+    // MonitorPalette and MediaPalette each carry a holdOpen for this, and each
+    // documents the shell binding the shared catcher's `armed` to it: the live
+    // case is MediaPalette's seek bar, where the pointer leaves the panel during
+    // the drag and the release is the tail of that drag rather than the user
+    // clicking away. Read through the loaders' items because the palettes only
+    // exist while they are up. AiUsagePalette has no holdOpen -- there is no
+    // gesture in it to interrupt -- so it is not asked.
+    function paletteHoldsOpen() {
+        if (monitorPaletteLoader.item && monitorPaletteLoader.item.holdOpen)
+            return true;
+        if (mediaPaletteLoader.item && mediaPaletteLoader.item.holdOpen)
+            return true;
+        return false;
     }
 
     // configure() runs before the surface is shown, so the palette is created
@@ -179,11 +206,11 @@ ShellRoot {
         loader.active = true;
     }
 
-    // Click-outside dismissal for the launcher and the two centres, in one
-    // place rather than one copy per palette: all three want the same gesture,
-    // all three are mutually exclusive by activeSurface, and a single catcher
-    // therefore never has to work out which of them it is guarding -- it closes
-    // whatever is up.
+    // Click-outside dismissal for the launcher, the two centres and the three
+    // panels the bar opens, in one place rather than one copy per palette: they
+    // all want the same gesture, they are all mutually exclusive by
+    // activeSurface, and a single catcher therefore never has to work out which
+    // of them it is guarding -- it closes whatever is up.
     //
     // Declared before the palette loaders on purpose. This and they both bind
     // to activeSurface, so within the turn that changes it they are served in
@@ -195,8 +222,11 @@ ShellRoot {
         active: shell.catchesOutsideClicks(shell.activeSurface)
         // Stood down for the whole screenshot flow: the pill's own clicks are
         // not the user clicking away from the panel being photographed, and
-        // neither are slurp's while a region is being dragged out.
-        armed: !(shell.screenshotOpen || captureProcess.running)
+        // neither are slurp's while a region is being dragged out. Stood down
+        // the same way for a palette holding itself open through a gesture --
+        // see paletteHoldsOpen above.
+        armed: !(shell.screenshotOpen || captureProcess.running
+            || shell.paletteHoldsOpen())
         onDismissed: shell.closeSurface(shell.activeSurface)
     }
 
@@ -308,6 +338,41 @@ ShellRoot {
         }
     }
 
+    // The three panels the bar's own modules open, on the same shape as the two
+    // centres above: one loader each, bound to activeSurface, and a dismissed()
+    // that clears the name it was activated by. The monitor and the AI usage
+    // panel sit against the right edge like the centres; the media panel is
+    // anchored to the top edge alone, so the compositor centres it under the bar.
+    LazyLoader {
+        id: monitorPaletteLoader
+        active: shell.activeSurface === "monitorPalette"
+
+        MonitorPalette {
+            targetScreenName: shell.monitorScreenName
+            onDismissed: shell.closeSurface("monitorPalette")
+        }
+    }
+
+    LazyLoader {
+        id: mediaPaletteLoader
+        active: shell.activeSurface === "mediaPalette"
+
+        MediaPalette {
+            targetScreenName: shell.mediaScreenName
+            onDismissed: shell.closeSurface("mediaPalette")
+        }
+    }
+
+    LazyLoader {
+        id: aiPaletteLoader
+        active: shell.activeSurface === "aiPalette"
+
+        AiUsagePalette {
+            targetScreenName: shell.aiUsageScreenName
+            onDismissed: shell.closeSurface("aiPalette")
+        }
+    }
+
     // The notification service, and the only surface in the shell that is not
     // loaded on demand. Everything else here is opened by the user, so it can wait
     // until they ask; a notification server has to be on the bus before anything
@@ -345,6 +410,9 @@ ShellRoot {
         property bool launcherVisible: launcherLoader.active
         property bool notificationCenterVisible: notificationCenterLoader.active
         property bool controlCenterVisible: controlCenterLoader.active
+        property bool monitorVisible: monitorPaletteLoader.active
+        property bool mediaVisible: mediaPaletteLoader.active
+        property bool aiUsageVisible: aiPaletteLoader.active
 
         function launcher(): void {
             // Read per call rather than bound: the marker changes underneath a
@@ -481,6 +549,75 @@ ShellRoot {
 
         function closeControlCenter(): void {
             shell.closeSurface("controlCenter");
+        }
+
+        // The three bar panels, each on the same three-function shape as the
+        // control centre above. The click on a bar module goes through
+        // garage-panel-toggle, which resolves the monitor under the pointer and
+        // calls the *On form with it; the parameterless form is there for a
+        // keybind, which has no pointer to resolve and so takes the focused
+        // monitor, the way launcher() and session() do.
+        function monitor(): void {
+            shell.toggleSurface("monitorPalette", () => {
+                shell.monitorScreenName = shell.focusedScreenName();
+            });
+        }
+
+        function monitorOn(screenName: string): void {
+            const sameScreen = shell.monitorScreenName === screenName;
+            const open = () => {
+                shell.monitorScreenName = screenName;
+            };
+            if (sameScreen)
+                shell.toggleSurface("monitorPalette", open);
+            else
+                shell.openSurface("monitorPalette", open);
+        }
+
+        function closeMonitor(): void {
+            shell.closeSurface("monitorPalette");
+        }
+
+        function media(): void {
+            shell.toggleSurface("mediaPalette", () => {
+                shell.mediaScreenName = shell.focusedScreenName();
+            });
+        }
+
+        function mediaOn(screenName: string): void {
+            const sameScreen = shell.mediaScreenName === screenName;
+            const open = () => {
+                shell.mediaScreenName = screenName;
+            };
+            if (sameScreen)
+                shell.toggleSurface("mediaPalette", open);
+            else
+                shell.openSurface("mediaPalette", open);
+        }
+
+        function closeMedia(): void {
+            shell.closeSurface("mediaPalette");
+        }
+
+        function aiUsage(): void {
+            shell.toggleSurface("aiPalette", () => {
+                shell.aiUsageScreenName = shell.focusedScreenName();
+            });
+        }
+
+        function aiUsageOn(screenName: string): void {
+            const sameScreen = shell.aiUsageScreenName === screenName;
+            const open = () => {
+                shell.aiUsageScreenName = screenName;
+            };
+            if (sameScreen)
+                shell.toggleSurface("aiPalette", open);
+            else
+                shell.openSurface("aiPalette", open);
+        }
+
+        function closeAiUsage(): void {
+            shell.closeSurface("aiPalette");
         }
     }
 

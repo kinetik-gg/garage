@@ -8,7 +8,10 @@ import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
 
 // The control centre: the handful of switches that are worth reaching without
-// opening System Preferences, plus the volume slider and whatever is playing.
+// opening System Preferences, plus the volume slider. Whatever is playing used
+// to sit at the foot of it as a MediaCard; MediaPalette, which the bar's own
+// media module opens, is the richer version of the same Mpris logic and owns
+// that now, so the copy here is gone rather than kept in step with it.
 //
 // A layer surface anchored under the bar on the right, the same idiom as the
 // notification centre next to it: a panel the next click outside dismisses,
@@ -369,16 +372,6 @@ PanelWindow {
                     horizontalAlignment: Text.AlignRight
                     renderType: Text.NativeRendering
                 }
-            }
-
-            // The last thing in the panel. Lock, Sleep and Log Out used to sit
-            // below it, and System Preferences below them: the session menu owns
-            // the session commands and its own Preferences item, so both were a
-            // second copy of a menu one click away -- and the copy was the one
-            // that could log the user out from under a mis-aimed click on a
-            // volume slider.
-            MediaCard {
-                Layout.fillWidth: true
             }
         }
     }

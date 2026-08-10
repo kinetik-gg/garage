@@ -64,20 +64,27 @@ hl.window_rule({
 -- Translucent shell surfaces use compositor blur behind their own alpha.
 hl.layer_rule({
     name = "apple-dark-shell-blur",
-    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-launcher|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-launcher|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center|garage-monitor|garage-media|garage-ai-usage)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
 })
+-- The panels that come in from the right edge, which is every panel anchored to
+-- it: the two centres and the two the bar opens beside them. garage-media is
+-- deliberately not here -- it is anchored to the top edge alone and centred
+-- across the output, so sliding it in from the right would carry it sideways
+-- across the screen. It is left to the compositor's default the same way
+-- garage-screenshot, the other surface that is not against a side, already is.
 hl.layer_rule({
     name = "control-center-slide",
-    match = { namespace = "^(garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(garage-notification-center|garage-control-center|garage-monitor|garage-ai-usage)$" },
     animation = "slide right",
 })
 -- Toast popups only: they appear involuntarily and can carry message content,
--- so they stay out of screen shares. The notification and control centers are
--- opened deliberately, and the owner explicitly wants to be able to screenshot
--- them, so they are left out of this rule.
+-- so they stay out of screen shares. The full panels -- the notification and
+-- control centers, and the monitor, media and AI usage panels the bar opens --
+-- are opened deliberately, and the owner explicitly wants to be able to
+-- screenshot them, so they are all left out of this rule.
 hl.layer_rule({
     name = "notification-screen-share-privacy",
     match = { namespace = "^(garage-notifications)$" },

@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-    echo "usage: garage-panel-toggle notifications|control-center" >&2
+    echo "usage: garage-panel-toggle notifications|control-center|monitor|media|ai-usage" >&2
     exit 1
 }
 
@@ -11,6 +11,9 @@ usage() {
 case "$1" in
     notifications)   fn=notificationsOn ;;
     control-center)  fn=controlCenterOn ;;
+    monitor)         fn=monitorOn ;;
+    media)           fn=mediaOn ;;
+    ai-usage)        fn=aiUsageOn ;;
     *)               usage ;;
 esac
 
@@ -34,9 +37,9 @@ output=$(jq -nr \
 
 [ -n "$output" ] || exit 1
 
-# control-center's ipc function does not exist until Wave 3. Letting qs fail
-# to stderr (rather than swallowing it with `|| true`) keeps that visible
-# instead of silently doing nothing; either way this exits 0 so the bind
-# never reports an error to the compositor over a shell function that simply
-# has not shipped yet.
+# Every arm above now names a function that ships in shell.qml. Letting qs
+# fail to stderr (rather than swallowing it with `|| true`) keeps a missing
+# one visible instead of silently doing nothing; either way this exits 0 so
+# the bind never reports an error to the compositor over a shell function
+# that simply has not shipped yet.
 qs -c garage ipc call shell "$fn" "$output" || true

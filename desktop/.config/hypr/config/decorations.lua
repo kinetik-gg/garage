@@ -121,7 +121,7 @@ if GLASS_AVAILABLE then
             corner_power = ROUNDING_POWER,
             -- Additive rim light living only on the bevel.
             highlight_opacity = 0.12,
-            layer_namespaces = "garage-screenshot=pill,garage-launcher,garage-session-menu,garage-session-confirmation,garage-notification-center,garage-control-center",
+            layer_namespaces = "garage-screenshot=pill,garage-launcher,garage-session-menu,garage-session-confirmation,garage-notification-center,garage-control-center,garage-monitor,garage-media,garage-ai-usage",
             layer_rounding = ROUNDING,
         },
     }})
