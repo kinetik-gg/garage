@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
@@ -23,17 +22,6 @@ PanelWindow {
     required property string targetScreenName
 
     signal dismissed()
-
-    // Grab arming, one turn late: a focus grab installed in the same turn the
-    // surface is created is cleared by the click that opened it.
-    property bool grabReady: false
-
-    // Suppresses the click-outside dismissal while another shell surface has
-    // taken the focus grab on purpose. The screenshot pill is the only thing
-    // that sets it: photographing this panel is the whole point of pressing the
-    // screenshot bind with it open, so the pill taking the grab must not be read
-    // as the user clicking somewhere else. See the grab at the foot of the file.
-    property bool holdOpen: false
 
     // The list, grouped by app. A plain property fed by refresh() rather than a
     // binding on the model: the list is deliberately *not* rebuilt while cards
@@ -255,7 +243,9 @@ PanelWindow {
     // OnDemand rather than Exclusive: the centre has a reply field to type into,
     // but it is a panel the user clicks into rather than a modal, and an
     // exclusive surface takes every keystroke in the session for as long as it
-    // is up. The focus grab below is what hands it the keyboard when it opens.
+    // is up. The compositor hands an on-demand layer surface the keyboard as it
+    // maps, which is what makes the Escape at the foot of this file heard
+    // without a click first.
     focusable: true
     aboveWindows: true
     exclusiveZone: 0
@@ -277,10 +267,7 @@ PanelWindow {
     WlrLayershell.namespace: "garage-notification-center"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
-    Component.onCompleted: {
-        centre.rebuild();
-        Qt.callLater(() => centre.grabReady = true);
-    }
+    Component.onCompleted: centre.rebuild()
 
     onFrozenChanged: {
         if (!centre.frozen && centre.refreshPending)
@@ -349,9 +336,8 @@ PanelWindow {
             borderColor: Theme.frameInner
         }
 
-        // Nothing under the panel should receive the clicks that land on it: the
-        // focus grab reports a click outside as a dismissal, and without this the
-        // gaps between cards would read as outside.
+        // The panel eats the clicks that land in the gaps between its cards
+        // rather than leaving them unhandled.
         MouseArea {
             anchors.fill: parent
         }
@@ -607,40 +593,6 @@ PanelWindow {
                 }
             }
         }
-    }
-
-    // Click anywhere else dismisses, and the grab is also what gives an
-    // on-demand layer surface the keyboard when it opens -- without it the
-    // Escape below would not be heard until the panel had been clicked.
-    HyprlandFocusGrab {
-        id: grab
-        active: centre.grabReady
-        windows: [centre]
-        onCleared: {
-            if (!centre.grabReady)
-                return;
-            // Hyprland keeps one grab at a time, so a surface that takes one
-            // clears this one whether or not the user clicked anywhere. While
-            // the screenshot pill holds it, letting go is not the same as being
-            // dismissed: the centre stays up and takes its grab back below.
-            if (centre.holdOpen)
-                return;
-            centre.dismissed();
-        }
-    }
-
-    // Re-armed by hand rather than by the binding above: a cleared grab is a
-    // write to active from the compositor's side, and a written property has no
-    // binding left to re-evaluate. One turn late for the same reason it is armed
-    // late -- the click that dismissed the pill would otherwise clear the fresh
-    // grab and take this panel with it.
-    onHoldOpenChanged: {
-        if (centre.holdOpen || !centre.grabReady)
-            return;
-        Qt.callLater(() => {
-            grab.active = false;
-            grab.active = true;
-        });
     }
 
     Shortcut {

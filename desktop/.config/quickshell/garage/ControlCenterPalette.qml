@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Bluetooth
-import Quickshell.Hyprland
 import Quickshell.Networking
 import Quickshell.Services.Pipewire
 import Quickshell.Wayland
@@ -22,17 +21,6 @@ PanelWindow {
     required property string targetScreenName
 
     signal dismissed()
-
-    // Grab arming, one turn late: a focus grab installed in the same turn the
-    // surface is created is cleared by the click that opened it.
-    property bool grabReady: false
-
-    // Suppresses the click-outside dismissal while another shell surface has
-    // taken the focus grab on purpose. The screenshot pill is the only thing
-    // that sets it: photographing this panel is the whole point of pressing the
-    // screenshot bind with it open, so the pill taking the grab must not be read
-    // as the user clicking somewhere else. See the grab at the foot of the file.
-    property bool holdOpen: false
 
     readonly property int contentMargin: 12
 
@@ -152,8 +140,9 @@ PanelWindow {
     color: "transparent"
     // OnDemand rather than Exclusive, as with the notification centre: this is a
     // panel the user clicks into, not a modal, and an exclusive surface takes
-    // every keystroke in the session while it is up. The focus grab below is
-    // what hands it the keyboard -- and therefore Escape -- when it opens.
+    // every keystroke in the session while it is up. The compositor hands an
+    // on-demand layer surface the keyboard as it maps, which is what makes the
+    // Escape at the foot of this file heard without a click first.
     focusable: true
     aboveWindows: true
     exclusiveZone: 0
@@ -174,8 +163,6 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-control-center"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-    Component.onCompleted: Qt.callLater(() => centre.grabReady = true)
 
     // The preferences backend, scoped to this panel the way PreferencesPalette
     // scopes its own: the tiles that write theme_mode and night_shift_enabled go
@@ -230,9 +217,8 @@ PanelWindow {
             borderColor: Theme.frameInner
         }
 
-        // Nothing under the panel should receive the clicks that land on it: the
-        // focus grab reports a click outside as a dismissal, and without this the
-        // gaps between the tiles would read as outside.
+        // The panel eats the clicks that land in the gaps between its tiles
+        // rather than leaving them unhandled.
         MouseArea {
             anchors.fill: parent
         }
@@ -409,40 +395,6 @@ PanelWindow {
             if (!volumeSlider.pressed)
                 volumeSlider.value = centre.volume;
         }
-    }
-
-    // Click anywhere else dismisses, and the grab is also what gives an
-    // on-demand layer surface the keyboard when it opens -- without it the
-    // Escape below would not be heard until the panel had been clicked.
-    HyprlandFocusGrab {
-        id: grab
-        active: centre.grabReady
-        windows: [centre]
-        onCleared: {
-            if (!centre.grabReady)
-                return;
-            // Hyprland keeps one grab at a time, so a surface that takes one
-            // clears this one whether or not the user clicked anywhere. While
-            // the screenshot pill holds it, letting go is not the same as being
-            // dismissed: the panel stays up and takes its grab back below.
-            if (centre.holdOpen)
-                return;
-            centre.dismissed();
-        }
-    }
-
-    // Re-armed by hand rather than by the binding above: a cleared grab is a
-    // write to active from the compositor's side, and a written property has no
-    // binding left to re-evaluate. One turn late for the same reason it is armed
-    // late -- the click that dismissed the pill would otherwise clear the fresh
-    // grab and take this panel with it.
-    onHoldOpenChanged: {
-        if (centre.holdOpen || !centre.grabReady)
-            return;
-        Qt.callLater(() => {
-            grab.active = false;
-            grab.active = true;
-        });
     }
 
     Shortcut {

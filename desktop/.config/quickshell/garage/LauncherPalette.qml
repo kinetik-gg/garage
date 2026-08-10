@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
@@ -10,9 +9,14 @@ import QtQuick.Layouts
 // the FloatingWindow this used to be. A toplevel is dismissed by losing focus,
 // and under focus-follows-mouse merely moving the pointer across another window
 // took that focus away -- so the launcher closed on a cursor twitch. A layer
-// surface has no such notion: it is dismissed by the focus grab below (a click
-// outside), by Escape, or by the keybind toggling the loader, and by nothing
-// else.
+// surface has no such notion: it is dismissed by a click outside, by Escape, or
+// by the keybind toggling the loader, and by nothing else.
+//
+// The click outside is caught by DismissCatcher, a surface the shell maps under
+// this one, rather than by a focus grab here. This compositor does not
+// implement hyprland-focus-grab -- the grab that used to be at the foot of this
+// file never fired once -- so the launcher could only be closed from the
+// keyboard until the catcher was added.
 PanelWindow {
     id: launcher
 
@@ -32,9 +36,6 @@ PanelWindow {
     // found, which the launcher has to say rather than silently doing nothing.
     property string browserId: ""
     property bool browserResolved: false
-    // Armed a turn after the surface exists: the grab is cleared as it is taken
-    // if it is armed in the same turn as the click that opened the launcher.
-    property bool grabReady: false
 
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
@@ -66,14 +67,13 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-launcher"
-    // Exclusive rather than OnDemand: this is a typing surface, and the search
-    // field has to have the keyboard the moment it appears rather than after a
-    // click. The grab below is the dismissal gesture, not the way in.
-    // OnDemand, not Exclusive: an exclusive layer keyboard is held at the
-    // protocol level no matter where the pointer clicks, so the focus grab
-    // below would never clear and a click outside could never dismiss. With
-    // OnDemand the grab is what delivers the keyboard on open -- and what
-    // hands it back, dismissing us, when a click lands anywhere else.
+    // OnDemand, not Exclusive. An exclusive layer keyboard is held at the
+    // protocol level no matter where the pointer goes, which takes every
+    // keystroke in the session for as long as the launcher is up. On demand is
+    // enough: the compositor hands this surface the keyboard as it maps, which
+    // is what makes the query field typeable the moment the bind is pressed and
+    // Escape heard without a click first. Leave this alone -- typing here works
+    // today, and Exclusive is what it was before.
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     // The search engine is resolved by garage and published as a
@@ -172,11 +172,10 @@ PanelWindow {
     onBrowserResolvedChanged: rebuild()
     Component.onCompleted: {
         rebuild();
-        // The compositor hands an exclusive layer surface the keyboard as it
-        // maps; this is what points it at the search field rather than at the
-        // window, so the first keystroke after the bind is typed into the query.
+        // The compositor hands the layer surface the keyboard as it maps; this
+        // is what points it at the search field rather than at the window, so
+        // the first keystroke after the bind is typed into the query.
         input.forceActiveFocus();
-        Qt.callLater(() => launcher.grabReady = true);
     }
 
     function activate(index) {
@@ -340,18 +339,6 @@ PanelWindow {
                     onClicked: noBrowser.visible = false
                 }
             }
-        }
-    }
-
-    // Clicking anywhere outside the launcher dismisses it. This is the whole of
-    // the click-outside gesture: moving the pointer over another window does not
-    // clear a grab, which is exactly why the launcher is a layer surface now.
-    HyprlandFocusGrab {
-        active: launcher.grabReady
-        windows: [launcher]
-        onCleared: {
-            if (launcher.grabReady)
-                launcher.dismissed();
         }
     }
 

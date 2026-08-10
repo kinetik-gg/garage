@@ -58,10 +58,22 @@ ShellRoot {
     }
 
     // The surfaces the pill may share the screen with: the two panels worth
-    // taking a picture of. Both of them survive the pill's focus grab by holding
-    // themselves open through it -- see holdOpen on the loaders below.
+    // taking a picture of. Both of them stay up through the capture, which is
+    // what disarming the dismiss catcher below is for.
     function sharesScreenWithScreenshot(name) {
         return name === "notificationCenter" || name === "controlCenter";
+    }
+
+    // The surfaces whose click-outside dismissal the shared catcher owns.
+    //
+    // Not the session menu: it has its own dismissal, a non-consuming mouse
+    // bind that runs garage-menu-dismiss and compares the cursor against the
+    // menu's own box, and that one works. Not the screenshot pill either --
+    // the catcher stands down for the pill rather than guarding it.
+    function catchesOutsideClicks(name) {
+        return name === "launcher"
+            || name === "notificationCenter"
+            || name === "controlCenter";
     }
 
     // configure() runs before the surface is shown, so the palette is created
@@ -105,11 +117,10 @@ ShellRoot {
         shell.screenshotOpen = true;
     }
 
-    // Run rather than detached, for its lifetime alone: slurp and grim take the
-    // keyboard themselves, which clears a panel's focus grab exactly as the pill's
-    // own grab does, so the panels have to hold themselves open until the capture
-    // is over. Detaching it left the centre being photographed dismissed by the
-    // tool photographing it.
+    // Run rather than detached, for its lifetime alone: the capture is what the
+    // dismiss catcher stands down for, and a detached command has no lifetime the
+    // shell can see. Detaching it left the centre being photographed dismissed by
+    // the tool photographing it.
     function captureScreenshot(mode) {
         const command = [
             Quickshell.env("HOME") + "/.local/bin/garage-screenshot-copy",
@@ -168,6 +179,27 @@ ShellRoot {
         loader.active = true;
     }
 
+    // Click-outside dismissal for the launcher and the two centres, in one
+    // place rather than one copy per palette: all three want the same gesture,
+    // all three are mutually exclusive by activeSurface, and a single catcher
+    // therefore never has to work out which of them it is guarding -- it closes
+    // whatever is up.
+    //
+    // Declared before the palette loaders on purpose. This and they both bind
+    // to activeSurface, so within the turn that changes it they are served in
+    // declaration order -- the catcher's surfaces map first, the palette's map
+    // second, and on this compositor the surface mapped second is the one that
+    // stacks on top. Measured. Moving this below them would put the catcher
+    // over the palette and turn every click on the panel into a dismissal.
+    DismissCatcher {
+        active: shell.catchesOutsideClicks(shell.activeSurface)
+        // Stood down for the whole screenshot flow: the pill's own clicks are
+        // not the user clicking away from the panel being photographed, and
+        // neither are slurp's while a region is being dragged out.
+        armed: !(shell.screenshotOpen || captureProcess.running)
+        onDismissed: shell.closeSurface(shell.activeSurface)
+    }
+
     LazyLoader {
         id: preferencesLoader
         active: false
@@ -219,9 +251,9 @@ ShellRoot {
         }
     }
 
-    // The capture itself. Its lifetime is what the notification and control
-    // centres hold themselves open for, so it has to be a Process the shell can
-    // see rather than a detached command.
+    // The capture itself. Its lifetime is what the dismiss catcher stands down
+    // for, so it has to be a Process the shell can see rather than a detached
+    // command.
     Process {
         id: captureProcess
     }
@@ -262,10 +294,6 @@ ShellRoot {
 
         NotificationCenterPalette {
             targetScreenName: shell.notificationScreenName
-            // Up for as long as the screenshot flow is: the pill's grab and then
-            // slurp's keyboard both clear this centre's focus grab, and neither is
-            // the user clicking away from it.
-            holdOpen: shell.screenshotOpen || captureProcess.running
             onDismissed: shell.closeSurface("notificationCenter")
         }
     }
@@ -276,8 +304,6 @@ ShellRoot {
 
         ControlCenterPalette {
             targetScreenName: shell.controlCenterScreenName
-            // Same hold as the notification centre above, for the same reason.
-            holdOpen: shell.screenshotOpen || captureProcess.running
             onDismissed: shell.closeSurface("controlCenter")
         }
     }
