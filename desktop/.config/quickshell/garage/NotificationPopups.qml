@@ -13,6 +13,10 @@ import QtQuick
 Scope {
     id: popups
 
+    // The overflow pill asks for the notification centre; the shell owns the
+    // surface, so this only names the screen the request came from.
+    signal openCenterRequested(string screenName)
+
     readonly property int maxVisible: 3
     readonly property int toastWidth: 390
     // How often a stack looks at its toasts: fine enough that a timeout lands
@@ -327,14 +331,14 @@ Scope {
                     }
                 }
 
-                // What the cap left out. Not a control yet: the notification centre
-                // it should open is the next thing to be built.
+                // What the cap left out. Clicking it opens the notification
+                // centre on this screen, where the rest of the stack lives.
                 ContinuousRectangle {
                     width: column.width
                     height: 26
                     visible: stack.overflow > 0
                     radius: Theme.controlRadius
-                    color: Theme.contentTint
+                    color: overflowHover.hovered ? Theme.hover : Theme.contentTint
                     borderWidth: 1
                     borderColor: Theme.frameOuter
 
@@ -346,6 +350,11 @@ Scope {
                         font.pixelSize: 11
                         font.weight: Font.Medium
                         renderType: Text.NativeRendering
+                    }
+
+                    HoverHandler { id: overflowHover }
+                    TapHandler {
+                        onTapped: popups.openCenterRequested(stack.screen ? stack.screen.name : "")
                     }
                 }
             }

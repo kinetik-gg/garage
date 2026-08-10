@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    echo "usage: garage-panel-toggle notifications|control-center" >&2
+    exit 1
+}
+
+[ $# -eq 1 ] || usage
+
+case "$1" in
+    notifications)   fn=notificationsOn ;;
+    control-center)  fn=controlCenterOn ;;
+    *)               usage ;;
+esac
+
+cursor=$(hyprctl cursorpos -j)
+monitors=$(hyprctl monitors -j)
+
+output=$(jq -nr \
+    --argjson cursor "$cursor" \
+    --argjson monitors "$monitors" '
+        first(
+            $monitors[]
+            | select(
+                $cursor.x >= .x
+                and $cursor.x < (.x + (.width / .scale))
+                and $cursor.y >= .y
+                and $cursor.y < (.y + (.height / .scale))
+            )
+            | .name
+        ) // empty
+    ')
+
+[ -n "$output" ] || exit 1
+
+# control-center's ipc function does not exist until Wave 3. Letting qs fail
+# to stderr (rather than swallowing it with `|| true`) keeps that visible
+# instead of silently doing nothing; either way this exits 0 so the bind
+# never reports an error to the compositor over a shell function that simply
+# has not shipped yet.
+qs -c garage ipc call shell "$fn" "$output" || true

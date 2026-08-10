@@ -208,14 +208,18 @@ Singleton {
         bodySupported: true
         bodyMarkupSupported: true
         imageSupported: true
-        // Wave 2 flips this on when the notification center renders its reply
-        // field. Advertising a capability nothing draws would make clients
-        // send repliable notifications with nowhere to reply.
-        inlineReplySupported: false
+        // On because there is now somewhere to reply from: the notification
+        // centre draws a field for anything that asks for one, and a card
+        // sends through Notification.sendInlineReply() from it. Advertising a
+        // capability nothing draws would make clients send repliable
+        // notifications with nowhere to answer them.
+        inlineReplySupported: true
         // Persistence advertises that notifications survive going offscreen with
-        // the server still able to act on them. The centre that would make that
-        // true does not exist yet, so claiming it would be a lie a client could
-        // act on.
+        // the server still able to act on them. The centre makes that true, but
+        // the flag is a claim clients change their own behaviour on -- several
+        // drop their in-app banner when the server says it persists -- so it is
+        // turned on deliberately rather than as a side effect of the centre
+        // landing.
         persistenceSupported: false
         // extraHints is left alone: it widens the hints map with names the shell
         // asks for by hand, and nothing here reads a non-standard hint yet.

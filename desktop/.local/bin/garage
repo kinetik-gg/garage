@@ -2502,6 +2502,49 @@ def render_bar_workspaces(config: dict) -> None:
                  json.dumps({"modules-left": modules}, indent=2) + "\n")
 
 
+# The shell's own SVG glyphs, read from the tracked (stowed) quickshell config
+# rather than copied: one source, so a redrawn icon in the shell reaches the
+# bar's copy the next time it is recoloured.
+BAR_ICON_NAMES = ("bell", "sliders")
+
+
+def render_bar_icons() -> None:
+    """Recolour the shell's bell/sliders glyphs to the bar's foreground.
+
+    Waybar's image modules point at generated/icons/*.svg instead of the
+    tracked quickshell sources directly, because nothing in a stylesheet can
+    reach an <svg fill>: this is the same problem activity-graph.py solves for
+    its own hand-drawn SVGs, by reading the marker render_theme() leaves in
+    BAR_FG_FILE. The sources here carry the fill as a single literal
+    attribute on the root element rather than drawing their own text, so the
+    fix is a substitution instead of a template.
+
+    Best-effort and silent: a missing or unreadable source -- a checkout that
+    predates one of these icons, or a stow link not yet in place -- leaves
+    whatever is already in generated/icons alone rather than raising. The
+    render-bar route this feeds is `-`-prefixed in waybar's unit, so a failure
+    here must not be the reason the rest of the bar fails to start.
+
+    Written with atomic_write(), not write_marker(): waybar is not watching
+    this path with inotify the way quickshell watches the markers under
+    generated/ -- it only rereads config and images on SIGUSR2 or a restart,
+    both of which already re-open the file fresh.
+    """
+    try:
+        color = BAR_FG_FILE.read_text().strip() or "#f5f5f7"
+    except OSError:
+        color = "#f5f5f7"
+    source_dir = CONFIG_HOME / "quickshell" / "garage" / "icons"
+    out_dir = GENERATED / "icons"
+    for name in BAR_ICON_NAMES:
+        try:
+            svg = (source_dir / f"{name}.svg").read_text()
+        except OSError:
+            continue
+        recolored = re.sub(r'fill="#[0-9a-fA-F]{3,8}"', f'fill="{color}"', svg, count=1)
+        atomic_write(out_dir / f"{name}.svg", recolored)
+
+
 def reload_bar() -> None:
     # waybar's default SIGUSR2 action is a full reload, which re-reads the
     # config and every file it includes. The bar is already signalled this way
@@ -4162,6 +4205,10 @@ def render_theme(config: dict) -> None:
     # The bar's widgets draw their own SVG text, which no stylesheet reaches.
     # Publish the resolved theme foreground so they match Waybar's CSS.
     write_marker(BAR_FG_FILE, PALETTE[scheme]["on_bg"] + "\n")
+    # The bar's image-module icons are SVGs too, and read this same marker --
+    # regenerate them together so a theme flip never leaves one behind the
+    # other after the reload push_theme() below issues.
+    render_bar_icons()
     render_toolkits(scheme)
 
 
@@ -6159,9 +6206,15 @@ def main(argv: list[str]) -> int:
             # render, which would rewrite a dozen toolkit configs the bar does
             # not read. Nothing is signalled: the unit starts the bar right
             # after, and it reads these on the way up.
+            #
+            # render_bar_icons() rides along for the same reason: a bar started
+            # before render_theme() has ever run (a fresh install, or
+            # generated/ cleared by hand) would otherwise come up with no icons
+            # at all rather than merely last theme's colour.
             config = load_preferences()
             render_region(config)
             render_bar_workspaces(config)
+            render_bar_icons()
             response(True)
         elif command == "render-wallpaper":
             # hyprpaper's ExecStartPre. Deliberately not "render": that rewrites

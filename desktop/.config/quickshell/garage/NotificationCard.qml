@@ -16,7 +16,9 @@ ContinuousRectangle {
 
     required property var notification
     // Toast mode: the body is clamped, because a popup is a glance and a wall of
-    // text pushes the stack off the screen.
+    // text pushes the stack off the screen. It also drops the affordances that
+    // only make sense in a list that stays put -- the reply field, the clock
+    // time, and the app name the centre's group header already carries.
     property bool compact: false
     // Set by the owner to play the card out. exited() follows when the animation
     // has finished and the notification is safe to close.
@@ -24,10 +26,23 @@ ContinuousRectangle {
 
     signal closeRequested()
     signal exited()
+    // A reply went out. The card does not close the notification for the same
+    // reason it never closes one anywhere else: only the owner knows whether the
+    // row should play out or stay.
+    signal replied()
 
     readonly property bool live: notification !== null && notification !== undefined
     readonly property string imageSource: live ? String(notification.image || "") : ""
     readonly property var actions: live ? notification.actions : []
+
+    // Inline reply. Only off a toast: a popup times out under the pointer, and a
+    // text field that can disappear mid-sentence is a trap. This field is the
+    // whole reason NotificationDaemon advertises the capability at all.
+    readonly property bool canReply: !card.compact && card.live
+        && card.notification.hasInlineReply
+    // Whether the field has the keyboard. The centre watches this so it can stop
+    // rebuilding its list while a reply is being typed into one of its rows.
+    readonly property bool replyActive: replyField.activeFocus
 
     // appIcon already falls back to the icon of the sender's desktop entry, so
     // this only has the icon theme and the built-in glyph left to try.
@@ -45,19 +60,56 @@ ContinuousRectangle {
     }
     readonly property bool usesGlyph: appIcon === ""
 
-    function relativeTime(reference) {
+    // What the card prints for its age, given the shell's minute clock. A toast
+    // gets the short relative form -- it is on screen for seconds, and the only
+    // question it answers is whether this is the notification that just arrived.
+    // The centre gets the clock time once a notification is old enough for "3d"
+    // to have stopped being an answer.
+    function timeLabel(reference) {
         if (!card.live)
             return "";
-        const elapsed = reference.getTime() - NotificationDaemon.arrivalTime(card.notification);
+        const arrival = NotificationDaemon.arrivalTime(card.notification);
+        const elapsed = reference.getTime() - arrival;
         if (elapsed < 60000)
             return "now";
         const minutes = Math.floor(elapsed / 60000);
+
+        if (card.compact) {
+            if (minutes < 60)
+                return minutes + "m";
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24)
+                return hours + "h";
+            return Math.floor(hours / 24) + "d";
+        }
+
         if (minutes < 60)
-            return minutes + "m";
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24)
-            return hours + "h";
-        return Math.floor(hours / 24) + "d";
+            return minutes + "m ago";
+
+        const when = new Date(arrival);
+        if (when.toDateString() === reference.toDateString())
+            return Qt.formatTime(when, Locale.ShortFormat);
+        const yesterday = new Date(reference.getTime() - 86400000);
+        if (when.toDateString() === yesterday.toDateString())
+            return "Yesterday";
+        // Formatted through the locale rather than a literal pattern: the shell
+        // has no business deciding whether the user writes the day or the month
+        // first.
+        return Qt.formatDate(when, Locale.ShortFormat);
+    }
+
+    function sendReply() {
+        if (!card.canReply)
+            return;
+        const text = replyField.text.trim();
+        if (text === "")
+            return;
+        // Cleared first: sendInlineReply may close the notification, and a field
+        // cleared afterwards would be writing into a card whose bindings have
+        // just gone null.
+        replyField.text = "";
+        card.notification.sendInlineReply(text);
+        card.replied();
     }
 
     implicitWidth: 390
@@ -86,7 +138,13 @@ ContinuousRectangle {
 
     // Appear rather than materialise. Starts itself on completion, which is
     // exactly when a card is created for a notification that just arrived.
+    //
+    // Toasts only. A card in the centre is created every time the list is
+    // rebuilt, which happens whenever the history changes, so fading in here
+    // would flash the whole column each time anything arrived; the centre fades
+    // its panel in once instead.
     NumberAnimation on opacity {
+        running: card.compact
         from: 0
         to: 1
         duration: 130
@@ -151,10 +209,15 @@ ContinuousRectangle {
             Layout.fillWidth: true
             spacing: 8
 
+            // The app icon and name, on a toast only: in the centre the group
+            // header directly above the card already says which app sent it, and
+            // repeating it on every row of the group is noise. Invisible items
+            // are left out of a layout, so this costs no space there.
             Item {
                 Layout.preferredWidth: 18
                 Layout.preferredHeight: 18
                 Layout.alignment: Qt.AlignVCenter
+                visible: card.compact
 
                 // Theme icons arrive already coloured and must not be overlaid.
                 Image {
@@ -194,6 +257,7 @@ ContinuousRectangle {
 
             Text {
                 Layout.fillWidth: true
+                visible: card.compact
                 text: card.live ? String(card.notification.appName || "Notification") : ""
                 color: Theme.textMuted
                 font.family: Theme.sans
@@ -203,8 +267,18 @@ ContinuousRectangle {
                 renderType: Text.NativeRendering
             }
 
+            // Takes the space the app name gave up, so the time and the close
+            // button stay at the right edge of a centre card.
+            Item {
+                Layout.fillWidth: true
+                visible: !card.compact
+            }
+
             Text {
-                text: card.relativeTime(NotificationDaemon.now)
+                // Re-read on the shell's minute tick, which is the whole reason
+                // the daemon owns a clock: a timer per card would wake the
+                // process once for every visible row.
+                text: card.timeLabel(NotificationDaemon.now)
                 color: Theme.textMuted
                 font.family: Theme.sans
                 font.pixelSize: 11
@@ -333,6 +407,106 @@ ContinuousRectangle {
                     // would be nothing left to animate. The card's owner drops the
                     // toast when the notification goes.
                     onClicked: modelData.invoke()
+                }
+            }
+        }
+
+        // The reply field. Built from a TextInput in a shape rather than a
+        // Controls TextField, like every other field in the shell: Controls would
+        // bring its own style into a shell that draws all of its own.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: card.canReply
+            spacing: 6
+
+            ContinuousRectangle {
+                Layout.fillWidth: true
+                implicitHeight: 30
+                radius: Theme.controlRadius
+                color: Theme.hoverStrong
+                borderWidth: 1
+                // The focus ring is the only thing that says the keyboard is in
+                // here rather than in the window behind the centre.
+                borderColor: replyField.activeFocus ? Theme.accent : Theme.border
+
+                TextInput {
+                    id: replyField
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    verticalAlignment: Text.AlignVCenter
+                    color: Theme.text
+                    selectionColor: Theme.accent
+                    selectedTextColor: Theme.accentText
+                    font.family: Theme.sans
+                    font.pixelSize: 12
+                    selectByMouse: true
+                    clip: true
+
+                    // Return sends. Escape is deliberately not handled, so it
+                    // reaches the surface and closes it: a field that swallowed
+                    // Escape would leave the user with no way out but the mouse.
+                    Keys.onReturnPressed: card.sendReply()
+                    Keys.onEnterPressed: card.sendReply()
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: replyField.text === ""
+                        // The sender's own placeholder when it sent one -- it is
+                        // the only party that knows whether this is a chat, a
+                        // comment or a subject line.
+                        text: card.live
+                            && String(card.notification.inlineReplyPlaceholder || "") !== ""
+                            ? String(card.notification.inlineReplyPlaceholder) : "Reply"
+                        color: Theme.textDisabled
+                        font: replyField.font
+                        renderType: Text.NativeRendering
+                    }
+                }
+            }
+
+            ContinuousRectangle {
+                id: sendButton
+                // Children of a ContinuousRectangle are reparented into its
+                // content item, so they reach this through the id rather than
+                // through parent.
+                readonly property bool ready: replyField.text.trim() !== ""
+
+                implicitWidth: 30
+                implicitHeight: 30
+                radius: Theme.controlRadius
+                color: !sendButton.ready ? Theme.hover
+                    : sendPointer.containsMouse ? Theme.accentHover : Theme.accent
+
+                Image {
+                    id: sendGlyph
+                    anchors.centerIn: parent
+                    width: 14
+                    height: 14
+                    source: "icons/arrow-up.svg"
+                    sourceSize.width: 28
+                    sourceSize.height: 28
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    antialiasing: true
+                    mipmap: true
+                    visible: false
+                }
+
+                ColorOverlay {
+                    anchors.fill: sendGlyph
+                    source: sendGlyph
+                    color: sendButton.ready ? Theme.accentText : Theme.textDisabled
+                    cached: true
+                }
+
+                MouseArea {
+                    id: sendPointer
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: sendButton.ready
+                        ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: card.sendReply()
                 }
             }
         }

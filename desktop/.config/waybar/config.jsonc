@@ -16,7 +16,7 @@
   "modules-center": [],
   // Parked: "custom/containers", "custom/git", "custom/monitor",
   //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
-  "modules-right": ["clock"],
+  "modules-right": ["image#notifications", "clock"],
   "hyprland/workspaces": {
     "format": " ",
     "on-click": "activate",
@@ -25,6 +25,16 @@
   "custom/menu": {
     "format": "",
     "on-click": "$HOME/.local/bin/garage-menu-toggle",
+    "tooltip": false
+  },
+  // The bell glyph, recoloured to the bar foreground by garage render-bar /
+  // render_theme() into generated/icons/bell.svg -- see activity-graph.py for
+  // the same trick applied to hand-drawn SVGs. Static path, not exec: the file
+  // only ever changes on a theme flip, which already reloads the bar wholesale.
+  "image#notifications": {
+    "path": "$HOME/.local/state/garage/generated/icons/bell.svg",
+    "size": 16,
+    "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
     "tooltip": false
   },
   "custom/media": {
@@ -106,7 +116,7 @@
   "include": ["$HOME/.local/state/garage/generated/waybar-clock.jsonc",
               "$HOME/.local/state/garage/generated/waybar-workspaces.jsonc"],
   "clock": {
-    "on-click": "swaync-client --toggle-panel",
+    "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
     "tooltip-format": "<tt>{calendar}</tt>"
   }
 }

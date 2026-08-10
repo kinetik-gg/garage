@@ -379,7 +379,7 @@ bind(mainMod .. " + SHIFT + W", "Choose a wallpaper", "qs ipc --config garage ca
 bind(mainMod .. " + SHIFT + V", "Paste from clipboard history", "bash -c 'cliphist list | rofi -normal-window -dmenu -p \"\" | cliphist decode | wl-copy'")
 
 -- Notifications
-bind(mainMod .. " + A",             "Toggle the notification panel", "swaync-client --toggle-panel")
+bind(mainMod .. " + A",             "Toggle Notification Center",     (os.getenv("HOME") or "") .. "/.local/bin/garage-panel-toggle notifications")
 bind(mainMod .. " + SHIFT + A",     "Show About This System",        "qs ipc --config garage call shell about")
 bind(mainMod .. " + SHIFT + comma", "Open System Preferences",       "qs ipc --config garage call shell preferences")
 
