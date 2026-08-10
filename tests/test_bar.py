@@ -251,21 +251,38 @@ class BarWidgetFragment(BackendTestCase):
             with self.subTest(widget=name):
                 self.assertIn(f"bar.monitor_{name}", self.garage.PREFERENCE_SCHEMA)
 
-    def test_the_height_is_published_and_the_strips_track_it(self) -> None:
+    def test_the_height_is_published_and_the_strip_sizes_are_the_svg_widths(self) -> None:
+        # waybar's image `size` boxes the LARGEST dimension: a 112x22 strip at
+        # size 22 renders 22px wide (measured -- the strips shrank to
+        # illegibility). Natural rendering means size == the SVG's width, per
+        # widget, independent of bar height.
         for height in (30, 36, 43, 60):
             with self.subTest(height=height):
                 fragment = self.fragment(height=height, **self.all_monitors(True))
                 self.assertEqual(height, fragment["height"])
-                size = fragment["image#metric-cpu"]["size"]
-                self.assertEqual(self.garage.metric_size(height), size)
-                self.assertLess(size, height, "a strip as tall as the bar leaves "
-                                              "no room for the bar's own padding")
                 for name in self.garage.BAR_METRICS:
-                    self.assertEqual(size, fragment[f"image#metric-{name}"]["size"])
+                    self.assertEqual(self.garage.METRIC_STRIP_WIDTHS[name],
+                                     fragment[f"image#metric-{name}"]["size"])
 
-    def test_the_probed_pairing_is_the_one_that_is_generated(self) -> None:
-        """22 on 43 is not arithmetic, it is the measurement. Pinned as such."""
-        self.assertEqual(22, self.garage.metric_size(43))
+    def test_the_strip_widths_match_the_collector(self) -> None:
+        """METRIC_STRIP_WIDTHS mirrors LAYOUTS[...]["width"] in garage-metrics.
+
+        The two scripts cannot import each other, so the pin is enforced here:
+        parse the collector's LAYOUTS table and fail on any drift.
+        """
+        import ast
+        source = (REPO_ROOT / "desktop" / ".local" / "bin" / "garage-metrics").read_text()
+        tree = ast.parse(source)
+        layouts = None
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == "LAYOUTS"
+                            for t in node.targets)):
+                layouts = ast.literal_eval(node.value)
+        self.assertIsNotNone(layouts, "LAYOUTS table not found in garage-metrics")
+        self.assertEqual(
+            {name: spec["width"] for name, spec in layouts.items()},
+            self.garage.METRIC_STRIP_WIDTHS)
 
     def test_the_fragment_is_rewritten_whole_rather_than_merged(self) -> None:
         # One writer per fragment. A renderer that added to what it found would
@@ -494,11 +511,9 @@ class BarRouting(BackendTestCase):
     def test_the_height_range_is_a_bar_rather_than_a_panel(self) -> None:
         entry = self.garage.PREFERENCE_SCHEMA["bar.height"]
         self.assertEqual((30, 60), (entry["minimum"], entry["maximum"]))
-        # Every height in the range renders a usable strip, which is the reason
-        # the ends are where they are rather than a guess.
-        for height in range(entry["minimum"], entry["maximum"] + 1):
-            with self.subTest(height=height):
-                self.assertGreaterEqual(self.garage.metric_size(height), 15)
+        # The strips are drawn 22px tall by the collector; the floor of the
+        # range is where the bar still fits one with breathing room.
+        self.assertGreaterEqual(entry["minimum"], 22)
 
     def test_the_scale_starts_at_the_shipped_spacing(self) -> None:
         entry = self.garage.PREFERENCE_SCHEMA["bar.padding_scale"]

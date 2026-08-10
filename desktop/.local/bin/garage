@@ -2601,16 +2601,20 @@ def render_bar_workspaces(config: dict) -> None:
                  json.dumps({"modules-left": modules}, indent=2) + "\n")
 
 
-def metric_size(height: int) -> int:
-    """How tall a metric strip is drawn for a bar of `height` px.
-
-    Half the bar, rounded up, which is the pairing that was probed live: size 22
-    on the 43px bar. Not the whole height -- waybar sizes the image widget to
-    this, and a strip as tall as the bar would push the bar's own padding out of
-    the way. Rounded up rather than down so the odd heights land where the probe
-    did: 43 // 2 is 21, and 22 is the number that was actually seen working.
-    """
-    return max(1, (int(height) + 1) // 2)
+# waybar's image `size` is a fit-within box on the LARGEST dimension: a 112x22
+# strip at size 22 renders 22px wide (measured on this bar -- the strips shrank
+# to illegibility). Natural 1:1 rendering therefore needs size == the SVG's
+# width, and the widths differ per widget because each strip is drawn just wide
+# enough for its worst-case value. These mirror LAYOUTS[...]["width"] in
+# garage-metrics; tests/test_bar.py parses that script and fails on drift.
+METRIC_STRIP_WIDTHS = {
+    "cpu": 112,
+    "memory": 115,
+    "temp": 120,
+    "disk": 118,
+    "gpu": 140,
+    "network": 146,
+}
 
 
 def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
@@ -2627,7 +2631,6 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
     lines while the bar runs three of them reads as though all six are running.
     """
     bar = config["bar"]
-    size = metric_size(bar["height"])
     right: list[str] = []
     definitions: dict = {}
     for name in BAR_METRICS:
@@ -2640,7 +2643,7 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
         # the note in config.jsonc. This is exec + interval + size, probed live.
         definitions[module] = {
             "exec": f"$HOME/.local/bin/garage-metrics --bar-svg {name}",
-            "size": size,
+            "size": METRIC_STRIP_WIDTHS[name],
             "interval": 2,
             "tooltip": True,
             "on-click": "$HOME/.local/bin/garage-panel-toggle monitor",
