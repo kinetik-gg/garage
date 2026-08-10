@@ -380,6 +380,7 @@ bind(mainMod .. " + SHIFT + V", "Paste from clipboard history", "bash -c 'cliphi
 
 -- Notifications
 bind(mainMod .. " + A",             "Toggle Notification Center",     (os.getenv("HOME") or "") .. "/.local/bin/garage-panel-toggle notifications")
+bind(mainMod .. " + CONTROL + A",   "Toggle Control Center",          (os.getenv("HOME") or "") .. "/.local/bin/garage-panel-toggle control-center")
 bind(mainMod .. " + SHIFT + A",     "Show About This System",        "qs ipc --config garage call shell about")
 bind(mainMod .. " + SHIFT + comma", "Open System Preferences",       "qs ipc --config garage call shell preferences")
 

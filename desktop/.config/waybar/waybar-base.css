@@ -99,6 +99,11 @@ window#waybar {
   padding-right: 10px;
 }
 
+#control-center {
+  padding-left: 10px;
+  padding-right: 4px;
+}
+
 #custom-network {
   min-width: 124px;
   font-family: "IBM Plex Mono", monospace;

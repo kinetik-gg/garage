@@ -9,14 +9,15 @@ ShellRoot {
     property string preferencesScreenName: ""
     property string preferencesSection: "general"
     property string notificationScreenName: ""
+    property string controlCenterScreenName: ""
 
     // Which transient surface is on screen, by name, or "" for none.
     //
     // The transient surfaces -- the launcher, the screenshot pill, the session
-    // menu and the notification centre -- are layer overlays that hold the
-    // keyboard or the pointer for as long as they are up, so no two of them can
-    // usefully be on screen together. Holding that as one name rather than a
-    // boolean per loader is what makes it true by construction: every loader
+    // menu, the notification centre and the control centre -- are layer overlays
+    // that hold the keyboard or the pointer for as long as they are up, so no two
+    // of them can usefully be on screen together. Holding that as one name rather
+    // than a boolean per loader is what makes it true by construction: every loader
     // binds to this, so activating one deactivates the rest with no cross-loader
     // clears to keep in step. Those clears were written out at each entry point
     // before, and were, in places, forgotten -- session() closed the screenshot
@@ -58,6 +59,25 @@ ShellRoot {
     function closeSurface(name) {
         if (shell.activeSurface === name)
             shell.activeSurface = "";
+    }
+
+    // What a session action runs, in one place. The session menu and the control
+    // centre both name actions out of this table, so a string that means sleep in
+    // one cannot mean nothing at all in the other -- which is what a second copy
+    // of the map in the second caller would eventually have arranged.
+    function runSessionAction(action) {
+        const commands = {
+            "reloadHyprland": ["hyprctl", "reload"],
+            "lock": ["hyprlock"],
+            "logout": ["uwsm", "stop"],
+            "suspend": ["systemctl", "suspend"],
+            "hibernate": ["systemctl", "hibernate"],
+            "restart": ["systemctl", "reboot"],
+            "poweroff": ["systemctl", "poweroff"]
+        };
+
+        if (commands[action] !== undefined)
+            Quickshell.execDetached(commands[action]);
     }
 
     function openWindow(loader, configure) {
@@ -154,18 +174,7 @@ ShellRoot {
                     return;
                 }
 
-                const commands = {
-                    "reloadHyprland": ["hyprctl", "reload"],
-                    "lock": ["hyprlock"],
-                    "logout": ["uwsm", "stop"],
-                    "suspend": ["systemctl", "suspend"],
-                    "hibernate": ["systemctl", "hibernate"],
-                    "restart": ["systemctl", "reboot"],
-                    "poweroff": ["systemctl", "poweroff"]
-                };
-
-                if (commands[action] !== undefined)
-                    Quickshell.execDetached(commands[action]);
+                shell.runSessionAction(action);
             }
 
             onDismissed: shell.closeSurface("session")
@@ -179,6 +188,34 @@ ShellRoot {
         NotificationCenterPalette {
             targetScreenName: shell.notificationScreenName
             onDismissed: shell.closeSurface("notificationCenter")
+        }
+    }
+
+    LazyLoader {
+        id: controlCenterLoader
+        active: shell.activeSurface === "controlCenter"
+
+        ControlCenterPalette {
+            targetScreenName: shell.controlCenterScreenName
+
+            // The panel is gone before the command runs: sleeping or locking with
+            // a layer surface still holding the keyboard leaves it up over the
+            // lock screen, and the click that asked for it is over either way.
+            onSessionAction: action => {
+                shell.closeSurface("controlCenter");
+                shell.runSessionAction(action);
+            }
+
+            // Same route the session menu's own Preferences item takes, on the
+            // screen the panel is on rather than the focused one -- the pointer
+            // that opened this may be on a different monitor. openWindow() is
+            // what dismisses the panel, as it does for every other transient.
+            onOpenPreferences: shell.openWindow(preferencesLoader, () => {
+                shell.preferencesScreenName = shell.controlCenterScreenName;
+                shell.preferencesSection = "general";
+            })
+
+            onDismissed: shell.closeSurface("controlCenter")
         }
     }
 
@@ -218,6 +255,7 @@ ShellRoot {
         property bool preferencesVisible: preferencesLoader.active
         property bool launcherVisible: launcherLoader.active
         property bool notificationCenterVisible: notificationCenterLoader.active
+        property bool controlCenterVisible: controlCenterLoader.active
 
         function launcher(): void {
             // Read per call rather than bound: the marker changes underneath a
@@ -323,6 +361,31 @@ ShellRoot {
 
         function closeNotifications(): void {
             shell.closeSurface("notificationCenter");
+        }
+
+        // The control centre, on the same three-function shape as the centre
+        // above: the bar's glyph and SUPER+CTRL+A both come in through
+        // garage-panel-toggle, which resolves the monitor under the pointer and
+        // calls controlCenterOn with it.
+        function controlCenter(): void {
+            shell.toggleSurface("controlCenter", () => {
+                shell.controlCenterScreenName = shell.focusedScreenName();
+            });
+        }
+
+        function controlCenterOn(screenName: string): void {
+            const sameScreen = shell.controlCenterScreenName === screenName;
+            const open = () => {
+                shell.controlCenterScreenName = screenName;
+            };
+            if (sameScreen)
+                shell.toggleSurface("controlCenter", open);
+            else
+                shell.openSurface("controlCenter", open);
+        }
+
+        function closeControlCenter(): void {
+            shell.closeSurface("controlCenter");
         }
     }
 

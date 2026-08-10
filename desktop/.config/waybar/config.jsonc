@@ -16,7 +16,7 @@
   "modules-center": [],
   // Parked: "custom/containers", "custom/git", "custom/monitor",
   //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
-  "modules-right": ["image#notifications", "clock"],
+  "modules-right": ["image#notifications", "image#control-center", "clock"],
   "hyprland/workspaces": {
     "format": " ",
     "on-click": "activate",
@@ -35,6 +35,15 @@
     "path": "$HOME/.local/state/garage/generated/icons/bell.svg",
     "size": 16,
     "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
+    "tooltip": false
+  },
+  // The sliders glyph, recoloured to the bar foreground by the same
+  // render-bar / render_theme() pass that produces bell.svg above, into
+  // generated/icons/sliders.svg. Static path, not exec, for the same reason.
+  "image#control-center": {
+    "path": "$HOME/.local/state/garage/generated/icons/sliders.svg",
+    "size": 16,
+    "on-click": "$HOME/.local/bin/garage-panel-toggle control-center",
     "tooltip": false
   },
   "custom/media": {
