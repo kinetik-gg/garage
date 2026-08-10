@@ -127,6 +127,17 @@ Singleton {
     function present(notification) {
         arrivals[String(notification.id)] = Date.now();
 
+        // Every close is journaled with its reason (1 expired, 2 dismissed,
+        // 3 closed by the sender). Deliberate, not debug leftovers: one
+        // notification was once destroyed with no visible cause in a session
+        // that could not be reopened, and this line is what turns the next
+        // such ghost into a one-grep diagnosis. The volume is a line per
+        // close -- journald noise well below the toplevel tracker's.
+        notification.closed.connect(function(reason) {
+            console.log("garage-notif: id", notification.id,
+                        "closed, reason", reason);
+        });
+
         // Tracking is what keeps the object alive -- an untracked notification is
         // destroyed as soon as this handler returns, and tracked = false is
         // documented as equivalent to dismiss(). Transient ones are tracked too,
