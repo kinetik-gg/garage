@@ -47,6 +47,16 @@ PanelWindow {
     // list can refuse to rebuild under it; nothing else reads it.
     property var replyTarget: null
 
+    // Which stacks the user has opened, by app name -- by name rather than by
+    // group object, because the groups are rebuilt from scratch every time the
+    // history changes and an opened stack has to survive the next arrival.
+    //
+    // Per-open by construction: the centre is destroyed when it closes, so every
+    // stack is closed again the next time it is opened. That is deliberate. A
+    // notification centre is read in one sitting, and a stack the user opened
+    // last week is not a preference to restore.
+    property var expandedGroups: ({})
+
     readonly property bool frozen: centre.closing.length > 0
         || centre.pending.length > 0 || centre.replyTarget !== null
 
@@ -62,6 +72,34 @@ PanelWindow {
 
     readonly property int contentMargin: 12
 
+    // Stack geometry. A closed group draws its newest card over the edges of the
+    // ones behind it: each layer down starts peekOffset lower and is peekInset
+    // narrower on each side, so what shows below the top card is a card's corner
+    // rather than a shadow. Two layers is the whole vocabulary -- one says
+    // "there is more", two says "there is more than one more", and a third
+    // would be drawn entirely underneath the second.
+    readonly property int peekOffset: 5
+    readonly property int peekInset: 3
+    readonly property int peekLimit: 2
+
+    function isExpanded(name) {
+        return centre.expandedGroups[String(name)] === true;
+    }
+
+    function toggleExpanded(name) {
+        const key = String(name);
+        // Copied and reassigned rather than mutated: a mutated object does not
+        // notify, and every delegate reads its open state off this one.
+        const next = ({});
+        for (const existing in centre.expandedGroups)
+            next[existing] = centre.expandedGroups[existing];
+        if (next[key] === true)
+            delete next[key];
+        else
+            next[key] = true;
+        centre.expandedGroups = next;
+    }
+
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
             const candidate = Quickshell.screens[index];
@@ -69,20 +107,6 @@ PanelWindow {
                 return candidate;
         }
         return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
-    }
-
-    // Same fallback chain as NotificationCard's own icon, for the group header.
-    // Repeated rather than shared through the daemon: the daemon is the bus
-    // service, and which icon a header draws is not its business.
-    function appIconFor(notification) {
-        if (!notification)
-            return "";
-        const icon = String(notification.appIcon || "");
-        if (icon === "")
-            return "";
-        if (icon.startsWith("/") || icon.startsWith("file:") || icon.startsWith("image:"))
-            return icon;
-        return Quickshell.iconPath(icon, true);
     }
 
     // Group by app name, newest group first, newest member first inside a group.
@@ -100,19 +124,15 @@ PanelWindow {
             const name = String(notification.appName || "").trim() || "Notification";
             let group = byName[name];
             if (group === undefined) {
-                group = { name: name, newest: 0, iconSource: "", notifications: [] };
+                group = { name: name, newest: 0, notifications: [] };
                 byName[name] = group;
                 order.push(group);
             }
 
             group.notifications.push(notification);
             const arrival = NotificationDaemon.arrivalTime(notification);
-            if (arrival >= group.newest) {
+            if (arrival > group.newest)
                 group.newest = arrival;
-                // The newest member's icon, so an app that changed it mid-session
-                // is shown as it is sending now.
-                group.iconSource = centre.appIconFor(notification);
-            }
         }
 
         for (const group of order) {
@@ -131,7 +151,33 @@ PanelWindow {
         centre.dropped = centre.dropped.filter(
             notification => live.indexOf(notification) !== -1);
         centre.groups = centre.buildGroups(live);
+        centre.forgetClosedStacks();
         centre.refreshPending = false;
+    }
+
+    // Drop the open state of groups that are no longer there. Without this, an
+    // app whose stack was opened and then cleared would come back opened the
+    // next time it sent something, which is not a state the user left it in.
+    function forgetClosedStacks() {
+        const kept = ({});
+        let changed = false;
+        for (const key in centre.expandedGroups) {
+            let found = false;
+            for (const group of centre.groups) {
+                if (group.name === key) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                kept[key] = centre.expandedGroups[key];
+            else
+                changed = true;
+        }
+        // Only when something actually went: every write here re-evaluates the
+        // open state of every delegate in the list.
+        if (changed)
+            centre.expandedGroups = kept;
     }
 
     function refresh() {
@@ -433,78 +479,154 @@ PanelWindow {
                     spacing: 14
                     boundsBehavior: Flickable.StopAtBounds
 
+                    // One app's notifications, as a stack. Closed, the newest
+                    // card stands over the edges of the ones behind it and the
+                    // whole thing is one control: click it and the group opens
+                    // in place. There is no header row -- the stack is the
+                    // group, and every card carries the app's icon and name
+                    // itself.
                     delegate: Column {
                         id: groupBlock
                         required property var modelData
+
+                        readonly property var items: groupBlock.modelData.notifications
+                        readonly property int count: groupBlock.items.length
+                        // One notification is not a stack, it is a card: an edge
+                        // peeking out from under it would be promising something
+                        // that is not there.
+                        readonly property bool stacked: groupBlock.count > 1
+                        readonly property bool open: groupBlock.stacked
+                            && centre.isExpanded(groupBlock.modelData.name)
+                        readonly property bool closed: groupBlock.stacked && !groupBlock.open
+                        readonly property int peeks: groupBlock.closed
+                            ? Math.min(centre.peekLimit, groupBlock.count - 1) : 0
 
                         width: list.width
                         spacing: 6
 
                         Item {
                             width: groupBlock.width
-                            height: 20
+                            height: cards.height + groupBlock.peeks * centre.peekOffset
 
-                            Item {
-                                id: groupIcon
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 16
-                                height: 16
+                            // Under the cards rather than over them. A card's own
+                            // buttons take the clicks that are theirs -- the x, an
+                            // action -- and everything they leave alone falls
+                            // through to here, which is what lets the stack be
+                            // the control that opens the stack.
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: groupBlock.closed
+                                hoverEnabled: enabled
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: centre.toggleExpanded(groupBlock.modelData.name)
+                            }
 
-                                readonly property string source:
-                                    String(groupBlock.modelData.iconSource || "")
-                                readonly property bool usesGlyph: groupIcon.source === ""
+                            // The edges of what is underneath. Drawn rather than
+                            // instantiated: these are the backs of cards nobody
+                            // is reading, and real ones would mean a second live
+                            // card for every notification in the group, each with
+                            // its own retain lock and exit animation to keep in
+                            // step with the copy that appears when the stack opens.
+                            Repeater {
+                                model: groupBlock.peeks
 
-                                // Theme icons arrive already coloured and must
-                                // not be overlaid.
-                                Image {
-                                    anchors.fill: parent
-                                    visible: !groupIcon.usesGlyph
-                                    source: groupIcon.usesGlyph ? "" : groupIcon.source
-                                    sourceSize.width: 32
-                                    sourceSize.height: 32
-                                    fillMode: Image.PreserveAspectFit
-                                    smooth: true
-                                    mipmap: true
-                                }
+                                ContinuousRectangle {
+                                    id: peek
+                                    required property int index
 
-                                // The built-in glyph ships its own colour, so it
-                                // goes through an overlay to follow the theme.
-                                Image {
-                                    id: groupBell
-                                    anchors.fill: parent
-                                    visible: false
-                                    source: groupIcon.usesGlyph ? "icons/bell.svg" : ""
-                                    sourceSize.width: 32
-                                    sourceSize.height: 32
-                                    fillMode: Image.PreserveAspectFit
-                                    smooth: true
-                                    antialiasing: true
-                                    mipmap: true
-                                }
+                                    readonly property int level: peek.index + 1
 
-                                ColorOverlay {
-                                    anchors.fill: groupBell
-                                    source: groupBell
-                                    visible: groupIcon.usesGlyph
-                                    color: Theme.textMuted
-                                    cached: true
+                                    x: peek.level * centre.peekInset
+                                    y: peek.level * centre.peekOffset
+                                    width: groupBlock.width - peek.level * centre.peekInset * 2
+                                    // As tall as the card in front, so the only
+                                    // thing that shows is the offset.
+                                    height: cards.height
+                                    radius: Theme.cornerRadius
+                                    color: Theme.contentTint
+                                    borderWidth: 1
+                                    // The card's own outer frame is a dark
+                                    // hairline, which is invisible where the only
+                                    // thing behind it is more dark: what shows of
+                                    // a layer down is four pixels over blurred
+                                    // wallpaper, so it is drawn with the lighter
+                                    // control border instead.
+                                    borderColor: Theme.border
+                                    // Dimmed by depth: the second layer down is
+                                    // further away than the first. Gently -- the
+                                    // sliver is thin enough that much more of a
+                                    // fade stops reading as a card at all.
+                                    opacity: 1 - peek.level * 0.15
                                 }
                             }
 
-                            Text {
-                                anchors.left: groupIcon.right
-                                anchors.leftMargin: 7
-                                anchors.right: groupClear.left
-                                anchors.rightMargin: 6
+                            Column {
+                                id: cards
+
+                                width: groupBlock.width
+                                spacing: 8
+
+                                Repeater {
+                                    // The newest alone while the stack is closed.
+                                    // Opening one does not stand up a second copy
+                                    // of the card already on screen: the top row
+                                    // stays where it is and the rest arrive
+                                    // underneath it.
+                                    model: groupBlock.closed
+                                        ? [groupBlock.items[0]] : groupBlock.items
+
+                                    NotificationCard {
+                                        id: row
+                                        required property var modelData
+
+                                        width: cards.width
+                                        notification: row.modelData
+                                        // The full card: body, actions and the
+                                        // reply field. Nothing here times out, so
+                                        // nothing has to be clamped to a glance --
+                                        // except the top of a closed stack, which
+                                        // is standing in for the rows behind it.
+                                        compact: false
+                                        collapsed: groupBlock.closed
+                                        stackNote: groupBlock.closed
+                                            ? (groupBlock.count - 1) + " more" : ""
+                                        exiting: centre.isClosing(row.modelData)
+
+                                        onCloseRequested: centre.beginClose([row.modelData])
+                                        // Sending is answering: the row plays out and the
+                                        // notification is dismissed with it, the same as
+                                        // any other close.
+                                        onReplied: centre.beginClose([row.modelData])
+                                        onReplyActiveChanged: {
+                                            if (row.replyActive)
+                                                centre.replyTarget = row.modelData;
+                                            else if (centre.replyTarget === row.modelData)
+                                                centre.replyTarget = null;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // The open stack's footer, and the only place the retired
+                        // group header's two jobs survive: the way back, and
+                        // clearing the group in one go. Closed, neither is needed
+                        // -- the stack opens on a click and the count in the top
+                        // card already says how much is under it.
+                        Item {
+                            width: groupBlock.width
+                            height: showLess.implicitHeight
+                            visible: groupBlock.open
+
+                            SettingsButton {
+                                id: showLess
+                                anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: String(groupBlock.modelData.name || "")
-                                color: Theme.text
-                                font.family: Theme.sans
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                renderType: Text.NativeRendering
+                                text: "Show Less"
+                                ghost: true
+                                verticalPadding: 4
+                                horizontalPadding: 8
+                                onClicked: centre.toggleExpanded(groupBlock.modelData.name)
                             }
 
                             ContinuousRectangle {
@@ -545,37 +667,7 @@ PanelWindow {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: centre.beginClose(
-                                        groupBlock.modelData.notifications)
-                                }
-                            }
-                        }
-
-                        Repeater {
-                            model: groupBlock.modelData.notifications
-
-                            NotificationCard {
-                                id: row
-                                required property var modelData
-
-                                width: groupBlock.width
-                                notification: row.modelData
-                                // The full card: body, actions and the reply
-                                // field. Nothing here times out, so nothing has
-                                // to be clamped to a glance.
-                                compact: false
-                                exiting: centre.isClosing(row.modelData)
-
-                                onCloseRequested: centre.beginClose([row.modelData])
-                                // Sending is answering: the row plays out and the
-                                // notification is dismissed with it, the same as
-                                // any other close.
-                                onReplied: centre.beginClose([row.modelData])
-                                onReplyActiveChanged: {
-                                    if (row.replyActive)
-                                        centre.replyTarget = row.modelData;
-                                    else if (centre.replyTarget === row.modelData)
-                                        centre.replyTarget = null;
+                                    onClicked: centre.beginClose(groupBlock.items)
                                 }
                             }
                         }

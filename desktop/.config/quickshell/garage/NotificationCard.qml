@@ -17,9 +17,19 @@ ContinuousRectangle {
     required property var notification
     // Toast mode: the body is clamped, because a popup is a glance and a wall of
     // text pushes the stack off the screen. It also drops the affordances that
-    // only make sense in a list that stays put -- the reply field, the clock
-    // time, and the app name the centre's group header already carries.
+    // only make sense in a list that stays put -- the reply field and the clock
+    // time -- and draws its identity as a meta row above the title rather than
+    // beside an icon, which is the shape the toast was approved in.
     property bool compact: false
+    // The top of a closed stack in the centre. The card is still the whole card,
+    // but it is standing in for the ones behind it: the body is cut to a glance
+    // and the affordances that need a row which is going to stay put -- the
+    // actions and the reply field -- wait until the stack is opened.
+    property bool collapsed: false
+    // What is left underneath, e.g. "2 more". Drawn in the card's own top line
+    // because the stack is the group: there is no header above it to hang a
+    // count on any more.
+    property string stackNote: ""
     // Set by the owner to play the card out. exited() follows when the animation
     // has finished and the notification is safe to close.
     property bool exiting: false
@@ -43,6 +53,54 @@ ContinuousRectangle {
         font.family: Theme.sans
         font.pixelSize: 11
         renderType: Text.NativeRendering
+    }
+
+    // The sender's icon, drawn the same way wherever it appears: the resolved
+    // theme icon when there is one, the shell's own bell when there is not.
+    // Shared between the toast's meta row and the centre card's leading tile so
+    // a sender cannot be one picture in a popup and another in the list.
+    component AppIcon: Item {
+        id: iconTile
+
+        // Rasterisation size, passed rather than derived from the width: the
+        // toast's icon is approved as it is drawn today, and a size the layout
+        // computes would re-raster it into something slightly else.
+        property int pixels: 36
+
+        // Theme icons arrive already coloured and must not be overlaid.
+        Image {
+            anchors.fill: parent
+            visible: !card.usesGlyph
+            source: card.usesGlyph ? "" : card.appIcon
+            sourceSize.width: iconTile.pixels
+            sourceSize.height: iconTile.pixels
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+        }
+
+        // The built-in glyph ships its own colour, so it is drawn through an
+        // overlay to follow the theme rather than staying fixed.
+        Image {
+            id: bellGlyph
+            anchors.fill: parent
+            visible: false
+            source: card.usesGlyph ? "icons/bell.svg" : ""
+            sourceSize.width: iconTile.pixels
+            sourceSize.height: iconTile.pixels
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            antialiasing: true
+            mipmap: true
+        }
+
+        ColorOverlay {
+            anchors.fill: bellGlyph
+            source: bellGlyph
+            visible: card.usesGlyph
+            color: Theme.textMuted
+            cached: true
+        }
     }
 
     component CloseButton: ContinuousRectangle {
@@ -84,7 +142,9 @@ ContinuousRectangle {
     // Inline reply. Only off a toast: a popup times out under the pointer, and a
     // text field that can disappear mid-sentence is a trap. This field is the
     // whole reason NotificationDaemon advertises the capability at all.
-    readonly property bool canReply: !card.compact && card.live
+    // Nor off the top of a closed stack: the field is there to be typed into,
+    // and a click anywhere in a closed stack opens it instead.
+    readonly property bool canReply: !card.compact && !card.collapsed && card.live
         && card.notification.hasInlineReply
     // Whether the field has the keyboard. The centre watches this so it can stop
     // rebuilding its list while a reply is being typed into one of its rows.
@@ -254,52 +314,16 @@ ContinuousRectangle {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
-            // Toast only. In the centre the group header already carries the app
-            // identity, so this whole row would hold nothing but the time and
-            // the close button floating over dead space -- those ride on the
-            // title row there instead.
+            // Toast only. A card in the centre wears its identity on the leading
+            // tile and the top line of the text column instead, so this row
+            // there would be a second app name over dead space.
             visible: card.compact
 
-            Item {
+            AppIcon {
                 Layout.preferredWidth: 18
                 Layout.preferredHeight: 18
                 Layout.alignment: Qt.AlignVCenter
-                visible: card.compact
-
-                // Theme icons arrive already coloured and must not be overlaid.
-                Image {
-                    anchors.fill: parent
-                    visible: !card.usesGlyph
-                    source: card.usesGlyph ? "" : card.appIcon
-                    sourceSize.width: 36
-                    sourceSize.height: 36
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    mipmap: true
-                }
-
-                // The built-in glyph ships its own colour, so it is drawn through
-                // an overlay to follow the theme rather than staying fixed.
-                Image {
-                    id: bellGlyph
-                    anchors.fill: parent
-                    visible: false
-                    source: card.usesGlyph ? "icons/bell.svg" : ""
-                    sourceSize.width: 36
-                    sourceSize.height: 36
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    antialiasing: true
-                    mipmap: true
-                }
-
-                ColorOverlay {
-                    anchors.fill: bellGlyph
-                    source: bellGlyph
-                    visible: card.usesGlyph
-                    color: Theme.textMuted
-                    cached: true
-                }
+                pixels: 36
             }
 
             Text {
@@ -325,6 +349,18 @@ ContinuousRectangle {
             Layout.fillWidth: true
             spacing: 10
 
+            // Centre only, and every card gets one. The centre used to draw a
+            // single icon on a header above each group; the stack replaced the
+            // header, so identity travels with the card -- which is also what
+            // makes an expanded stack legible as one app's list.
+            AppIcon {
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
+                Layout.alignment: Qt.AlignTop
+                visible: !card.compact
+                pixels: 64
+            }
+
             // The sender's own picture -- a profile photo, an album cover. Drawn
             // to fit rather than cropped to a rounded tile: fitting needs no mask,
             // and a mask over a superellipse is a second silhouette to keep in
@@ -346,38 +382,58 @@ ContinuousRectangle {
                 Layout.fillWidth: true
                 spacing: 2
 
-                // The centre card's title row: summary on the left, time and
-                // close at the right edge -- the meta row above is toast-only,
-                // so without this a centre card led with floating chrome.
+                // The centre card's top line: who sent it, what is still stacked
+                // underneath, how old it is, and the way out. Small and muted, so
+                // it reads as a caption over the title rather than as a heading
+                // competing with it.
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    visible: !card.compact || summaryText.text !== ""
+                    visible: !card.compact
 
                     Text {
-                        id: summaryText
                         Layout.fillWidth: true
-                        text: card.live ? String(card.notification.summary || "") : ""
-                        visible: summaryText.text !== ""
-                        color: Theme.text
+                        text: card.live
+                            ? String(card.notification.appName || "Notification") : ""
+                        color: Theme.textMuted
                         font.family: Theme.sans
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: card.compact ? 2 : 4
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
                         elide: Text.ElideRight
                         renderType: Text.NativeRendering
                     }
 
-                    TimeLabel {
-                        visible: !card.compact
-                        Layout.alignment: Qt.AlignTop
+                    Text {
+                        text: card.stackNote
+                        visible: card.stackNote !== ""
+                        color: Theme.textMuted
+                        font.family: Theme.sans
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                        renderType: Text.NativeRendering
                     }
 
-                    CloseButton {
-                        visible: !card.compact
-                        Layout.alignment: Qt.AlignTop
-                    }
+                    TimeLabel {}
+                    CloseButton {}
+                }
+
+                Text {
+                    id: summaryText
+                    Layout.fillWidth: true
+                    text: card.live ? String(card.notification.summary || "") : ""
+                    visible: summaryText.text !== ""
+                    color: Theme.text
+                    font.family: Theme.sans
+                    font.pixelSize: 13
+                    // Semibold in the list, where the top line above it is
+                    // already demibold and a bold title would shout over a
+                    // column of them. The toast keeps the weight it was
+                    // approved with.
+                    font.weight: card.compact ? Font.Bold : Font.DemiBold
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: card.compact || card.collapsed ? 2 : 4
+                    elide: Text.ElideRight
+                    renderType: Text.NativeRendering
                 }
 
                 Text {
@@ -390,7 +446,9 @@ ContinuousRectangle {
                     font.pixelSize: 12
                     lineHeight: 1.15
                     wrapMode: Text.WordWrap
-                    maximumLineCount: card.compact ? 4 : 12
+                    // A glance on a toast, a glance on top of a closed stack,
+                    // and the whole thing once the row is one the user opened.
+                    maximumLineCount: card.compact ? 4 : card.collapsed ? 2 : 12
                     elide: Text.ElideRight
                     // The server advertises body markup, so senders send the
                     // freedesktop subset -- b, i, u, a, img -- and StyledText is
@@ -405,7 +463,9 @@ ContinuousRectangle {
 
         Flow {
             Layout.fillWidth: true
-            visible: card.actions.length > 0
+            // Not off the top of a closed stack: a button there is a target the
+            // click that was meant to open the stack would land on.
+            visible: !card.collapsed && card.actions.length > 0
             spacing: 6
 
             Repeater {
