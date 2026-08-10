@@ -5191,6 +5191,38 @@ def deployed_plugin_abi(name: str) -> str:
     return hop.parent.name
 
 
+def pinned_plugins() -> dict[str, str]:
+    """The commit each plugin should be deployed at, from system/plugin-pins.
+
+    The checkout's copy, not /usr/lib/kinetik/plugin-pins: the installed copy
+    is republished from this one at deploy time, so after a pull it is exactly
+    the file that can be behind.
+    """
+    pins_file = checkout_root() / "system/plugin-pins"
+    names = {"glass_pin": "kinetik-glass", "hyprexpo_pin": "hyprexpo"}
+    pins: dict[str, str] = {}
+    try:
+        for line in pins_file.read_text(encoding="utf-8").splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() in names and value.strip():
+                pins[names[key.strip()]] = value.strip().strip('"')
+    except OSError:
+        pass
+    return pins
+
+
+def deployed_plugin_pin(name: str) -> str:
+    """The commit baked into a deployed plugin's file name, or "".
+
+    garage-rebuild-plugins installs to <abi>/<name>-<commit>.so, so the pin a
+    build was made from is readable without opening the file.
+    """
+    hop = link_hop(PLUGIN_ROOT / f"{name}.so")
+    if hop is None or hop.suffix != ".so":
+        return ""
+    return hop.name.removeprefix(f"{name}-").removesuffix(".so")
+
+
 def plugin_state(report: str) -> dict:
     """The live ABI comparison garage-rebuild-plugins --check makes.
 
@@ -5213,8 +5245,18 @@ def plugin_state(report: str) -> dict:
     ever = any(PLUGIN_ROOT.glob("*/*.so"))
     stale = [name for name, where in deployed.items()
              if where != abi or not (PLUGIN_ROOT / f"{name}.so").exists()]
+    # Behind is different from stale: the deployed build loads fine, it is just
+    # not the commit the pins file names -- what a local-only checkout looks
+    # like after a pin bump, where no pull exists for update to notice the
+    # move in.
+    pins = pinned_plugins()
+    behind = [name for name in PLUGIN_NAMES
+              if name not in stale and pins.get(name)
+              and deployed_plugin_pin(name)
+              and deployed_plugin_pin(name) != pins[name]]
     return {"abi": abi, "deployed": deployed, "ever": ever,
-            "stale": [] if not abi else stale}
+            "stale": [] if not abi else stale,
+            "behind": [] if not abi else behind}
 
 
 def session_is_up() -> bool:
@@ -5369,6 +5411,11 @@ def check_plugins() -> tuple[str, str, str]:
     if state["stale"]:
         return ("fail",
                 f"{', '.join(state['stale'])} not built for the running build {build}",
+                "~/.config/hypr/scripts/garage-rebuild-plugins")
+    if state["behind"]:
+        return ("fail",
+                f"{', '.join(state['behind'])} deployed at a different commit "
+                f"than system/plugin-pins names",
                 "~/.config/hypr/scripts/garage-rebuild-plugins")
     return "ok", f"{', '.join(PLUGIN_NAMES)} built for the running build {build}", ""
 
@@ -5989,12 +6036,15 @@ def update(argv: list[str]) -> int:
         note("Hyprland reports no ABI string; skipping.")
     elif not state["ever"]:
         note("no plugins have ever been deployed here; skipping.")
-    elif not state["stale"] and not pins_changed:
+    elif not state["stale"] and not state["behind"] and not pins_changed:
         note(f"{', '.join(PLUGIN_NAMES)} are in step with the running build "
              f"{state['abi'].split('_')[0][:12]}; skipping the rebuild.")
     else:
         reason = ("a pin moved in this update" if pins_changed
-                  else f"not built for the running build: {', '.join(state['stale'])}")
+                  else f"not built for the running build: {', '.join(state['stale'])}"
+                  if state["stale"]
+                  else f"deployed at a different commit than the pins file: "
+                       f"{', '.join(state['behind'])}")
         note(f"redeploy needed ({reason}).")
         rebuild = HOME / ".config/hypr/scripts/garage-rebuild-plugins"
         if not rebuild.is_file():
