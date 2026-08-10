@@ -17,10 +17,11 @@
   // Parked: "custom/containers", "custom/git", "custom/monitor",
   //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
   "modules-right": ["custom/notifications", "custom/launcher", "custom/control-center", "clock"],
-  "hyprland/workspaces": {
-    "format": " ",
+  "ext/workspaces": {
     "on-click": "activate",
-    "sort-by-number": true
+    "sort-by-id": true,
+    "all-outputs": false,
+    "format": " "
   },
   "custom/menu": {
     "format": "",

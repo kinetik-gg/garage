@@ -258,7 +258,7 @@ packages=(
     swayosd cliphist wl-clipboard playerctl
     grim slurp satty hyprpicker
     networkmanager bluez bluez-utils
-    pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol
+    pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol cava
     nautilus gvfs gvfs-smb gnome-text-editor gnome-calculator loupe
     btop fastfetch micro qt6ct qt6-wayland xsettingsd
     python python-pip python-pipx uv lua jq zenity file libnotify 7zip

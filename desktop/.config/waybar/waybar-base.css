@@ -18,7 +18,7 @@ window#waybar {
 
 #custom-menu {
   padding-left: 13px;
-  padding-right: 10px;
+  padding-right: 20px;
   color: @menu_fg;
   /* The label is a Nerd Font glyph; Plus Jakarta Sans must not claim the codepoint. */
   font-family: "CaskaydiaMono Nerd Font", "Plus Jakarta Sans", sans-serif;
@@ -53,9 +53,8 @@ window#waybar {
   background: @dot_hover;
 }
 
-#workspaces button.active label,
-#workspaces button.focused label,
-#workspaces button.visible label {
+/* ext/workspaces only exposes .active/.urgent/.hidden -- no .focused/.visible. */
+#workspaces button.active label {
   min-width: 20px;
   background: @dot_active;
 }

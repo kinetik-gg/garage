@@ -138,7 +138,7 @@ WAYBAR_WORKSPACES = GENERATED / "waybar-workspaces.jsonc"
 # includes -- so the whole list has to be published here for either variant of
 # it to reach the bar. custom/menu is carried along unchanged.
 WAYBAR_MODULES_LEFT = ["custom/menu"]
-WAYBAR_WORKSPACE_MODULE = "hyprland/workspaces"
+WAYBAR_WORKSPACE_MODULE = "ext/workspaces"
 
 # Toolkit configs that offer no include or indirection mechanism, so a theme
 # switch has to rewrite the file itself. They are deliberately not stowed: every
@@ -2142,8 +2142,8 @@ def render_idle(config: dict) -> None:
     if int(lock["display_off_timeout"]) > 0:
         listeners.append(f'''listener {{
     timeout = {int(lock["display_off_timeout"])}
-    on-timeout = hyprctl dispatch dpms off
-    on-resume = hyprctl dispatch dpms on
+    on-timeout = hyprctl dispatch 'hl.dsp.dpms({{ mode = "off" }})'
+    on-resume = hyprctl dispatch 'hl.dsp.dpms({{ mode = "on" }})'
 }}''')
     if int(lock["suspend_timeout"]) > 0:
         listeners.append(f'''listener {{
@@ -2154,7 +2154,7 @@ def render_idle(config: dict) -> None:
 general {
     lock_cmd = pidof hyprlock || ~/.config/hypr/scripts/garage-lock-session
     before_sleep_cmd = loginctl lock-session
-    after_sleep_cmd = hyprctl dispatch dpms on
+    after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({ mode = "on" })'
 }
 
 ''' + "\n\n".join(listeners) + "\n"

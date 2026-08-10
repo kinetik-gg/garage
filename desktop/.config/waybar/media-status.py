@@ -201,7 +201,8 @@ def activate():
             address = client.get("address")
             if address:
                 subprocess.run(
-                    ["/usr/bin/hyprctl", "dispatch", "focuswindow", f"address:{address}"],
+                    ["/usr/bin/hyprctl", "dispatch",
+                     f'hl.dsp.focus({{ window = "address:{address}" }})'],
                     timeout=2,
                     check=False,
                 )
