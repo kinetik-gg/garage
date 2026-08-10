@@ -39,6 +39,37 @@ glass_refraction = 0.7
 glass_clarity = 0.75
 glass_highlight = 0.12
 
+[bar]
+# The menu bar's height in pixels, and the multiplier over the spacing inside it.
+# Neither can live in ~/.config/waybar/config.jsonc: waybar gives an option named
+# in that file to that file, so an option it names could never be overridden from
+# the generated fragment. height, modules-left, modules-center and modules-right
+# are all published from ~/.local/state/garage/generated instead.
+height = 43
+# 1.0 is the spacing PADDING_TABLE ships; the default is a little looser because
+# those values were drawn for a shorter bar.
+padding_scale = 1.2
+# transparent: the bar has no body of its own and only Hyprland's blur layer sits
+# behind it. blurred: the same layer plus a light or dark tint from the palette,
+# which is what frosts it.
+background = "transparent"
+# One switch per metric strip. Each one is a garage-metrics widget, drawn as an
+# SVG the bar shows through its image module. The three that are on are the three
+# every machine has; temperature, disk and GPU depend on hardware that may not be
+# there, and a strip drawing a flat line is worse than no strip.
+monitor_cpu = true
+monitor_memory = true
+monitor_network = true
+monitor_temp = false
+monitor_disk = false
+monitor_gpu = false
+# The AI token-usage readout. Safe to leave on: it prints nothing at all when the
+# tokscale CLI is not installed, and the module hides itself on an empty text.
+ai_usage = true
+# The now-playing readout, which is the whole of the bar's centre. It also hides
+# itself when no player is running.
+media_player = true
+
 [general]
 terminal = ""
 builtin_launcher = true

@@ -1,22 +1,26 @@
 {
   "layer": "top",
   "position": "top",
-  "height": 36,
   "margin-top": 0,
   "margin-right": 0,
   "margin-bottom": 0,
   "margin-left": 0,
   "spacing": 0,
-  // Parked: "custom/media"
-  // modules-left is not here on purpose. The Workspaces pane can hide the
-  // workspace indicator, which means dropping "hyprland/workspaces" from the
-  // list -- and an option named in this file is won by this file, so the
-  // generated fragment included below could never override it. The whole list
-  // lives there instead; without the fragment the left side is simply empty.
-  "modules-center": [],
+  // No module list and no height here on purpose, and it is the same reason for
+  // all four. An option named in this file is won by this file: waybar reads it
+  // before anything it includes, and an include can only supply an option this
+  // file has not already answered. But the Menu Bar pane can hide the workspace
+  // indicator, switch a metric strip on, hide the media readout and resize the
+  // bar -- so height, modules-left, modules-center and modules-right all have to
+  // be published from the generated fragments instead, and this file must not
+  // name any of them. See render_bar_widgets() and render_bar_workspaces().
+  //
+  // Without the fragments the bar is not broken, only bare: an empty left side,
+  // an empty right side and waybar's own default height. waybar.service runs
+  // `garage render-bar` as its ExecStartPre so a first boot has them anyway.
+  //
   // Parked: "custom/containers", "custom/git", "custom/monitor",
-  //         "custom/smb", "custom/network", "pulseaudio", "custom/microphone", "tray"
-  "modules-right": ["custom/notifications", "custom/launcher", "custom/control-center", "clock"],
+  //         "custom/smb", "pulseaudio", "custom/microphone", "tray"
   "ext/workspaces": {
     "on-click": "activate",
     "sort-by-id": true,
@@ -28,18 +32,28 @@
     "on-click": "$HOME/.local/bin/garage-menu-toggle",
     "tooltip": false
   },
-  // Font glyphs, NOT the image module. This waybar's image module spins the
-  // whole bar at 100% CPU with no bar ever configured for EVERY format --
-  // SVG and PNG alike, from a clean process, with paths that load fine
-  // through gdk-pixbuf standalone -- and its `exec` variant deadlocks
-  // construction outright. Until that is fixed upstream, no image of any
-  // kind can ride in this bar: the bell, the launcher and the toggle are
-  // the real Phosphor icon font, bundled at desktop/.local/share/fonts
-  // (MIT, PHOSPHOR-LICENSE alongside it) and stowed into
-  // ~/.local/share/fonts where fontconfig finds it natively -- the same
-  // glyphs the shell's panels render as Phosphor SVGs through Qt where GTK
-  // is not involved. The Arch menu logo stays a Nerd Font glyph because
-  // Phosphor carries no brand logos.
+  // THE IMAGE MODULE, and the one recipe that works. Probed live on this
+  // machine: an image module spelled
+  //
+  //   "image#name": { "exec": CMD, "size": N, "interval": SECONDS,
+  //                   "tooltip": true }
+  //
+  // -- where CMD prints the image path on its first line and the tooltip on its
+  // second -- draws correctly and costs nothing measurable. That is the form
+  // render_bar_widgets() generates for every metric strip, and nothing else may
+  // be used. The earlier findings still stand and are why: a `path`-based image
+  // module spins the whole bar at 100% CPU with no bar ever drawn, for EVERY
+  // format, SVG and PNG alike, from a clean process, with paths that load fine
+  // through gdk-pixbuf standalone; and an `exec` with no `interval` deadlocks
+  // construction outright.
+  //
+  // The three modules below are font glyphs regardless, and stay that way: they
+  // are the real Phosphor icon font, bundled at desktop/.local/share/fonts (MIT,
+  // PHOSPHOR-LICENSE alongside it) and stowed into ~/.local/share/fonts where
+  // fontconfig finds it natively -- the same glyphs the shell's panels render as
+  // Phosphor SVGs through Qt where GTK is not involved. A glyph follows the bar's
+  // colour and its font size for free, which an image cannot. The Arch menu logo
+  // stays a Nerd Font glyph because Phosphor carries no brand logos.
   "custom/notifications": {
     "format": "\ue0ce",
     "on-click": "$HOME/.local/bin/garage-panel-toggle notifications",
@@ -55,18 +69,9 @@
     "on-click": "$HOME/.local/bin/garage-panel-toggle control-center",
     "tooltip": false
   },
-  "custom/media": {
-    "exec": "$HOME/.config/waybar/media-status.py",
-    "return-type": "json",
-    "interval": 2,
-    "hide-empty-text": true,
-    "tooltip": true,
-    "on-click": "$HOME/.config/waybar/media-status.py --activate",
-    "on-click-middle": "/usr/bin/playerctl --player=playerctld play-pause",
-    "on-click-right": "/usr/bin/playerctl --player=playerctld next",
-    "on-scroll-up": "/usr/bin/playerctl --player=playerctld previous",
-    "on-scroll-down": "/usr/bin/playerctl --player=playerctld next"
-  },
+  // custom/media is defined in the widgets fragment, not here: bar.media_player
+  // decides whether it is listed at all, and the module list and the definition
+  // have to be written by the same writer to stay in step.
   "custom/containers": {
     "exec": "$HOME/.config/waybar/context-status.py containers",
     "return-type": "json",
@@ -96,13 +101,6 @@
     "on-click": "$HOME/.local/bin/garage-monitor-dashboard",
     "tooltip-format": "Open infrastructure monitor"
   },
-  // Parked: re-add "image#activity" to modules-right to bring it back.
-  // "image#activity": {
-  //     "exec": "$HOME/.config/waybar/activity-graph.py all",
-  //     "size": 569,
-  //     "interval": 2,
-  //     "tooltip": true
-  //   },
   "network": {
     "format-wifi": "󰖩",
     "format-ethernet": "󰈀",
@@ -117,22 +115,25 @@
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-",
     "tooltip-format": "Volume {volume}%"
   },
-  "custom/network": {
-    "exec": "$HOME/.config/waybar/system-activity.py network",
-    "return-type": "json",
-    "restart-interval": 5,
-    "tooltip": true
-  },
   "tray": { "spacing": 11, "icon-size": 19 },
-  // The clock's format, locale and calendar come from Language & Region. This
-  // file is a stow symlink into the dotfiles repo, so the setting cannot be
-  // written here; waybar merges the generated fragment instead, and an option
-  // named in both files is won by this one -- which is why format is not here.
-  // A missing fragment is not an error: the clock falls back to waybar's own
-  // default format. The second fragment carries modules-left, for the same
-  // reason and by the same rule; see the note where modules-left used to be.
+  // Three fragments, one writer each -- render_region(), render_bar_workspaces()
+  // and render_bar_widgets(). A fragment carries only what it owns, because an
+  // option is won by whichever file names it first and a second writer of the
+  // same file would have to reproduce the first one's content or drop it.
+  //
+  //   waybar-clock.jsonc       the clock's format, locale and calendar, which
+  //                            come from Language & Region -- and which cannot be
+  //                            written here, because this file is a stow symlink
+  //                            into the dotfiles repo
+  //   waybar-workspaces.jsonc  modules-left
+  //   waybar-widgets.jsonc     height, modules-center, modules-right, and the
+  //                            definition of every widget they list
+  //
+  // A missing fragment is never an error, only a bar with less in it: the clock
+  // falls back to waybar's own default format, and the module lists to nothing.
   "include": ["$HOME/.local/state/garage/generated/waybar-clock.jsonc",
-              "$HOME/.local/state/garage/generated/waybar-workspaces.jsonc"],
+              "$HOME/.local/state/garage/generated/waybar-workspaces.jsonc",
+              "$HOME/.local/state/garage/generated/waybar-widgets.jsonc"],
   "clock": {
     "tooltip-format": "<tt>{calendar}</tt>"
   }

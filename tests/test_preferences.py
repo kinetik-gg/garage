@@ -155,9 +155,12 @@ class DeltaWriting(BackendTestCase):
         Stamped current, so the migration does not run: this is the write-time
         half of the policy.
         """
+        # Inserted straight after the section header rather than before whichever
+        # section happens to follow appearance: the schema decides that order, and
+        # a section added between the two used to move this stray key with it.
         write_stored(self.garage, full_document(
             self.garage, self.garage.PREFERENCES_VERSION, {})
-            .replace("[general]", "retired_setting = 3\n\n[general]"))
+            .replace("[appearance]\n", "[appearance]\nretired_setting = 3\n", 1))
         notes: list[str] = []
         config = self.garage.load_preferences(notes)
         self.assertEqual(3, config["appearance"]["retired_setting"])

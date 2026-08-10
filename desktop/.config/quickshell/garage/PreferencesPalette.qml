@@ -21,6 +21,7 @@ Scope {
         { key: "wallpaper", title: "Wallpaper", icon: "icons/image.svg", source: "WallpaperPane.qml" },
         { key: "displays", title: "Displays", icon: "icons/monitor.svg", source: "DisplaysPane.qml" },
         { key: "workspaces", title: "Workspaces", icon: "icons/squares-four.svg", source: "WorkspacesPane.qml" },
+        { key: "menubar", title: "Menu Bar", icon: "icons/browser.svg", source: "MenuBarPane.qml" },
         { key: "network", title: "Network", icon: "icons/wifi-high.svg", source: "NetworkPane.qml" },
         { key: "bluetooth", title: "Bluetooth", icon: "icons/bluetooth.svg", source: "BluetoothPane.qml" },
         { key: "sound", title: "Sound", icon: "icons/speaker-high.svg", source: "SoundPane.qml" },

@@ -131,6 +131,7 @@ BROWSER_FILE = GENERATED / "browser"
 LOCALE_ENV = GENERATED / "locale.env"
 WAYBAR_CLOCK = GENERATED / "waybar-clock.jsonc"
 WAYBAR_WORKSPACES = GENERATED / "waybar-workspaces.jsonc"
+WAYBAR_WIDGETS = GENERATED / "waybar-widgets.jsonc"
 
 # The bar's left side, which is what the workspace indicator is toggled out of.
 # waybar cannot append to an array from an include -- an option is won by
@@ -140,10 +141,60 @@ WAYBAR_WORKSPACES = GENERATED / "waybar-workspaces.jsonc"
 WAYBAR_MODULES_LEFT = ["custom/menu"]
 WAYBAR_WORKSPACE_MODULE = "ext/workspaces"
 
+# The right side's fixed tail, in order, after whatever widgets are switched on.
+# Here for the same reason as the left side: modules-right is now published from
+# the generated fragment, so config.jsonc must not name it at all -- an option
+# named there would be won by there and the toggles could never add to it.
+WAYBAR_MODULES_RIGHT = ["custom/notifications", "custom/launcher",
+                        "custom/control-center", "clock"]
+
+# The metric strips the bar can carry, in the order they sit on the right side.
+# The names are garage-metrics' own --bar-svg widgets, and each one is switched
+# by bar.monitor_<name> -- so this tuple, that program's WIDGETS and the schema
+# keys are one list, and adding a widget is a schema entry plus a name here.
+BAR_METRICS = ("cpu", "memory", "network", "temp", "disk", "gpu")
+
+# What bar.background offers. "blurred" is the translucent tint PALETTE already
+# carries in bar_bg; "transparent" is that same colour at zero alpha, so only
+# Hyprland's blur layer is left behind the bar. Both are compatible with the
+# layer rules and ignore_alpha already in hyprland.conf.
+BAR_BACKGROUNDS = ("blurred", "transparent")
+
+# The bar's spacing, as base pixel values at bar.padding_scale = 1.0. These used
+# to be literals in waybar-base.css, which meant the scale could not reach them:
+# GTK CSS has no arithmetic and no custom properties, so a scaled padding has to
+# be *generated*. waybar-base.css keeps the structure, the fonts and the radii
+# and names none of these; the generated stylesheet appends the computed block
+# after its @import, where a later rule of the same specificity wins.
+#
+# Deliberately not everything with a px in it. The dot geometry (6px idle, 20px
+# active), every font size and tooltip's border radius are shape rather than
+# spacing: scaling them would resize the thing, not the room around it. The dot's
+# *vertical* margin is excluded for a harder reason -- see waybar_spacing_css(),
+# where it is derived from the bar height instead.
+PADDING_TABLE = {
+    "menu_left": 13,      # #custom-menu padding-left
+    "menu_right": 20,     # #custom-menu padding-right, wider so the logo clears
+    "workspace_gap": 5,   # half the space between two workspace dots
+    "module": 12,         # the horizontal padding every text module shares
+    "image": 8,           # #image, which is every metric strip
+    "icon": 10,           # the notification / launcher / control-centre trio
+    "tray": 8,
+    "clock_right": 15,    # the bar's right edge, so the clock is not flush
+    "tooltip": 8,
+}
+
+# The idle workspace dot's diameter, which has to agree with the min-width and
+# min-height waybar-base.css gives `#workspaces button label`. Named here because
+# waybar_spacing_css() centres the dot against the bar height and needs to know
+# how much of that height the dot itself takes.
+WORKSPACE_DOT = 6
+
 # Toolkit configs that offer no include or indirection mechanism, so a theme
 # switch has to rewrite the file itself. They are deliberately not stowed: every
 # other path under ~/.config is a symlink into the dotfiles repo, and rewriting
 # one of those at runtime would edit a tracked file on every switch.
+WAYBAR_STYLE = CONFIG_HOME / "waybar/style.css"
 GTK3_SETTINGS = CONFIG_HOME / "gtk-3.0/settings.ini"
 GTK4_SETTINGS = CONFIG_HOME / "gtk-4.0/settings.ini"
 XSETTINGSD_CONF = CONFIG_HOME / "xsettingsd/xsettingsd.conf"
@@ -971,6 +1022,69 @@ PREFERENCE_SCHEMA: dict[str, dict] = {
         "route": "glass",
     },
 
+    # The menu bar. Two routes out, and the split is the one thing worth reading
+    # twice: bar_style reaches the *stylesheet* only, and bar_widgets reaches the
+    # *module list* only. They are separate files with separate writers -- see
+    # render_bar_widgets() on the one-writer-per-fragment rule -- so a key on the
+    # wrong route would silently rewrite the file that does not hold it.
+    #
+    # px, and the range is what a bar can be: below thirty the workspace dots and
+    # the icon trio stop fitting, above sixty it is a panel rather than a bar. The
+    # metric strips are sized from this rather than from a preference of their
+    # own, so a taller bar draws taller graphs with nothing to keep in step.
+    "bar.height": {
+        "default": 43, "kind": "int", "minimum": 30, "maximum": 60,
+        "route": "bar_widgets",
+    },
+    # A multiplier over PADDING_TABLE. One is the shipped spacing exactly, two is
+    # as loose as the bar gets before the right side runs into the clock; the
+    # default sits just above one because the shipped values were drawn for a
+    # 36px bar and the bar is taller now.
+    "bar.padding_scale": {
+        "default": 1.2, "kind": "float", "minimum": 1.0, "maximum": 2.0,
+        "route": "bar_style",
+    },
+    # From BAR_BACKGROUNDS, so the offered names and the alpha the stylesheet is
+    # written with cannot come apart.
+    "bar.background": {
+        "default": "transparent", "kind": "enum", "members": BAR_BACKGROUNDS,
+        "route": "bar_style",
+    },
+    # One switch per metric strip, all on the same route: each one adds or drops a
+    # module, and the list is published whole. The three that are on by default
+    # are the three every machine has; temperature, disk and GPU are off because
+    # each depends on hardware garage-metrics may find nothing for, and a strip
+    # that draws a flat line is worse than no strip.
+    "bar.monitor_cpu": {
+        "default": True, "kind": "bool", "route": "bar_widgets",
+    },
+    "bar.monitor_memory": {
+        "default": True, "kind": "bool", "route": "bar_widgets",
+    },
+    "bar.monitor_network": {
+        "default": True, "kind": "bool", "route": "bar_widgets",
+    },
+    "bar.monitor_temp": {
+        "default": False, "kind": "bool", "route": "bar_widgets",
+    },
+    "bar.monitor_disk": {
+        "default": False, "kind": "bool", "route": "bar_widgets",
+    },
+    "bar.monitor_gpu": {
+        "default": False, "kind": "bool", "route": "bar_widgets",
+    },
+    # On by default and safe to be: garage-ai-usage prints an empty text when the
+    # tokscale CLI is absent, and the module carries hide-empty-text, so a machine
+    # without it shows nothing rather than an empty box.
+    "bar.ai_usage": {
+        "default": True, "kind": "bool", "route": "bar_widgets",
+    },
+    # The centre of the bar, which is the only thing in it. media-status.py also
+    # hides itself when no player is running.
+    "bar.media_player": {
+        "default": True, "kind": "bool", "route": "bar_widgets",
+    },
+
     # Held as a desktop id rather than a command so the pane can show the name
     # and icon the application ships. An id that is no longer installed is left
     # alone -- any string will do -- because resolve_terminal() falls back on its
@@ -1177,6 +1291,13 @@ PREFERENCE_ROUTES: dict[str, tuple] = {
     "workspaces": ("apply_workspace_plan",),
     # Nothing in the compositor depends on this, so the desktop is left alone.
     "workspace_indicator": ("apply_bar_workspaces",),
+    # The two bar routes. Both end at reload_bar() and neither touches the
+    # compositor: the bar is a layer surface with its own config and its own
+    # stylesheet, and nothing in Hyprland reads either. They stay apart because
+    # they write different files -- the stylesheet and the module fragment -- and
+    # a shared route would make each writer responsible for the other's content.
+    "bar_style": ("apply_bar_style",),
+    "bar_widgets": ("apply_bar_widgets",),
 }
 
 # The route a key the table does not have takes, per section. Unreachable through
@@ -2480,6 +2601,116 @@ def render_bar_workspaces(config: dict) -> None:
                  json.dumps({"modules-left": modules}, indent=2) + "\n")
 
 
+def metric_size(height: int) -> int:
+    """How tall a metric strip is drawn for a bar of `height` px.
+
+    Half the bar, rounded up, which is the pairing that was probed live: size 22
+    on the 43px bar. Not the whole height -- waybar sizes the image widget to
+    this, and a strip as tall as the bar would push the bar's own padding out of
+    the way. Rounded up rather than down so the odd heights land where the probe
+    did: 43 // 2 is 21, and 22 is the number that was actually seen working.
+    """
+    return max(1, (int(height) + 1) // 2)
+
+
+def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
+    """The bar's right side and centre, as (right, centre, definitions).
+
+    Split out from the renderer so the order can be asserted without writing a
+    file. The order is BAR_METRICS' order, then the AI strip, then
+    WAYBAR_MODULES_RIGHT -- the static tail is last so the notification bell, the
+    launcher and the clock stay where they have always been however many widgets
+    are switched on in front of them.
+
+    Only the modules that are actually listed are defined. waybar does not mind a
+    definition for a module nobody lists, but a fragment that carries six exec
+    lines while the bar runs three of them reads as though all six are running.
+    """
+    bar = config["bar"]
+    size = metric_size(bar["height"])
+    right: list[str] = []
+    definitions: dict = {}
+    for name in BAR_METRICS:
+        if not bar[f"monitor_{name}"]:
+            continue
+        module = f"image#metric-{name}"
+        right.append(module)
+        # The one image-module form that works. `path` -- and every other
+        # spelling tried -- spins waybar at 100% CPU with no bar ever drawn; see
+        # the note in config.jsonc. This is exec + interval + size, probed live.
+        definitions[module] = {
+            "exec": f"$HOME/.local/bin/garage-metrics --bar-svg {name}",
+            "size": size,
+            "interval": 2,
+            "tooltip": True,
+            "on-click": "$HOME/.local/bin/garage-panel-toggle monitor",
+        }
+    if bar["ai_usage"]:
+        right.append("custom/ai-usage")
+        # Minutes, not seconds: the figure behind it is a rolling usage total that
+        # moves over a billing window, and tokscale is a subprocess per tick.
+        definitions["custom/ai-usage"] = {
+            "exec": "$HOME/.local/bin/garage-ai-usage --bar",
+            "return-type": "json",
+            "interval": 300,
+            "hide-empty-text": True,
+            "tooltip": True,
+            "on-click": "$HOME/.local/bin/garage-panel-toggle ai-usage",
+        }
+    right += WAYBAR_MODULES_RIGHT
+    center: list[str] = []
+    if bar["media_player"]:
+        center.append("custom/media")
+        # Moved here from config.jsonc verbatim but for on-click, which used to
+        # re-enter the script to raise the player and now opens the panel. The
+        # scroll and middle-click transport controls are unchanged.
+        definitions["custom/media"] = {
+            "exec": "$HOME/.config/waybar/media-status.py",
+            "return-type": "json",
+            "interval": 2,
+            "hide-empty-text": True,
+            "tooltip": True,
+            "on-click": "$HOME/.local/bin/garage-panel-toggle media",
+            "on-click-middle": "/usr/bin/playerctl --player=playerctld play-pause",
+            "on-click-right": "/usr/bin/playerctl --player=playerctld next",
+            "on-scroll-up": "/usr/bin/playerctl --player=playerctld previous",
+            "on-scroll-down": "/usr/bin/playerctl --player=playerctld next",
+        }
+    return right, center, definitions
+
+
+def render_bar_widgets(config: dict) -> None:
+    """Publish the bar's height, its centre and its whole right side.
+
+    A third fragment rather than more of either existing one, by the same rule
+    render_bar_workspaces() states: waybar-clock.jsonc is written on a region
+    change and waybar-workspaces.jsonc on a workspaces change, so a bar change
+    that shared either file would have to reproduce that writer's content or
+    silently drop it. One writer per fragment, three fragments.
+
+    `height` is here and not in config.jsonc for the reason modules-left is not
+    there either -- an option a named file declares is won by that file, and an
+    include can never override it. Everything the [bar] section decides about the
+    layout therefore has to leave config.jsonc entirely, which is why that file
+    now names neither height, nor modules-center, nor modules-right.
+
+    Written unconditionally, even with every widget switched off: the fragment is
+    then the bar's static tail and nothing else, which is a correct bar. An absent
+    fragment is not -- config.jsonc no longer names modules-right, so it would be
+    a bar with an empty right side. waybar.service runs `garage render-bar` as its
+    ExecStartPre for exactly that reason.
+    """
+    GENERATED.mkdir(parents=True, exist_ok=True)
+    right, center, definitions = bar_widget_modules(config)
+    fragment = {
+        "height": int(config["bar"]["height"]),
+        "modules-center": center,
+        "modules-right": right,
+    }
+    fragment.update(definitions)
+    atomic_write(WAYBAR_WIDGETS, json.dumps(fragment, indent=2) + "\n")
+
+
 def reload_bar() -> None:
     # waybar's default SIGUSR2 action is a full reload, which re-reads the
     # config and every file it includes. The bar is already signalled this way
@@ -3151,6 +3382,7 @@ def render_all(config: dict) -> None:
     render_region(config)
     render_workspaces(config)
     render_bar_workspaces(config)
+    render_bar_widgets(config)
     render_accent(config)
     render_corner_radius(config)
     render_theme(config)
@@ -3470,9 +3702,153 @@ def qt_palette_conf(scheme: str) -> str:
     return "\n".join([*header, "[ColorScheme]", *rows]) + "\n"
 
 
-def render_toolkits(scheme: str, *, root: Path | None = None) -> None:
+def bar_background(scheme: str, config: dict) -> str:
+    """The bar's body colour, as bar.background asks for it.
+
+    "blurred" is PALETTE's bar_bg unchanged -- the translucent light or dark tint
+    that gives Hyprland's blur something to frost. "transparent" is that same
+    colour at zero alpha, which leaves the blur layer alone behind the bar: the
+    rule and its ignore_alpha in hyprland.conf apply to the layer, not to the
+    fill, so the frost survives a body nobody can see.
+
+    Read from PALETTE rather than from a second table of alphas, so the tint the
+    bar is drawn with stays one number in one place.
+    """
+    tint = PALETTE[scheme]["bar_bg"]
+    if str(config["bar"]["background"]) != "transparent":
+        return tint
+    # The same three channels at zero alpha. Taken from the tint itself rather
+    # than from rgb_parts(), which reads an opaque hex: every composited role is
+    # spelled `rgba(r, g, b, a)`, so everything up to the last comma is the body.
+    return f"rgba({tint[tint.index('(') + 1:tint.rindex(',')]}, 0.00)"
+
+
+def waybar_spacing_css(config: dict) -> str:
+    """PADDING_TABLE, scaled by bar.padding_scale, as the rules it overrides.
+
+    Appended after the @import of waybar-base.css, which names none of these
+    paddings any more: GTK CSS has no arithmetic, so the only way a scale can
+    reach a padding is for the padding to be generated. Every selector here is
+    the same selector the base sheet uses for the rest of that rule, and a later
+    rule of equal specificity wins in GTK CSS -- so the fonts and colours come
+    from the import and the spacing from here.
+
+    The one value that is not scaled is the workspace dot's vertical margin. It
+    is what gives the dot's box its height, so it is derived from the bar height
+    instead: at scale 2.0 a scaled 15px would ask for a 66px box inside a 43px
+    bar, and the bar would either grow or clip the dots.
+    """
+    scale = float(config["bar"]["padding_scale"])
+    step = {name: max(0, round(base * scale)) for name, base in PADDING_TABLE.items()}
+    # Centred by hand rather than left to GTK, because the margin *is* the box:
+    # the label is WORKSPACE_DOT tall and the margin is the rest of the bar.
+    dot_margin = max(0, (int(config["bar"]["height"]) - WORKSPACE_DOT) // 2)
+    return f'''/* Spacing from PADDING_TABLE at bar.padding_scale {scale:g}. */
+#custom-menu {{
+  padding-left: {step["menu_left"]}px;
+  padding-right: {step["menu_right"]}px;
+}}
+
+#workspaces button {{
+  margin: 0 {step["workspace_gap"]}px;
+}}
+
+/* Not scaled: the bar height decides this one. See waybar_spacing_css(). */
+#workspaces button label {{
+  margin: {dot_margin}px 0;
+}}
+
+#custom-media,
+#custom-containers,
+#custom-microphone,
+#custom-smb,
+#custom-git,
+#custom-monitor,
+#custom-ai-usage,
+#pulseaudio,
+#clock {{
+  padding: 0 {step["module"]}px;
+}}
+
+#image {{
+  padding: 0 {step["image"]}px;
+}}
+
+#custom-notifications,
+#custom-launcher,
+#custom-control-center {{
+  padding-left: {step["icon"]}px;
+  padding-right: {step["icon"]}px;
+}}
+
+#tray {{
+  padding: 0 {step["tray"]}px;
+}}
+
+#clock {{
+  padding-right: {step["clock_right"]}px;
+}}
+
+tooltip {{
+  padding: {step["tooltip"]}px;
+}}
+'''
+
+
+def waybar_style_css(scheme: str, config: dict) -> str:
+    """The bar's whole generated stylesheet: colours, the import, the overrides.
+
+    A function of its own, and not just tidiness: bar.padding_scale is a slider,
+    so `set` fires one of these per notch, and render_bar_style() writes this file
+    alone rather than dragging the other twenty toolkit configs along with it.
+
+    Waybar uses Hyprland's native layer blur, with a light or dark translucent
+    tint selected from the resolved theme. The bar's foreground is the tint
+    direction itself -- white over the dark glass, black over the light --
+    because it is read against the desktop rather than against a surface.
+    """
+    colors = PALETTE[scheme]
+    bar_fg = colors["on_bg"]
+    bar_shadow = f'0 1px 2px {colors["shade"]}' if scheme == "dark" else "none"
+    dot = rgb_parts(colors["bar_dot"])
+    return f'''/* Generated by garage. */
+@define-color bar_bg {bar_background(scheme, config)};
+@define-color bar_edge {colors["bar_edge"]};
+@define-color bar_sheen {colors["bar_sheen"]};
+@define-color bar_fg {bar_fg};
+@define-color menu_fg {bar_fg};
+@define-color module_fg {bar_fg};
+@define-color module_fg_hover {bar_fg};
+@define-color module_fg_muted alpha({bar_fg}, 0.55);
+@define-color dot_idle rgba({dot}, 0.45);
+@define-color dot_hover rgba({dot}, 0.65);
+@define-color dot_active rgba({dot}, 0.95);
+@define-color urgent {colors["urgent"]};
+@define-color tooltip_bg {colors["tooltip_bg"]};
+@define-color tooltip_fg {colors["fg_strong"]};
+
+@import "waybar-base.css";
+
+{waybar_spacing_css(config)}
+/* The resolved theme chooses the foreground over Hyprland's frosted glass. */
+window#waybar * {{
+  text-shadow: {bar_shadow};
+}}
+
+tooltip, tooltip * {{
+  text-shadow: none;
+}}
+'''
+
+
+def render_toolkits(scheme: str, *, root: Path | None = None,
+                    config: dict | None = None) -> None:
     look = THEME_TOOLKITS[scheme]
     colors = PALETTE[scheme]
+    # Only the bar's stylesheet reads the configuration, and only for the [bar]
+    # section. The shipped defaults stand in when a caller has none to hand -- a
+    # palette render must never be the thing that fails for want of a preference.
+    config = config if config is not None else FALLBACK_DEFAULTS
     # The material still supplies the surface, but the terminal carries some body
     # of its own so text has something to sit on. Near-opaque would hide the
     # glass entirely, which is the trade to avoid.
@@ -3566,40 +3942,9 @@ configuration {{
 @theme "apple-{scheme}"
 ''')
 
-    # Waybar uses Hyprland's native layer blur, with a light or dark translucent
-    # tint selected from the resolved theme. The bar's foreground is the tint
-    # direction itself -- white over the dark glass, black over the light --
-    # because it is read against the desktop rather than against a surface.
-    bar_fg = colors["on_bg"]
-    bar_shadow = f'0 1px 2px {colors["shade"]}' if scheme == "dark" else "none"
-    dot = rgb_parts(colors["bar_dot"])
-    write("waybar/style.css", f'''/* Generated by garage. */
-@define-color bar_bg {colors["bar_bg"]};
-@define-color bar_edge {colors["bar_edge"]};
-@define-color bar_sheen {colors["bar_sheen"]};
-@define-color bar_fg {bar_fg};
-@define-color menu_fg {bar_fg};
-@define-color module_fg {bar_fg};
-@define-color module_fg_hover {bar_fg};
-@define-color module_fg_muted alpha({bar_fg}, 0.55);
-@define-color dot_idle rgba({dot}, 0.45);
-@define-color dot_hover rgba({dot}, 0.65);
-@define-color dot_active rgba({dot}, 0.95);
-@define-color urgent {colors["urgent"]};
-@define-color tooltip_bg {colors["tooltip_bg"]};
-@define-color tooltip_fg {colors["fg_strong"]};
-
-@import "waybar-base.css";
-
-/* The resolved theme chooses the foreground over Hyprland's frosted glass. */
-window#waybar * {{
-  text-shadow: {bar_shadow};
-}}
-
-tooltip, tooltip * {{
-  text-shadow: none;
-}}
-''')
+    # The bar's colours, its spacing and the base sheet it imports; see
+    # waybar_style_css(), which render_bar_style() also writes on its own.
+    write("waybar/style.css", waybar_style_css(scheme, config))
 
     write("swayosd/style.css", f'''/* Generated by garage. */
 @import "swayosd-{scheme}.css";
@@ -4071,6 +4416,38 @@ def apply_bar_workspaces(config: dict) -> None:
     reload_bar()
 
 
+def render_bar_style(config: dict) -> None:
+    """Rewrite the bar's stylesheet alone, for the resolved appearance.
+
+    Narrow on purpose, the same way `garage render-bar` is: bar.padding_scale is
+    a slider and the pane fires a `set` per notch, so going through render_theme()
+    would rewrite twenty toolkit configs -- GTK, Qt, rofi, kitty -- per notch, for
+    a change none of them can see. Only this one file carries [bar]'s styling.
+
+    write_marker(), not atomic_write(), for the reason every path under ~/.config
+    uses it: waybar watches this file, and a rename past its inotify watch is a
+    change it never hears about.
+    """
+    write_marker(WAYBAR_STYLE, waybar_style_css(resolve_theme(config), config))
+
+
+def apply_bar_style(config: dict) -> None:
+    """Rewrite the bar's stylesheet and have the bar re-read it."""
+    render_bar_style(config)
+    reload_bar()
+
+
+def apply_bar_widgets(config: dict) -> None:
+    """Republish the bar's widgets and have the bar re-read them.
+
+    Paired with its own renderer like apply_bar_workspaces() above, and for the
+    same reason: reload_bar() takes no configuration of its own, and a route step
+    is always handed one.
+    """
+    render_bar_widgets(config)
+    reload_bar()
+
+
 def render_theme(config: dict) -> None:
     """Write every file the resolved palette decides. Pure: nothing is signalled.
 
@@ -4090,7 +4467,10 @@ def render_theme(config: dict) -> None:
     # The bar's widgets draw their own SVG text, which no stylesheet reaches.
     # Publish the resolved theme foreground so they match Waybar's CSS.
     write_marker(BAR_FG_FILE, PALETTE[scheme]["on_bg"] + "\n")
-    render_toolkits(scheme)
+    # The configuration goes with it: the bar's stylesheet is the one file here
+    # that reads a preference rather than only the palette -- [bar]'s background
+    # and padding_scale, which have to be generated into the CSS.
+    render_toolkits(scheme, config=config)
 
 
 def push_theme(config: dict) -> None:
@@ -4346,9 +4726,10 @@ def apply_changed_preference(config: dict, dotted: str) -> None:
     if route is None:
         route = SECTION_ROUTES.get(section)
     if route is None:
-        # appearance and general name the key, because both have always been able
-        # to: every one of their keys routes somewhere of its own.
-        if section in {"appearance", "general"}:
+        # appearance, general and bar name the key, because each can: every one
+        # of their keys routes somewhere of its own, so there is no section-wide
+        # fallback to be reached and an unknown name really is unknown.
+        if section in {"appearance", "general", "bar"}:
             raise SettingsError(f"Unsupported {section} preference: {key}")
         raise SettingsError(f"Unsupported preference section: {section}")
     for step in PREFERENCE_ROUTES[route]:
@@ -6067,8 +6448,9 @@ def main(argv: list[str]) -> int:
             render_idle(load_preferences())
             response(True)
         elif command == "render-bar":
-            # waybar's modules-left now lives only in the generated fragment, so
-            # the bar comes up with an empty left side if it starts before the
+            # waybar's modules-left, modules-right, modules-center and height now
+            # live only in the generated fragments, so the bar comes up with an
+            # empty left side and an empty right side if it starts before the
             # first render. Its unit runs this first; narrow rather than a full
             # render, which would rewrite a dozen toolkit configs the bar does
             # not read. Nothing is signalled: the unit starts the bar right
@@ -6076,6 +6458,7 @@ def main(argv: list[str]) -> int:
             config = load_preferences()
             render_region(config)
             render_bar_workspaces(config)
+            render_bar_widgets(config)
             response(True)
         elif command == "render-wallpaper":
             # hyprpaper's ExecStartPre. Deliberately not "render": that rewrites
