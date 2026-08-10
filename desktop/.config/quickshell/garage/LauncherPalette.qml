@@ -1,14 +1,30 @@
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Wayland
 import QtQuick
-import QtQuick.Window
 import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
 
-FloatingWindow {
+// A layer surface, like every other transient palette in the shell, and unlike
+// the FloatingWindow this used to be. A toplevel is dismissed by losing focus,
+// and under focus-follows-mouse merely moving the pointer across another window
+// took that focus away -- so the launcher closed on a cursor twitch. A layer
+// surface has no such notion: it is dismissed by the focus grab below (a click
+// outside), by Escape, or by the keybind toggling the loader, and by nothing
+// else.
+PanelWindow {
     id: launcher
 
     signal dismissed()
+
+    // The monitor the launcher was asked for on, resolved by the shell at the
+    // moment of the keypress and held as a name. Deliberately not read live from
+    // Hyprland's focused monitor: under focus-follows-mouse that changes as soon
+    // as the pointer crosses a screen edge, and an open launcher that jumps to
+    // another monitor when the cursor drifts is the bug this file is fixing
+    // wearing a different hat.
+    required property string targetScreenName
 
     property string query: ""
     property int selected: 0
@@ -16,18 +32,44 @@ FloatingWindow {
     // found, which the launcher has to say rather than silently doing nothing.
     property string browserId: ""
     property bool browserResolved: false
+    // Armed a turn after the surface exists: the grab is cleared as it is taken
+    // if it is armed in the same turn as the click that opened the launcher.
+    property bool grabReady: false
 
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
 
-    title: "Launcher"
+    function targetScreen() {
+        for (let index = 0; index < Quickshell.screens.length; ++index) {
+            const candidate = Quickshell.screens[index];
+            if (candidate.name === launcher.targetScreenName)
+                return candidate;
+        }
+        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
+    }
+
+    screen: launcher.targetScreen()
     implicitWidth: 640
     implicitHeight: Math.min(
         72 + Math.max(results.count, 1) * rowHeight + 12,
         72 + maxRows * rowHeight + 12)
-    minimumSize: Qt.size(640, 124)
     color: "transparent"
+    focusable: true
+    aboveWindows: true
+    exclusiveZone: 0
     surfaceFormat.opaque: false
+
+    // Deliberately no anchors: a layer surface anchored to nothing is centred on
+    // its output by the compositor, which is where a launcher belongs. The
+    // implicit size below is the whole geometry, so the height still tracks the
+    // result count as it did when this was a window.
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "garage-launcher"
+    // Exclusive rather than OnDemand: this is a typing surface, and the search
+    // field has to have the keyboard the moment it appears rather than after a
+    // click. The grab below is the dismissal gesture, not the way in.
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
     // The search engine is resolved by garage and published as a
     // URL template, so the launcher does not have to know the engine list.
@@ -123,7 +165,14 @@ FloatingWindow {
 
     onQueryChanged: rebuild()
     onBrowserResolvedChanged: rebuild()
-    Component.onCompleted: { rebuild(); input.forceActiveFocus(); }
+    Component.onCompleted: {
+        rebuild();
+        // The compositor hands an exclusive layer surface the keyboard as it
+        // maps; this is what points it at the search field rather than at the
+        // window, so the first keystroke after the bind is typed into the query.
+        input.forceActiveFocus();
+        Qt.callLater(() => launcher.grabReady = true);
+    }
 
     function activate(index) {
         if (index < 0 || index >= results.count)
@@ -146,14 +195,6 @@ FloatingWindow {
     ContinuousRectangle {
         anchors.fill: parent
         color: Theme.dialogTint
-
-        // FloatingWindow wraps the window rather than being one, so focus is
-        // read through the attached Window property from inside the content.
-        // Clicking another window takes focus away, which is the dismissal
-        // gesture; dragging keeps focus, so it does not fight moving it.
-        readonly property bool windowActive: Window.active
-        onWindowActiveChanged: if (!windowActive && launcher.browserResolved)
-            launcher.dismissed()
 
         ColumnLayout {
             anchors.fill: parent
@@ -294,6 +335,18 @@ FloatingWindow {
                     onClicked: noBrowser.visible = false
                 }
             }
+        }
+    }
+
+    // Clicking anywhere outside the launcher dismisses it. This is the whole of
+    // the click-outside gesture: moving the pointer over another window does not
+    // clear a grab, which is exactly why the launcher is a layer surface now.
+    HyprlandFocusGrab {
+        active: launcher.grabReady
+        windows: [launcher]
+        onCleared: {
+            if (launcher.grabReady)
+                launcher.dismissed();
         }
     }
 

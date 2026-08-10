@@ -64,7 +64,7 @@ hl.window_rule({
 -- Translucent shell surfaces use compositor blur behind their own alpha.
 hl.layer_rule({
     name = "apple-dark-shell-blur",
-    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center)$" },
+    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-launcher|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
@@ -85,7 +85,10 @@ hl.layer_rule({
 })
 hl.layer_rule({
     name = "static-shell-layers",
-    match = { namespace = "^(waybar|rofi|garage-session-menu|garage-session-confirmation)$" },
+    -- garage-launcher takes rofi's slot here: it replaced rofi, and a launcher
+    -- opened from a keystroke should be under the pointer already rather than
+    -- sliding in.
+    match = { namespace = "^(waybar|rofi|garage-launcher|garage-session-menu|garage-session-confirmation)$" },
     no_anim = true,
 })
 hl.window_rule({ match = { class = "^([Bb]lender)$" }, opacity = "1.0 override" })

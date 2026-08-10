@@ -10,6 +10,7 @@ ShellRoot {
     property string preferencesSection: "general"
     property string notificationScreenName: ""
     property string controlCenterScreenName: ""
+    property string launcherScreenName: ""
 
     // Which transient surface is on screen, by name, or "" for none.
     //
@@ -197,6 +198,7 @@ ShellRoot {
         active: shell.activeSurface === "launcher"
 
         LauncherPalette {
+            targetScreenName: shell.launcherScreenName
             onDismissed: shell.closeSurface("launcher")
         }
     }
@@ -326,7 +328,13 @@ ShellRoot {
                 shell.closeSurface("launcher");
                 return;
             }
-            shell.toggleSurface("launcher");
+            // The monitor is resolved here, on the keypress, rather than bound
+            // inside the palette: the launcher is a layer surface now, and the
+            // focused monitor moves with the pointer, so a binding would walk an
+            // open launcher between screens.
+            shell.toggleSurface("launcher", () => {
+                shell.launcherScreenName = shell.focusedScreenName();
+            });
         }
 
         function closeLauncher(): void {
