@@ -37,6 +37,14 @@ Item {
     // the owner asked out of the visualiser.
     property color ink: Theme.text
 
+    // The process-owning item may cover a larger masked surface while the graph
+    // occupies only its lower portion. Defaults preserve standalone/full-item
+    // behaviour; MediaPalette uses these to keep the baseline off its frame.
+    property real graphHeight: height
+    property real graphLeftMargin: 0
+    property real graphRightMargin: 0
+    property real graphBottomMargin: 0
+
     // Frequency bands, which are the points of the line. Fixed rather than
     // fitted to the width the way the old bar row's count was: a line has no
     // per-point width to fit, and the count is now a statement about the audio
@@ -169,10 +177,19 @@ Item {
     // report, it is a flat line, and before the first frame it is nothing.
     GraphChart {
         id: spectrum
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: visualizer.graphLeftMargin
+        anchors.rightMargin: visualizer.graphRightMargin
+        anchors.bottomMargin: visualizer.graphBottomMargin
+        height: Math.max(0, visualizer.graphHeight)
         points: visualizer.levels
         ink: visualizer.ink
         active: true
+        smoothCurve: true
+        strokeWidth: 0
+        fillOpacity: 0.20
         midlineOpacity: 0
         baselineOpacity: 0
         idleLabel: ""

@@ -80,6 +80,14 @@ hl.layer_rule({
     match = { namespace = "^(garage-notification-center|garage-control-center|garage-monitor|garage-ai-usage)$" },
     animation = "slide right",
 })
+-- Media is centred rather than attached to an edge. Fade the layer itself so
+-- Glass, the frame and the QML contents enter and leave as one surface; a QML
+-- opacity animation only faded the client content and doubled the map animation.
+hl.layer_rule({
+    name = "media-palette-fade",
+    match = { namespace = "^(garage-media)$" },
+    animation = "fade",
+})
 -- Toast popups only: they appear involuntarily and can carry message content,
 -- so they stay out of screen shares. The full panels -- the notification and
 -- control centers, and the monitor, media and AI usage panels the bar opens --

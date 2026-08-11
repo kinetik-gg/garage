@@ -196,12 +196,6 @@ PanelWindow {
         borderWidth: 1
         borderColor: Theme.frameOuter
 
-        NumberAnimation on opacity {
-            from: 0
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
-        }
 
         // Inner hairline one inset px in from the outer one, the double
         // frame every other panel in the shell draws.
@@ -212,6 +206,7 @@ PanelWindow {
             power: Theme.cornerPower
             borderWidth: 1
             borderColor: Theme.frameInner
+            z: 1
         }
 
         // The panel eats the clicks that land in the gaps between its controls
@@ -224,24 +219,47 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        // Drawn first, so everything else in the panel stacks over it. Kept
-        // inside `panel` rather than at the window level so the superellipse
-        // clip on the panel's corners clips it too, and bound to the
-        // window's own visibility so nothing here samples audio while the
-        // palette is not on screen.
-        //
-        // Left and right to the panel's own edges: this is a line graph across
-        // the full content width now, not a centred row of bars, and the whole
-        // point of the change is that the frequency axis spans the panel.
+        // Capture the live visualizer explicitly, then mask that texture with
+        // the panel's superellipse. `hideSource` suppresses only the original
+        // scene-graph node; unlike hiding an ancestor Item, it keeps the source
+        // renderable for the effect. The mask follows the frame's inside edge.
         CavaVisualizer {
-            id: visualizer
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.margins: 1
-            height: parent.height * 0.72
-            opacity: 0.4
+            id: visualizerSource
+            anchors.fill: parent
+            graphHeight: height
+            graphLeftMargin: 2
+            graphRightMargin: 2
+            // GraphChart keeps half its stroke inside its own bounds, so one
+            // logical pixel puts that stroke immediately above the inner frame.
+            graphBottomMargin: 1
             running: media.visible
+        }
+
+        ShaderEffectSource {
+            id: visualizerTexture
+            anchors.fill: parent
+            sourceItem: visualizerSource
+            hideSource: true
+            live: true
+            recursive: true
+            visible: false
+        }
+
+        ContinuousRectangle {
+            id: visualizerMask
+            anchors.fill: parent
+            radius: panel.radius
+            power: panel.power
+            outlineInset: 1
+            color: "white"
+            visible: false
+        }
+
+        OpacityMask {
+            anchors.fill: parent
+            source: visualizerTexture
+            maskSource: visualizerMask
+            opacity: 0.4
         }
 
         ColumnLayout {
@@ -274,11 +292,17 @@ PanelWindow {
                 // same approach MediaCard uses, at a larger size for the
                 // standalone panel.
                 ContinuousRectangle {
+                    id: artWell
                     Layout.preferredWidth: 64
                     Layout.preferredHeight: 64
                     Layout.alignment: Qt.AlignVCenter
                     radius: Theme.controlRadius
                     color: Theme.iconWell
+
+                    // Keep the last successful frame while the next track's art
+                    // loads. Without this, every asynchronous source change swaps
+                    // to the fallback for a frame or two and reads as a flicker.
+                    property bool hasArtwork: false
 
                     Image {
                         id: art
@@ -286,11 +310,22 @@ PanelWindow {
                         source: media.artUrl
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
+                        retainWhileLoading: true
                         sourceSize.width: 128
                         sourceSize.height: 128
                         smooth: true
                         mipmap: true
                         visible: false
+                        onSourceChanged: {
+                            if (source === "")
+                                artWell.hasArtwork = false;
+                        }
+                        onStatusChanged: {
+                            if (status === Image.Ready)
+                                artWell.hasArtwork = true;
+                            else if (status === Image.Error || status === Image.Null)
+                                artWell.hasArtwork = false;
+                        }
                     }
 
                     ContinuousRectangle {
@@ -303,7 +338,7 @@ PanelWindow {
 
                     OpacityMask {
                         anchors.fill: art
-                        visible: media.artUrl !== "" && art.status === Image.Ready
+                        visible: artWell.hasArtwork
                         source: art
                         maskSource: artMask
                         cached: true
@@ -327,7 +362,7 @@ PanelWindow {
                     ColorOverlay {
                         anchors.fill: artFallback
                         source: artFallback
-                        visible: media.artUrl === "" || art.status !== Image.Ready
+                        visible: !artWell.hasArtwork
                         color: Theme.iconWellGlyph
                         cached: true
                     }

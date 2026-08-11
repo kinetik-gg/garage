@@ -60,6 +60,11 @@ Item {
     property real midlineOpacity: 0.10
     property real baselineOpacity: 0.16
 
+    // Opt-in because the activity charts intentionally retain the straight-line
+    // geometry of garage-metrics. The media spectrum enables this to turn its
+    // closely spaced frequency bands into one continuous cubic Bézier curve.
+    property bool smoothCurve: false
+
     implicitWidth: 160
     implicitHeight: 40
 
@@ -112,11 +117,44 @@ Item {
             return chart.emptyPath;
         const span = values.length - 1;
         const width = chart.plotRight - chart.plotLeft;
-        let path = "";
+        const coordinates = [];
         for (let index = 0; index < values.length; ++index) {
-            const x = chart.plotLeft + index * width / span;
-            const y = chart.plotBottom - values[index] / 100 * chart.plotHeight;
-            path += (index === 0 ? "M " : " L ") + x.toFixed(2) + " " + y.toFixed(2);
+            coordinates.push({
+                x: chart.plotLeft + index * width / span,
+                y: chart.plotBottom - values[index] / 100 * chart.plotHeight
+            });
+        }
+
+        let path = "M " + coordinates[0].x.toFixed(2) + " "
+            + coordinates[0].y.toFixed(2);
+        if (!chart.smoothCurve) {
+            for (let index = 1; index < coordinates.length; ++index)
+                path += " L " + coordinates[index].x.toFixed(2) + " "
+                    + coordinates[index].y.toFixed(2);
+            return path;
+        }
+
+        // Convert a Catmull-Rom spline to cubic Bézier segments. Repeating the
+        // first/last points supplies stable endpoint tangents. Control-point Y
+        // values are clamped to the plot so even a large adjacent-band jump can
+        // never make the curve escape the chart vertically.
+        for (let index = 0; index < coordinates.length - 1; ++index) {
+            const previous = index > 0 ? coordinates[index - 1] : coordinates[index];
+            const current = coordinates[index];
+            const next = coordinates[index + 1];
+            const following = index + 2 < coordinates.length
+                ? coordinates[index + 2] : next;
+            const control1X = current.x + (next.x - previous.x) / 6;
+            const control1Y = Math.max(chart.plotTop, Math.min(chart.plotBottom,
+                current.y + (next.y - previous.y) / 6));
+            const control2X = next.x - (following.x - current.x) / 6;
+            const control2Y = Math.max(chart.plotTop, Math.min(chart.plotBottom,
+                next.y - (following.y - current.y) / 6));
+            path += " C " + Number(control1X).toFixed(2) + " "
+                + Number(control1Y).toFixed(2) + " "
+                + Number(control2X).toFixed(2) + " "
+                + Number(control2Y).toFixed(2) + " "
+                + Number(next.x).toFixed(2) + " " + Number(next.y).toFixed(2);
         }
         return path;
     }

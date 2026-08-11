@@ -8,6 +8,10 @@ Item {
     property color color: "transparent"
     property color borderColor: "transparent"
     property real borderWidth: 0
+    // Insets the rendered outline while the Item itself keeps its full size.
+    // Useful for texture masks, where changing the mask item's geometry would
+    // make GraphicalEffects rescale it back over the source texture.
+    property real outlineInset: 0
     property real radius: Theme.cornerRadius
     property real power: Theme.cornerPower
     readonly property real effectiveRadius: Math.min(
@@ -63,7 +67,10 @@ Item {
             strokeColor: root.borderWidth > 0 ? root.borderColor : "transparent"
             strokeWidth: root.borderWidth
             joinStyle: ShapePath.RoundJoin
-            PathSvg { path: root.outlinePath(root.borderWidth / 2) }
+            PathSvg {
+                path: root.outlinePath(Math.max(root.outlineInset,
+                    root.borderWidth / 2))
+            }
         }
     }
 
