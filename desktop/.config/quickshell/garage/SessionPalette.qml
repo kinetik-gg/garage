@@ -16,6 +16,13 @@ Scope {
     signal actionSelected(string action)
     signal dismissed()
 
+    // Dismissal goes through the motion so the exit has time to play; the shell
+    // destroys this the moment dismissed() lands. Every path out of the menu
+    // calls this rather than the signal.
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
             const candidate = Quickshell.screens[index];
@@ -85,7 +92,7 @@ Scope {
 
     function cancelPending() {
         menu.pendingAction = "";
-        menu.dismissed();
+        menu.requestDismissal();
     }
 
     function updateWaybarGeometry(text) {
@@ -136,6 +143,14 @@ Scope {
         exclusiveZone: 0
         surfaceFormat.opaque: false
 
+        // Top-to-bottom entrance, shared with every other palette. See
+        // PanelMotion. The menu drops out of the logo it was opened from, the
+        // same way the bar's panels drop out of their own modules.
+        PanelMotion {
+            id: motion
+            onFinished: menu.dismissed()
+        }
+
         anchors {
             left: true
             top: true
@@ -143,7 +158,7 @@ Scope {
 
         margins.left: 6
         // Overlay surfaces already begin below Waybar's exclusive zone.
-        margins.top: Theme.windowGutter
+        margins.top: motion.surfaceTop
 
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "garage-session-menu"
@@ -152,7 +167,8 @@ Scope {
 
         Rectangle {
             anchors.fill: parent
-            color: Theme.menuTint
+            color: Theme.contentTint
+            opacity: motion.opacity
 
             ColumnLayout {
                 anchors.fill: parent
@@ -278,7 +294,7 @@ Scope {
         Rectangle {
             id: confirmationDialog
             anchors.fill: parent
-            color: Theme.dialogTint
+            color: Theme.contentTint
 
             MouseArea {
                 anchors.fill: parent
@@ -436,7 +452,7 @@ Scope {
             if (menu.pendingAction !== "")
                 menu.cancelPending();
             else
-                menu.dismissed();
+                menu.requestDismissal();
         }
     }
 }

@@ -7,9 +7,11 @@ import QtQuick.Layouts
 // The activity monitor: the six numbers the bar keeps in 44px strips, drawn at a
 // size they can be read at.
 //
-// A right-anchored layer surface, the same idiom as the control centre next to
-// it: a panel the next click outside dismisses, above fullscreen clients so it
-// stays reachable, as tall as what it holds rather than full height. Everything
+// A layer surface hung under the bar's metric strips -- anchored to the top and
+// to the left, because a left anchor plus a margin is the only way to place one
+// at a computed X. Otherwise the same idiom as the control centre next to it: a
+// panel the next click outside dismisses, above fullscreen clients so it stays
+// reachable, as tall as what it holds rather than full height. Everything
 // in it comes from one process -- `garage-metrics --stream`, one JSON object per
 // line at 1 Hz -- which is the same collector the bar renders its strips from, so
 // the panel and the bar cannot disagree about what the machine is doing.
@@ -19,12 +21,20 @@ import QtQuick.Layouts
 // as the panel maps and reaped as it unmaps, and the destruction guard at the
 // foot of the file covers the case where the window is destroyed outright (which
 // is the normal one -- the shell keeps its palettes in LazyLoaders).
+//
+// Which is also why the panel opens on PaletteCache: a destroyed window takes
+// its readings with it, and a monitor that shows an empty shell for a second
+// every time it is toggled is one nobody can glance at. The header says which
+// of the two it is showing.
 PanelWindow {
     id: monitor
 
     // The monitor this was asked for, resolved by the shell at the moment of the
     // click and held as a name. Same contract as every other palette.
     required property string targetScreenName
+    // Horizontal centre of the complete Waybar metrics group in target-screen
+    // coordinates. Negative for keyboard launches, which use the output centre.
+    required property real targetAnchorX
 
     signal dismissed()
 
@@ -80,6 +90,24 @@ PanelWindow {
     // below are the instantaneous picture the overall graph does not show, which
     // is one core pinned while the average looks idle.
     property var coreValues: []
+
+    // False until this window has seen a snapshot of its own. Everything on
+    // screen before that came out of PaletteCache and is as old as `cachedAt`
+    // says, so this is what stands between a restored panel and a panel claiming
+    // to be reporting at 1 Hz.
+    property bool live: false
+
+    // When the reading this panel opened with was taken, read once at
+    // construction: PaletteCache.monitorSavedAt moves on as this window's own
+    // snapshots are stored, and the header is talking about the seed rather than
+    // about the newest thing in the cache.
+    property real cachedAt: 0
+
+    // Ages the header's cached-reading label. A second's granularity for a
+    // label printed in seconds, and only while there is a cached reading with
+    // nothing live over it -- once the collector answers there is nothing left
+    // to age.
+    property real now: Date.now()
 
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
@@ -200,8 +228,53 @@ PanelWindow {
             monitor.seedSeries(seed, "gpu_vram", monitor.gpuVramHistory);
     }
 
+    // The state a reopened panel is rebuilt from, and the whole of what this
+    // window contributes to PaletteCache. The series are handed over by
+    // reference rather than copied because pushPoint and seedSeries both replace
+    // the array instead of mutating it -- what is stored here can never be
+    // rewritten behind the cache's back.
+    function snapshotState() {
+        return {
+            latest: monitor.latest,
+            coreValues: monitor.coreValues,
+            cpu: monitor.cpuHistory,
+            temp: monitor.tempHistory,
+            memory: monitor.memoryHistory,
+            networkDown: monitor.networkDownHistory,
+            networkUp: monitor.networkUpHistory,
+            disk: monitor.diskHistory,
+            gpu: monitor.gpuHistory,
+            gpuVram: monitor.gpuVramHistory
+        };
+    }
+
+    // Draw the previous reading before the collector has said anything. The
+    // stream overwrites all of it within a second or two -- its first line is
+    // the bar's own stored history, which is longer and more current than
+    // anything this panel accumulated while it was up -- so this is a first
+    // frame with figures in it rather than a source of truth.
+    function restore() {
+        const state = PaletteCache.monitorState;
+        if (!state)
+            return;
+        monitor.latest = state.latest;
+        monitor.coreValues = state.coreValues;
+        monitor.cpuHistory = state.cpu;
+        monitor.tempHistory = state.temp;
+        monitor.memoryHistory = state.memory;
+        monitor.networkDownHistory = state.networkDown;
+        monitor.networkUpHistory = state.networkUp;
+        monitor.diskHistory = state.disk;
+        monitor.gpuHistory = state.gpu;
+        monitor.gpuVramHistory = state.gpuVram;
+        monitor.cachedAt = PaletteCache.monitorSavedAt;
+    }
+
+    Component.onCompleted: monitor.restore()
+
     function applySnapshot(snapshot) {
         monitor.latest = snapshot;
+        monitor.live = true;
 
         const cpu = snapshot.cpu || null;
         if (cpu !== null) {
@@ -261,6 +334,10 @@ PanelWindow {
                 monitor.gpuVramHistory = monitor.pushPoint(monitor.gpuVramHistory,
                     vramUsed / vramTotal * 100);
         }
+
+        // Last, once every series above has been pushed, so the cache never
+        // holds a half-updated second.
+        PaletteCache.saveMonitor(monitor.snapshotState());
     }
 
     // The discrete card if there is one: the collector sorts discrete first, and
@@ -371,32 +448,44 @@ PanelWindow {
         const total = monitor.number(monitor.gpuInfo.vram_total);
         const used = monitor.number(monitor.gpuInfo.vram_used);
         if (!isNaN(used) && !isNaN(total) && total > 0)
-            return "VRAM " + monitor.formatBytes(used) + " / " + monitor.formatBytes(total);
+            return "vram " + monitor.formatBytes(used) + " / " + monitor.formatBytes(total);
         if (!isNaN(total) && total > 0)
-            return "VRAM " + monitor.formatBytes(total);
-        return "VRAM n/a";
+            return "vram " + monitor.formatBytes(total);
+        return "vram n/a";
     }
 
+    // The one place the panel says where its figures came from. A restored panel
+    // is showing real readings taken at a real moment, which is worth having on
+    // screen -- but it is not reporting at 1 Hz yet, and the difference between
+    // "this is the machine now" and "this is the machine when you last looked"
+    // is the whole reason to read the panel.
     readonly property string statusText: {
         if (monitor.streamError !== "")
             return monitor.streamError;
+        if (monitor.live)
+            return "1 Hz";
         if (monitor.latest === null)
             return "connecting…";
-        return "1 Hz";
+        return "cached · " + PaletteCache.formatAge(monitor.cachedAt, monitor.now);
     }
 
     // -- Surface ---------------------------------------------------------------
 
     screen: monitor.targetScreen()
-    implicitWidth: 390
-    // Sized to its content and clamped at both ends: at 1px because a layer
-    // surface with no height is not a surface the compositor can show and the
-    // column's implicit height is zero for the frame before its children are laid
-    // out, and at the output's height because a panel taller than the screen
-    // loses its bottom rows with no way to reach them. The Flickable below is
-    // what makes the clamp survivable.
-    implicitHeight: Math.max(1, Math.min(
-        body.implicitHeight + monitor.contentMargin * 2, monitor.maxSurfaceHeight))
+    // Two equal monitoring columns with enough plot width to remain readable,
+    // clamped for small outputs rather than allowed to cross an edge.
+    implicitWidth: {
+        const target = monitor.targetScreen();
+        const available = target ? target.width : 1920;
+        return Math.max(1, Math.min(740, available - Theme.windowGutter * 2));
+    }
+    // Exactly its content, floored at 1px because a layer surface with no height
+    // is not a surface the compositor can show and the column's implicit height
+    // is zero for the frame before its children are laid out. Deliberately no
+    // ceiling: a maximum would have to either clip a section away or scroll it
+    // out of sight, and this panel is six readings that are all meant to be
+    // readable at a glance.
+    implicitHeight: Math.max(1, body.implicitHeight + monitor.contentMargin * 2)
     color: "transparent"
     // OnDemand rather than Exclusive, as with the control centre: this is a panel
     // the user clicks into, not a modal, and an exclusive surface takes every
@@ -408,26 +497,40 @@ PanelWindow {
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
-    // An overlay surface already begins below the bar's exclusive zone, and the
-    // gutter is measured from there, so the room left is the output less the bar
-    // and both gutters. A layer surface cannot ask how tall the bar is, so it is
-    // taken at a generous 84px; whatever that allowance is wrong by is absorbed
-    // by the Flickable rather than shown as a cut-off row.
-    readonly property real maxSurfaceHeight: {
+
+    // A layer surface can be placed at an arbitrary horizontal position by
+    // anchoring it left and supplying that position as a margin. Centre around
+    // the full metrics group, then clamp the result into the output. Keybind
+    // launches have no bar geometry and use the output centre instead.
+    readonly property real surfaceLeft: {
         const target = monitor.targetScreen();
-        const available = target ? target.height : 1080;
-        return Math.max(240, available - 84 - Theme.windowGutter * 2);
+        const available = target ? target.width : 1920;
+        const desired = monitor.targetAnchorX >= 0
+            ? monitor.targetAnchorX - monitor.implicitWidth / 2
+            : (available - monitor.implicitWidth) / 2;
+        return Math.max(Theme.windowGutter, Math.min(desired,
+            available - monitor.implicitWidth - Theme.windowGutter));
     }
 
-    // Top and right only: the panel is as tall as its contents, so anchoring the
-    // bottom as well would stretch it down the screen.
     anchors {
         top: true
-        right: true
+        left: true
     }
 
-    margins.top: Theme.windowGutter
-    margins.right: Theme.windowGutter
+    // -- Motion ----------------------------------------------------------------
+
+    PanelMotion {
+        id: motion
+        onFinished: monitor.dismissed()
+    }
+
+    function requestDismissal() {
+        if (!monitor.holdOpen)
+            motion.dismiss();
+    }
+
+    margins.top: motion.surfaceTop
+    margins.left: monitor.surfaceLeft
 
     WlrLayershell.layer: WlrLayer.Overlay
     // Not yet in the compositor's glass layer_namespaces or its blur rules --
@@ -468,19 +571,27 @@ PanelWindow {
         }
     }
 
-    // Set for the last instant of this window's life. The window is normally
-    // destroyed rather than hidden -- the shell keeps its palettes in LazyLoaders
-    // -- and a destroyed window notifies nothing, so the binding above never sees
-    // the close; clearing `running` by hand is what makes sure the collector goes
-    // with the panel instead of being left streaming into a pipe with no reader,
-    // and the flag is what stops the kill that follows from being reported as a
-    // failure.
-    property bool closing: false
-
-    Component.onDestruction: {
-        monitor.closing = true;
-        stream.running = false;
+    // Advances `now`, which only the cached-reading label re-reads. Stopped the
+    // moment a snapshot lands: the label it ages is gone by then, and a panel
+    // that is up all day must not be waking once a second for a string nobody
+    // is looking at.
+    Timer {
+        interval: 1000
+        repeat: true
+        running: monitor.visible && !monitor.live && monitor.latest !== null
+        onTriggered: monitor.now = Date.now()
     }
+
+    // Read through to the motion, which owns the lifecycle. Guards the
+    // collector's exit code below: the window is normally destroyed rather than
+    // hidden -- the shell keeps its palettes in LazyLoaders -- and a destroyed
+    // window notifies nothing, so the binding never sees the close. Clearing
+    // `running` by hand is what makes sure the collector goes with the panel
+    // instead of being left streaming into a pipe with no reader, and this flag
+    // is what stops the kill that follows from being reported as a failure.
+    readonly property bool closing: motion.closing
+
+    Component.onDestruction: stream.running = false
 
     // One metric's block: the well every section is drawn in, so the six of them
     // cannot drift apart. Same recessed hairline-framed shape SettingsGroup uses
@@ -515,23 +626,36 @@ PanelWindow {
         borderWidth: 1
         borderColor: Theme.frameOuter
 
-        NumberAnimation on opacity {
-            from: 0
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
-        }
+        // The panel always fills its surface exactly. Anything less leaves bare
+        // surface around it, and the compositor blurs that: an uncovered edge
+        // does not read as empty, it reads as a second panel behind this one.
+        // Which is why the entrance is a move and a fade and nothing else -- a
+        // scale would shrink the panel inside its own surface for the length of
+        // the animation and put that border back on screen every time it opened.
+        opacity: motion.opacity
 
-        // The content body, one inset pixel in so the frame stays the outermost
-        // thing drawn. Every other glass palette in the shell leaves this to the
-        // material; this one carries its own because a panel of 10px figures over
-        // whatever is playing behind it has to hold its contrast itself.
+
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
         ContinuousRectangle {
             anchors.fill: parent
             anchors.margins: 1
             radius: Theme.insetRadius(panel.radius, 1)
             power: Theme.cornerPower
             color: Theme.contentTint
+        }
+
+        // Inner hairline one inset px in from the outer one, the double frame
+        // every other panel in the shell draws. insetRadius keeps the two
+        // concentric at every corner radius setting.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
             borderWidth: 1
             borderColor: Theme.frameInner
         }
@@ -542,249 +666,315 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        // Scrolls only when the clamp above has actually bitten, so on a normal
-        // display this is an ordinary column that happens to be inside a
-        // Flickable.
-        Flickable {
-            id: scroll
+        // Nothing scrolls and nothing is clipped. The window takes its height
+        // from this column, so every section is on screen by construction and
+        // there is no reading the panel can put out of reach.
+        Item {
+            id: content
             anchors.fill: parent
             anchors.margins: monitor.contentMargin
-            clip: true
-            contentWidth: scroll.width
-            contentHeight: body.implicitHeight
-            boundsBehavior: Flickable.StopAtBounds
-            interactive: scroll.contentHeight > scroll.height
 
             ColumnLayout {
                 id: body
-                // The Flickable's width rather than the content item's: the
-                // content item is as wide as contentWidth, which is bound to this
-                // width in turn, and going through it would be a longer way round
-                // to the same number.
-                width: scroll.width
+                width: content.width
                 spacing: 9
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 12
 
-                    Text {
-                        text: "Activity"
-                        color: Theme.text
-                        font.family: Theme.sans
-                        font.pixelSize: 17
-                        font.weight: Font.DemiBold
-                        renderType: Text.NativeRendering
+                    ColumnLayout {
+                        spacing: 2
+
+                        Text {
+                            text: "System Activity"
+                            color: Theme.text
+                            font.family: Theme.sans
+                            font.pixelSize: 17
+                            font.weight: Font.DemiBold
+                            renderType: Text.NativeRendering
+                        }
+
+                        Text {
+                            text: "Rolling telemetry · two minutes per plot"
+                            color: Theme.textDisabled
+                            font.family: Theme.sans
+                            font.pixelSize: 10
+                            renderType: Text.NativeRendering
+                        }
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
-                        Layout.maximumWidth: 180
-                        text: monitor.statusText
-                        color: monitor.streamError !== ""
-                            ? Theme.text : Theme.textDisabled
-                        font.family: Theme.sans
-                        font.pixelSize: 11
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignRight
-                        renderType: Text.NativeRendering
-                    }
-                }
-
-                MenuSeparator {}
-
-                // -- CPU ---------------------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "CPU"
-                        value: isNaN(monitor.cpuLoad)
-                            ? "--" : monitor.cpuLoad.toFixed(0) + "%"
-                        extra: monitor.cpuLoadAverage
-                        points: monitor.cpuHistory
-                        active: !isNaN(monitor.cpuLoad) && monitor.cpuLoad >= 25
-                        graphHeight: 38
-                    }
-
-                    // Per-core load, one bar each. Fixed height whether or not
-                    // there are any yet, so the section does not jump a row taller
-                    // on the first snapshot.
-                    Item {
-                        Layout.fillWidth: true
-                        implicitHeight: 16
+                    ContinuousRectangle {
+                        Layout.preferredWidth: statusRow.implicitWidth + 20
+                        Layout.preferredHeight: 28
+                        radius: Theme.controlRadius
+                        power: Theme.cornerPower
+                        color: Theme.hover
+                        borderWidth: 1
+                        borderColor: Theme.frameInner
 
                         RowLayout {
-                            anchors.fill: parent
-                            spacing: 2
+                            id: statusRow
+                            anchors.centerIn: parent
+                            spacing: 7
 
-                            Repeater {
-                                model: monitor.coreValues
+                            Rectangle {
+                                Layout.preferredWidth: 6
+                                Layout.preferredHeight: 6
+                                radius: 3
+                                color: Theme.text
+                                // Dim for anything that is not a live stream, so
+                                // the pill reads as reporting or not reporting
+                                // from across the room without the text.
+                                opacity: monitor.live && monitor.streamError === ""
+                                    ? 0.85 : 0.45
+                            }
 
-                                delegate: Item {
-                                    required property var modelData
-                                    // A core with no reading is drawn as idle
-                                    // rather than as a gap: the row's job is to
-                                    // show one core pinned against the rest, and a
-                                    // missing slot would read as a missing core.
-                                    readonly property real load: {
-                                        const value = monitor.percent(modelData);
-                                        return isNaN(value) ? 0 : value;
-                                    }
-
-                                    Layout.fillWidth: true
-                                    // Equal preferred widths and fillWidth on all
-                                    // of them is what divides the row evenly
-                                    // without any child measuring the row it is
-                                    // in.
-                                    Layout.preferredWidth: 1
-                                    Layout.fillHeight: true
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 1
-                                        color: Theme.hoverStrong
-                                    }
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.bottom: parent.bottom
-                                        // A pixel of floor, so an idle core is a
-                                        // slot rather than nothing at all.
-                                        height: Math.max(1,
-                                            parent.height * parent.load / 100)
-                                        radius: 1
-                                        // Monochrome like every graph above it,
-                                        // and for the same reason: the accent
-                                        // said nothing about a core's load that
-                                        // its height was not already saying, and
-                                        // it was the one coloured thing left in
-                                        // the panel. The well behind it is
-                                        // Theme.hoverStrong, which is this same
-                                        // white at 9% -- so the pair is one
-                                        // colour at two opacities.
-                                        color: Theme.text
-                                        opacity: 0.85
-                                    }
-                                }
+                            Text {
+                                text: monitor.statusText
+                                color: monitor.streamError !== ""
+                                    ? Theme.text : Theme.textMuted
+                                font.family: Theme.mono
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                                renderType: Text.NativeRendering
                             }
                         }
                     }
                 }
 
-                // -- CPU temperature ---------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "CPU Temperature"
-                        value: isNaN(monitor.cpuCelsius)
-                            ? "n/a" : monitor.cpuCelsius.toFixed(0) + "°C"
-                        points: monitor.tempHistory
-                        active: !isNaN(monitor.cpuCelsius) && monitor.cpuCelsius >= 75
-                        detail: monitor.cpuSensor + " · 0–100°C"
-                        // A machine with no package sensor has nothing to collect,
-                        // so it says that instead of promising a line later.
-                        idleLabel: monitor.latest !== null && isNaN(monitor.cpuCelsius)
-                            ? "no sensor" : "collecting…"
-                    }
-                }
+                MenuSeparator {}
 
-                // -- Memory ------------------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "Memory"
-                        value: isNaN(monitor.memoryPercent)
-                            ? "--" : monitor.memoryPercent.toFixed(0) + "%"
-                        // PSI some avg10: the share of the last ten seconds in
-                        // which at least one task was stalled waiting on memory.
-                        // It moves before anything is visibly wrong, which is why
-                        // it is here next to a usage figure that does not.
-                        extra: isNaN(monitor.memoryPressure)
-                            ? "pressure n/a"
-                            : "pressure " + monitor.memoryPressure.toFixed(2) + "%"
-                        points: monitor.memoryHistory
-                        active: !isNaN(monitor.memoryPercent) && monitor.memoryPercent >= 70
-                        detail: monitor.memoryInfo === null ? ""
-                            : monitor.formatBytes(monitor.memoryInfo.used) + " of "
-                                + monitor.formatBytes(monitor.memoryInfo.total)
-                                + " · " + monitor.formatBytes(monitor.memoryInfo.available)
-                                + " available"
-                    }
-                }
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 10
+                    rowSpacing: 10
+                    uniformCellWidths: true
 
-                // -- Network -----------------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "Network"
-                        value: "↓ " + monitor.formatRate(monitor.networkDown)
-                        extra: "↑ " + monitor.formatRate(monitor.networkUp)
-                        points: monitor.networkDownHistory
-                        // Up as the second line, no fill and a dimmer stroke: it
-                        // shares the axis with down and is the subordinate of the
-                        // two on a desktop.
-                        secondaryPoints: monitor.networkUpHistory
-                        active: !isNaN(monitor.networkDown) && !isNaN(monitor.networkUp)
-                            && (monitor.networkDown + monitor.networkUp) / monitor.mib >= 0.1
-                        detail: {
-                            const iface = monitor.networkInfo
-                                ? String(monitor.networkInfo.iface || "").trim() : "";
-                            return (iface !== "" ? iface : "no default route")
-                                + " · down over up · log scale to 2 GiB/s";
+                    // -- CPU ---------------------------------------------------
+                    Section {
+                        Layout.row: 0
+                        Layout.column: 0
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "CPU"
+                            value: isNaN(monitor.cpuLoad)
+                                ? "--" : monitor.cpuLoad.toFixed(0) + "%"
+                            extra: monitor.cpuLoadAverage
+                            points: monitor.cpuHistory
+                            active: !isNaN(monitor.cpuLoad) && monitor.cpuLoad >= 25
+                            graphHeight: 48
+                        }
+
+                        // Per-core load, one bar each. Fixed height whether or not
+                        // there are any yet, so the section does not jump a row taller
+                        // on the first snapshot.
+                        Item {
+                            Layout.fillWidth: true
+                            implicitHeight: 16
+
+                            RowLayout {
+                                anchors.fill: parent
+                                spacing: 2
+
+                                Repeater {
+                                    model: monitor.coreValues
+
+                                    delegate: Item {
+                                        required property var modelData
+                                        // A core with no reading is drawn as idle
+                                        // rather than as a gap: the row's job is to
+                                        // show one core pinned against the rest, and a
+                                        // missing slot would read as a missing core.
+                                        readonly property real load: {
+                                            const value = monitor.percent(modelData);
+                                            return isNaN(value) ? 0 : value;
+                                        }
+
+                                        Layout.fillWidth: true
+                                        // Equal preferred widths and fillWidth on all
+                                        // of them is what divides the row evenly
+                                        // without any child measuring the row it is
+                                        // in.
+                                        Layout.preferredWidth: 1
+                                        Layout.fillHeight: true
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 1
+                                            color: Theme.hoverStrong
+                                        }
+
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.bottom: parent.bottom
+                                            // A pixel of floor, so an idle core is a
+                                            // slot rather than nothing at all.
+                                            height: Math.max(1,
+                                                parent.height * parent.load / 100)
+                                            radius: 1
+                                            // Monochrome like every graph above it,
+                                            // and for the same reason: the accent
+                                            // said nothing about a core's load that
+                                            // its height was not already saying, and
+                                            // it was the one coloured thing left in
+                                            // the panel. The well behind it is
+                                            // Theme.hoverStrong, which is this same
+                                            // white at 9% -- so the pair is one
+                                            // colour at two opacities.
+                                            color: Theme.text
+                                            opacity: 0.85
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                // -- Disk --------------------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "Disk"
-                        value: "r " + monitor.formatRate(monitor.diskRead)
-                        extra: "w " + monitor.formatRate(monitor.diskWrite)
-                        // Read and write are graphed as one line rather than two.
-                        // That is what the bar stores and therefore what the seed
-                        // can restore: splitting the line would mean opening this
-                        // section empty every time, and the two figures above are
-                        // where the split actually gets read.
-                        points: monitor.diskHistory
-                        active: !isNaN(monitor.diskRead) && !isNaN(monitor.diskWrite)
-                            && (monitor.diskRead + monitor.diskWrite) / monitor.mib >= 1
-                        detail: {
-                            const device = monitor.diskInfo
-                                ? String(monitor.diskInfo.device || "").trim() : "";
-                            const read = isNaN(monitor.diskRead) ? 0 : monitor.diskRead;
-                            const write = isNaN(monitor.diskWrite) ? 0 : monitor.diskWrite;
-                            return (device !== "" ? device : "no block device")
-                                + " · total " + monitor.formatRate(read + write)
-                                + " · log scale to 2 GiB/s";
+                    // -- CPU temperature ---------------------------------------
+                    Section {
+                        Layout.row: 1
+                        Layout.column: 1
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "CPU Temperature"
+                            value: isNaN(monitor.cpuCelsius)
+                                ? "n/a" : monitor.cpuCelsius.toFixed(0) + "°C"
+                            points: monitor.tempHistory
+                            active: !isNaN(monitor.cpuCelsius) && monitor.cpuCelsius >= 75
+                            detail: monitor.cpuSensor + " · 0–100°C"
+                            // A machine with no package sensor has nothing to collect,
+                            // so it says that instead of promising a line later.
+                            idleLabel: monitor.latest !== null && isNaN(monitor.cpuCelsius)
+                                ? "no sensor" : "collecting…"
                         }
                     }
-                }
 
-                // -- GPU ---------------------------------------------------
-                Section {
-                    MetricGraphRow {
-                        label: "GPU"
-                        value: isNaN(monitor.gpuLoad)
-                            ? "n/a" : monitor.gpuLoad.toFixed(0) + "%"
-                        extra: monitor.gpuVramLabel
-                        points: monitor.gpuHistory
-                        secondaryPoints: monitor.gpuVramHistory
-                        active: !isNaN(monitor.gpuLoad) && monitor.gpuLoad >= 10
-                        detail: {
-                            if (monitor.gpuInfo === null)
-                                return monitor.latest === null ? "" : "no GPU found";
-                            const parts = [
-                                String(monitor.gpuInfo.name || "GPU").trim(),
-                                monitor.gpuLoadKind
-                            ];
-                            const celsius = monitor.number(monitor.gpuInfo.temp_c);
-                            if (!isNaN(celsius))
-                                parts.push(celsius.toFixed(0) + "°C");
-                            if (monitor.gpuCount > 1)
-                                parts.push("+" + (monitor.gpuCount - 1) + " more GPU");
-                            return parts.join(" · ");
+                    // -- Memory ------------------------------------------------
+                    Section {
+                        Layout.row: 1
+                        Layout.column: 0
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "Memory"
+                            value: isNaN(monitor.memoryPercent)
+                                ? "--" : monitor.memoryPercent.toFixed(0) + "%"
+                            // PSI some avg10: the share of the last ten seconds in
+                            // which at least one task was stalled waiting on memory.
+                            // It moves before anything is visibly wrong, which is why
+                            // it is here next to a usage figure that does not.
+                            extra: isNaN(monitor.memoryPressure)
+                                ? "pressure n/a"
+                                : "pressure " + monitor.memoryPressure.toFixed(2) + "%"
+                            points: monitor.memoryHistory
+                            active: !isNaN(monitor.memoryPercent) && monitor.memoryPercent >= 70
+                            detail: monitor.memoryInfo === null ? ""
+                                : monitor.formatBytes(monitor.memoryInfo.used) + " of "
+                                    + monitor.formatBytes(monitor.memoryInfo.total)
+                                    + " · " + monitor.formatBytes(monitor.memoryInfo.available)
+                                    + " available"
                         }
-                        idleLabel: monitor.latest !== null && monitor.gpuInfo === null
-                            ? "no GPU" : "collecting…"
+                    }
+
+                    // -- Network -----------------------------------------------
+                    Section {
+                        Layout.row: 2
+                        Layout.column: 0
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "Network"
+                            value: "↓ " + monitor.formatRate(monitor.networkDown)
+                            extra: "↑ " + monitor.formatRate(monitor.networkUp)
+                            points: monitor.networkDownHistory
+                            // Up as the second line, no fill and a dimmer stroke: it
+                            // shares the axis with down and is the subordinate of the
+                            // two on a desktop.
+                            secondaryPoints: monitor.networkUpHistory
+                            active: !isNaN(monitor.networkDown) && !isNaN(monitor.networkUp)
+                                && (monitor.networkDown + monitor.networkUp) / monitor.mib >= 0.1
+                            detail: {
+                                const iface = monitor.networkInfo
+                                    ? String(monitor.networkInfo.iface || "").trim() : "";
+                                return (iface !== "" ? iface : "no default route")
+                                    + " · down over up · log scale to 2 GiB/s";
+                            }
+                        }
+                    }
+
+                    // -- Disk --------------------------------------------------
+                    Section {
+                        Layout.row: 2
+                        Layout.column: 1
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "Disk"
+                            // Same two glyphs the network row and the bar's network
+                            // strip use, rather than an r/w of its own: a pair of
+                            // throughput figures reads the same way everywhere in the
+                            // shell, and the detail line below says which is which.
+                            value: "↓ " + monitor.formatRate(monitor.diskRead)
+                            extra: "↑ " + monitor.formatRate(monitor.diskWrite)
+                            // Read and write are graphed as one line rather than two.
+                            // That is what the bar stores and therefore what the seed
+                            // can restore: splitting the line would mean opening this
+                            // section empty every time, and the two figures above are
+                            // where the split actually gets read.
+                            points: monitor.diskHistory
+                            active: !isNaN(monitor.diskRead) && !isNaN(monitor.diskWrite)
+                                && (monitor.diskRead + monitor.diskWrite) / monitor.mib >= 1
+                            detail: {
+                                const device = monitor.diskInfo
+                                    ? String(monitor.diskInfo.device || "").trim() : "";
+                                const read = isNaN(monitor.diskRead) ? 0 : monitor.diskRead;
+                                const write = isNaN(monitor.diskWrite) ? 0 : monitor.diskWrite;
+                                return (device !== "" ? device : "no block device")
+                                    + " · read over write · total "
+                                    + monitor.formatRate(read + write)
+                                    + " · log scale to 2 GiB/s";
+                            }
+                        }
+                    }
+
+                    // -- GPU ---------------------------------------------------
+                    Section {
+                        Layout.row: 0
+                        Layout.column: 1
+                        Layout.fillHeight: true
+
+                        MetricGraphRow {
+                            label: "GPU"
+                            value: isNaN(monitor.gpuLoad)
+                                ? "n/a" : monitor.gpuLoad.toFixed(0) + "%"
+                            extra: monitor.gpuVramLabel
+                            points: monitor.gpuHistory
+                            secondaryPoints: monitor.gpuVramHistory
+                            active: !isNaN(monitor.gpuLoad) && monitor.gpuLoad >= 10
+                            detail: {
+                                if (monitor.gpuInfo === null)
+                                    return monitor.latest === null ? "" : "no GPU found";
+                                const parts = [
+                                    String(monitor.gpuInfo.name || "GPU").trim(),
+                                    monitor.gpuLoadKind
+                                ];
+                                const celsius = monitor.number(monitor.gpuInfo.temp_c);
+                                if (!isNaN(celsius))
+                                    parts.push(celsius.toFixed(0) + "°C");
+                                if (monitor.gpuCount > 1)
+                                    parts.push("+" + (monitor.gpuCount - 1) + " more GPU");
+                                return parts.join(" · ");
+                            }
+                            idleLabel: monitor.latest !== null && monitor.gpuInfo === null
+                                ? "no GPU" : "collecting…"
+                        }
                     }
                 }
             }
@@ -793,9 +983,6 @@ PanelWindow {
 
     Shortcut {
         sequence: "Escape"
-        onActivated: {
-            if (!monitor.holdOpen)
-                monitor.dismissed();
-        }
+        onActivated: monitor.requestDismissal()
     }
 }

@@ -2,18 +2,33 @@
 set -eu
 
 usage() {
-    echo "usage: garage-panel-toggle notifications|control-center|monitor|media|ai-usage" >&2
+    echo "usage: garage-panel-toggle notifications|control-center|monitor [WIDGET]|media|ai-usage" >&2
     exit 1
 }
 
-[ $# -eq 1 ] || usage
+[ $# -ge 1 ] || usage
 
 case "$1" in
-    notifications)   fn=notificationsOn ;;
-    control-center)  fn=controlCenterOn ;;
-    monitor)         fn=monitorOn ;;
-    media)           fn=mediaOn ;;
-    ai-usage)        fn=aiUsageOn ;;
+    notifications)   [ $# -eq 1 ] || usage; fn=notificationsOn ;;
+    control-center)  [ $# -eq 1 ] || usage; fn=controlCenterOn ;;
+    monitor)
+        # The strip that was clicked. The dashboard shows all six either way and
+        # is anchored under the group rather than under one strip, so this names
+        # the click rather than steering it; it is validated here so a bar
+        # fragment naming a widget the collector does not have is caught at the
+        # click instead of being passed into the shell.
+        [ $# -le 2 ] || usage
+        fn=monitorOn
+        widget=${2:-}
+        if [ -n "$widget" ]; then
+            case "$widget" in
+                cpu|memory|network|temp|disk|gpu) ;;
+                *) usage ;;
+            esac
+        fi
+        ;;
+    media)           [ $# -eq 1 ] || usage; fn=mediaOn ;;
+    ai-usage)        [ $# -eq 1 ] || usage; fn=aiUsageOn ;;
     *)               usage ;;
 esac
 
@@ -37,9 +52,64 @@ output=$(jq -nr \
 
 [ -n "$output" ] || exit 1
 
-# Every arm above now names a function that ships in shell.qml. Letting qs
-# fail to stderr (rather than swallowing it with `|| true`) keeps a missing
-# one visible instead of silently doing nothing; either way this exits 0 so
-# the bind never reports an error to the compositor over a shell function
-# that simply has not shipped yet.
-qs -c garage ipc call shell "$fn" "$output" || true
+# The monitor dashboard is anchored under the centre of Waybar's metric group.
+# The status tail follows that group and reaches a known distance in from the
+# right edge of the output, so the group's centre is the output's width, less
+# that tail, less half the width the strips themselves add up to. No cursor
+# coordinate participates: clicking either edge of a strip must put the surface
+# in the same place. Both numbers are read back out of what Garage generated --
+# see WAYBAR_STATUS_TAIL_WIDTH and bar_widget_modules().
+if [ "$1" = monitor ]; then
+    state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+    config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+    fragment="$state_home/garage/generated/waybar-widgets.jsonc"
+    stylesheet="$config_home/waybar/style.css"
+    # The fallbacks are the shipped defaults. A missing or hand-edited runtime
+    # file must not turn a bar click into a no-op under `set -e`; losing these
+    # only costs the anchor its accuracy, and the panel clamps itself into the
+    # output regardless of what it is handed.
+    image_padding=8
+    tail_width=300
+    if [ -r "$stylesheet" ]; then
+        configured_padding=$(sed -n \
+            '/^#image {/,/^}/s/.*padding: 0 \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        image_padding=${configured_padding:-8}
+        configured_tail=$(sed -n \
+            '/^#status-tail {/,/^}/s/.*min-width: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        tail_width=${configured_tail:-300}
+    fi
+    module_padding=$((image_padding * 2))
+    metric_width=0
+    if [ -r "$fragment" ]; then
+        if configured_width=$(jq -nr \
+            --argjson padding "$module_padding" \
+            --slurpfile config "$fragment" '
+                $config[0] as $c
+                | [
+                    $c["group/monitoring"].modules[] as $module
+                    | select($module | startswith("image#metric-"))
+                    | $c[$module].size + $padding
+                ] | add // 0
+            ' 2>/dev/null); then
+            metric_width=$configured_width
+        fi
+    fi
+    anchor_x=$(jq -nr \
+        --argjson monitors "$monitors" \
+        --arg output "$output" \
+        --argjson metrics "$metric_width" \
+        --argjson tail "$tail_width" '
+            first(
+                $monitors[]
+                | select(.name == $output)
+                | (((.width / .scale) - $tail - ($metrics / 2)) | floor)
+            )
+        ')
+    qs -c garage ipc call shell "$fn" "$output" "$anchor_x" || true
+else
+    # Letting qs fail to stderr keeps a missing function visible instead of
+    # silently doing nothing; either way the compositor binding still succeeds.
+    qs -c garage ipc call shell "$fn" "$output" || true
+fi

@@ -27,10 +27,12 @@ PanelWindow {
 
     readonly property int contentMargin: 12
 
-    // Caffeine is held by this surface, so it lasts as long as the panel does.
-    // A hold that outlives the panel needs an inhibitor in the shell rather than
-    // in a transient palette; see the note on the inhibitor below.
+    // Caffeine is the shell's, not this panel's. The inhibitor has to outlive
+    // the surface that toggles it -- a hold that ends when the control centre is
+    // dismissed is a hold nobody asked for -- so the state is owned by shell.qml
+    // and this is the input half of it.
     property bool caffeine: false
+    signal caffeineToggled()
 
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
@@ -153,6 +155,16 @@ PanelWindow {
 
     // Top and right only: the panel is as tall as its contents, so anchoring the
     // bottom as well would stretch it down the screen.
+    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
+    PanelMotion {
+        id: motion
+        onFinished: centre.dismissed()
+    }
+
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
     anchors {
         top: true
         right: true
@@ -160,7 +172,7 @@ PanelWindow {
 
     // Overlay surfaces already begin below Waybar's exclusive zone, so the top
     // gutter is measured from there rather than from the top of the screen.
-    margins.top: Theme.windowGutter
+    margins.top: motion.surfaceTop
     margins.right: Theme.windowGutter
 
     WlrLayershell.layer: WlrLayer.Overlay
@@ -180,17 +192,9 @@ PanelWindow {
         objects: centre.sink ? [centre.sink] : []
     }
 
-    // Held by this window, so the compositor drops the inhibitor when the panel
-    // closes. That also means Caffeine only lasts while the panel is open --
-    // making it persist needs the inhibitor to live in the shell rather than in
-    // a surface that is destroyed on dismissal.
-    IdleInhibitor {
-        enabled: centre.caffeine
-        window: centre
-    }
-
     ContinuousRectangle {
         id: panel
+        opacity: motion.opacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower
@@ -201,11 +205,17 @@ PanelWindow {
         borderWidth: 1
         borderColor: Theme.frameOuter
 
-        NumberAnimation on opacity {
-            from: 0
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            color: Theme.contentTint
         }
 
         // Inner hairline one inset px in from the outer one, the double frame
@@ -289,7 +299,7 @@ PanelWindow {
                     title: "Caffeine"
                     subtitle: centre.caffeine ? "Display stays awake" : "Off"
                     active: centre.caffeine
-                    onToggled: centre.caffeine = !centre.caffeine
+                    onToggled: centre.caffeineToggled()
                 }
 
                 ControlTile {
@@ -390,8 +400,11 @@ PanelWindow {
         }
     }
 
+    // Through the motion, not straight to dismissed(): the signal is what makes
+    // the shell destroy this window, so raising it here would take the panel off
+    // screen on the frame Escape lands and leave the exit with nothing to play.
     Shortcut {
         sequence: "Escape"
-        onActivated: centre.dismissed()
+        onActivated: centre.requestDismissal()
     }
 }

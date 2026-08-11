@@ -69,24 +69,23 @@ hl.layer_rule({
     blur_popups = true,
     ignore_alpha = 0.15,
 })
--- The panels that come in from the right edge, which is every panel anchored to
--- it: the two centres and the two the bar opens beside them. garage-media is
--- deliberately not here -- it is anchored to the top edge alone and centred
--- across the output, so sliding it in from the right would carry it sideways
--- across the screen. It is left to the compositor's default the same way
--- garage-screenshot, the other surface that is not against a side, already is.
+-- Every panel the shell opens animates itself, and moves its own layer surface
+-- to do it: PanelMotion.qml drives margins.top, so the compositor repositions
+-- the whole surface -- Glass, frame and contents together -- on every frame.
+--
+-- They are all top-to-bottom now. The two centres and the AI usage panel used to
+-- slide in from the right edge they are anchored to, which said the panel had
+-- arrived from off-screen rather than from the control that opened it; the ones
+-- not against a side could not use that rule at all, so the shell had three
+-- different entrances for one kind of surface.
+--
+-- no_anim rather than no rule at all, so a compositor animation cannot move the
+-- same surface underneath the client's own.
 hl.layer_rule({
-    name = "control-center-slide",
-    match = { namespace = "^(garage-notification-center|garage-control-center|garage-monitor|garage-ai-usage)$" },
-    animation = "slide right",
-})
--- Media is centred rather than attached to an edge. Fade the layer itself so
--- Glass, the frame and the QML contents enter and leave as one surface; a QML
--- opacity animation only faded the client content and doubled the map animation.
-hl.layer_rule({
-    name = "media-palette-fade",
-    match = { namespace = "^(garage-media)$" },
-    animation = "fade",
+    name = "shell-palette-client-animation",
+    match = { namespace = "^(garage-notification-center|garage-control-center"
+        .. "|garage-ai-usage|garage-media|garage-monitor)$" },
+    no_anim = true,
 })
 -- Toast popups only: they appear involuntarily and can carry message content,
 -- so they stay out of screen shares. The full panels -- the notification and

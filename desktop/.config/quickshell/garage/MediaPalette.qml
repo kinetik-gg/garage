@@ -155,11 +155,21 @@ PanelWindow {
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
+    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
+    PanelMotion {
+        id: motion
+        onFinished: media.dismissed()
+    }
+
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
     anchors {
         top: true
     }
 
-    margins.top: Theme.windowGutter
+    margins.top: motion.surfaceTop
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-media"
@@ -186,6 +196,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
+        opacity: motion.opacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower
@@ -196,6 +207,19 @@ PanelWindow {
         borderWidth: 1
         borderColor: Theme.frameOuter
 
+
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            color: Theme.contentTint
+        }
 
         // Inner hairline one inset px in from the outer one, the double
         // frame every other panel in the shell draws.
@@ -525,8 +549,11 @@ PanelWindow {
         }
     }
 
+    // Through the motion, not straight to dismissed(): the signal is what makes
+    // the shell destroy this window, so raising it here would take the panel off
+    // screen on the frame Escape lands and leave the exit with nothing to play.
     Shortcut {
         sequence: "Escape"
-        onActivated: media.dismissed()
+        onActivated: media.requestDismissal()
     }
 }

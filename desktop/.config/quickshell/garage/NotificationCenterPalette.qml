@@ -297,17 +297,48 @@ PanelWindow {
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
+    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
+    PanelMotion {
+        id: motion
+        onFinished: centre.dismissed()
+    }
+
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
     anchors {
         top: true
         right: true
         bottom: true
     }
 
+    // The animated top margin, made an integer once rather than at each margin.
+    //
+    // Margins are ints and PanelMotion's travel is a real, so letting the two
+    // margins below each convert it themselves is two conversions of a moving
+    // fractional value that do not always sum to the constant the compensation
+    // depends on: at a top of 3.7 they come out 3 and 8, which is 11 rather than
+    // 12 and so a surface one pixel taller than it was the frame before. A pixel
+    // is not the stretch this arrangement was written to stop, but it is a
+    // relayout of the list, and those are the whole cost. One integer, used
+    // twice, and the pair sums to the same number on every frame.
+    readonly property int surfaceTopPx: Math.round(motion.surfaceTop)
+
     // Overlay surfaces already begin below Waybar's exclusive zone, so the top
     // gutter is measured from there rather than from the top of the screen.
-    margins.top: Theme.windowGutter
+    margins.top: centre.surfaceTopPx
     margins.right: Theme.windowGutter
-    margins.bottom: Theme.windowGutter
+    // The bottom margin moves with the top, by the same amount in the opposite
+    // direction, so the entrance translates this surface instead of resizing it.
+    //
+    // It is anchored top and bottom because the list wants the full height of
+    // the output. That makes margins.top a size as well as a position: animated
+    // on its own it stretched a 390x1025 surface on every frame of the
+    // entrance, and each of those frames was a full relayout of the notification
+    // list and a re-blur of the whole thing. Holding the height constant is what
+    // makes this cost a move rather than sixty relayouts a second.
+    margins.bottom: Theme.windowGutter * 2 - centre.surfaceTopPx
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-notification-center"
@@ -350,6 +381,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
+        opacity: motion.opacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower
@@ -363,11 +395,17 @@ PanelWindow {
         // Whole-panel appear. One animation rather than a fade on every card:
         // the list is rebuilt whenever the history changes, and a per-card fade
         // would flash the entire column every time a notification arrived.
-        NumberAnimation on opacity {
-            from: 0
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            color: Theme.contentTint
         }
 
         // Inner hairline one inset px in from the outer one, the double frame
@@ -687,8 +725,11 @@ PanelWindow {
         }
     }
 
+    // Through the motion, not straight to dismissed(): the signal is what makes
+    // the shell destroy this window, so raising it here would take the panel off
+    // screen on the frame Escape lands and leave the exit with nothing to play.
     Shortcut {
         sequence: "Escape"
-        onActivated: centre.dismissed()
+        onActivated: centre.requestDismissal()
     }
 }

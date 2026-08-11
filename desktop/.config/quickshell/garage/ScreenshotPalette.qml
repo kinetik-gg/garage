@@ -54,7 +54,7 @@ PanelWindow {
     ContinuousRectangle {
         id: panel
         anchors.fill: parent
-        color: Theme.toolbarTint
+        color: Theme.contentTint
         // Matches the pill the compositor draws beneath it; the default 14px
         // radius left a rounded rectangle sitting on top of a pill.
         radius: height / 2

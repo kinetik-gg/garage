@@ -38,24 +38,41 @@ window#waybar {
   padding: 0;
 }
 
+/* The button is the click target, and it is deliberately much bigger than the
+   dot it contains: the dot is 6px and a pointer is not. Its width comes from the
+   generated horizontal padding, which puts the space between two dots inside a
+   button rather than between them, and its height from the dot's own margin.
+   Radius and hover tint to match every other module on the bar -- what is about
+   to be clicked has to be visible, and on a 6px mark it is the only way to see
+   the target at all. */
 #workspaces button {
   min-width: 0;
   min-height: 0;
-  padding: 0;
+  border-radius: 8px;
   background: transparent;
   color: transparent;
   box-shadow: none;
 }
 
-/* The dot itself. Its vertical margin is generated from the bar height, which
-   is what gives this box its height -- see waybar_spacing_css(). */
+#workspaces button:hover {
+  background: @module_hover_bg;
+}
+
+/* After :hover, for the reason given at the press block further down. */
+#workspaces button:active {
+  background: @module_press_bg;
+}
+
+/* The dot itself. Its vertical margin is generated, and is what gives the dot's
+   box -- and therefore the button's hover tint -- its height. Derived from
+   MODULE_HOVER_PILL so the tint matches every other module's; see
+   waybar_spacing_css(). */
 #workspaces button label {
   min-width: 6px;
   min-height: 6px;
   border-radius: 999px;
   background: @dot_idle;
   font-size: 0;
-  transition: min-width 180ms ease-out, background-color 180ms ease-out;
 }
 
 #workspaces button:hover label {
@@ -127,6 +144,74 @@ window#waybar {
    the resolved bar foreground to garage-metrics through the bar-foreground
    marker -- and the image module scales it to `size`, so all that is left to say
    here is the room around it, and that is generated. */
+
+/* The pointer's own indicator. Every module that answers a click wears a tint
+   while the pointer is over it, so what is about to be clicked is never in
+   doubt -- the bar is one unbroken strip of glass, and without this there is
+   nothing to say where one target ends and the next begins.
+ *
+ * The shape is here and the colour is a palette define, per the note at the top
+ * of this file; the vertical margin that gives the pill its height is generated,
+ * because it is spacing. The list is WAYBAR_HOVER_MODULES in the backend, which
+ * writes that margin against the same selectors -- the two have to name the same
+ * modules or a module gets the tint at full bar height.
+ *
+ * Squared off rather than a 999px stadium: the strips are wide and the icons are
+ * not, and a stadium makes those read as two different kinds of control. */
+#custom-menu,
+#image,
+#custom-media,
+#custom-ai-usage,
+#custom-notifications,
+#custom-launcher,
+#custom-control-center,
+#custom-containers,
+#custom-microphone,
+#custom-smb,
+#custom-git,
+#custom-monitor,
+#pulseaudio,
+#clock {
+  border-radius: 8px;
+  background: transparent;
+}
+
+#custom-menu:hover,
+#image:hover,
+#custom-media:hover,
+#custom-ai-usage:hover,
+#custom-notifications:hover,
+#custom-launcher:hover,
+#custom-control-center:hover,
+#custom-containers:hover,
+#custom-microphone:hover,
+#custom-smb:hover,
+#custom-git:hover,
+#custom-monitor:hover,
+#pulseaudio:hover,
+#clock:hover {
+  background: @module_hover_bg;
+}
+
+/* After the hover block, not before it. A pressed module is also a hovered one,
+   both selectors have the same specificity, and GTK CSS breaks that tie by
+   order -- written first, the press state would never be the one that shows. */
+#custom-menu:active,
+#image:active,
+#custom-media:active,
+#custom-ai-usage:active,
+#custom-notifications:active,
+#custom-launcher:active,
+#custom-control-center:active,
+#custom-containers:active,
+#custom-microphone:active,
+#custom-smb:active,
+#custom-git:active,
+#custom-monitor:active,
+#pulseaudio:active,
+#clock:active {
+  background: @module_press_bg;
+}
 
 #custom-smb.warning {
   color: @urgent;

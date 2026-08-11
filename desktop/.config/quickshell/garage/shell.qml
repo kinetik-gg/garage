@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Wayland
 import QtQuick
 
 ShellRoot {
@@ -12,6 +13,9 @@ ShellRoot {
     property string controlCenterScreenName: ""
     property string launcherScreenName: ""
     property string monitorScreenName: ""
+    // Monitor-local X coordinate of the complete Waybar metrics group's centre.
+    // A negative value means a keybind opened the dashboard, so it uses screen centre.
+    property real monitorAnchorX: -1
     property string mediaScreenName: ""
     property string aiUsageScreenName: ""
 
@@ -57,6 +61,44 @@ ShellRoot {
     // pairings live in the four functions below rather than at each entry point.
     property bool screenshotOpen: false
 
+    // Caffeine, held here rather than in the control centre that toggles it.
+    //
+    // An idle inhibitor is a property of a Wayland surface, and the control
+    // centre is destroyed on dismissal -- so an inhibitor living there was
+    // dropped by the compositor the moment the panel closed, which is to say
+    // the setting did nothing at all except while its own switch was on screen.
+    // The surface below exists for no other reason than to be something the
+    // inhibitor can be attached to, and only while the setting is on.
+    property bool caffeine: false
+
+    LazyLoader {
+        active: shell.caffeine
+
+        PanelWindow {
+            id: caffeineHold
+            // One pixel, on the background layer, drawing nothing and masked out
+            // of input entirely: this is a handle for the inhibitor, not
+            // something anyone should be able to see or click.
+            implicitWidth: 1
+            implicitHeight: 1
+            color: "transparent"
+            // A transparent colour on a surface the compositor was handed as
+            // opaque composites as black, so without this the handle is a black
+            // pixel on the wallpaper for as long as Caffeine is on.
+            surfaceFormat.opaque: false
+            exclusiveZone: 0
+            focusable: false
+            WlrLayershell.layer: WlrLayer.Background
+            WlrLayershell.namespace: "garage-caffeine"
+            mask: Region {}
+
+            IdleInhibitor {
+                enabled: true
+                window: caffeineHold
+            }
+        }
+    }
+
     function focusedScreenName() {
         return Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
     }
@@ -67,7 +109,7 @@ ShellRoot {
     function sharesScreenWithScreenshot(name) {
         return name === "notificationCenter" || name === "controlCenter"
             || name === "monitorPalette" || name === "mediaPalette"
-            || name === "aiPalette";
+            || name === "aiPalette" || name === "launcher";
     }
 
     // The surfaces whose click-outside dismissal the shared catcher owns.
@@ -122,8 +164,10 @@ ShellRoot {
             configure();
         if (shell.activeSurface === name) {
             // Closing something is not opening anything, so the pill is left
-            // where it is rather than being taken down with the panel.
-            shell.activeSurface = "";
+            // where it is rather than being taken down with the panel. The
+            // monitor dashboard keeps its loader alive for the length of its
+            // exit; every other surface goes down immediately.
+            shell.requestCloseSurface(name);
             return;
         }
         if (!shell.sharesScreenWithScreenshot(name))
@@ -134,6 +178,32 @@ ShellRoot {
     function closeSurface(name) {
         if (shell.activeSurface === name)
             shell.activeSurface = "";
+    }
+
+    // The loaders whose surface plays an exit before it may be destroyed. Each
+    // of these owns a PanelMotion and raises dismissed() when it has finished;
+    // clearing activeSurface here instead would destroy the window mid-fade.
+    function animatedLoader(name) {
+        if (name === "monitorPalette")      return monitorPaletteLoader;
+        if (name === "controlCenter")       return controlCenterLoader;
+        if (name === "notificationCenter")  return notificationCenterLoader;
+        if (name === "mediaPalette")        return mediaPaletteLoader;
+        if (name === "aiPalette")           return aiPaletteLoader;
+        if (name === "session")             return sessionLoader;
+        if (name === "launcher")            return launcherLoader;
+        return null;
+    }
+
+    // Closing, but through the surface itself where the surface has something to
+    // play on the way out. Anything not in the list above is closed by clearing
+    // activeSurface, which destroys its loader on the spot.
+    function requestCloseSurface(name) {
+        const loader = shell.animatedLoader(name);
+        if (loader && loader.item && loader.item.requestDismissal) {
+            loader.item.requestDismissal();
+            return;
+        }
+        shell.closeSurface(name);
     }
 
     // The pill closes whatever cannot share the screen with it, which is what
@@ -227,7 +297,7 @@ ShellRoot {
         // see paletteHoldsOpen above.
         armed: !(shell.screenshotOpen || captureProcess.running
             || shell.paletteHoldsOpen())
-        onDismissed: shell.closeSurface(shell.activeSurface)
+        onDismissed: shell.requestCloseSurface(shell.activeSurface)
     }
 
     LazyLoader {
@@ -376,6 +446,8 @@ ShellRoot {
 
         ControlCenterPalette {
             targetScreenName: shell.controlCenterScreenName
+            caffeine: shell.caffeine
+            onCaffeineToggled: shell.caffeine = !shell.caffeine
             onDismissed: shell.closeSurface("controlCenter")
         }
     }
@@ -383,14 +455,16 @@ ShellRoot {
     // The three panels the bar's own modules open, on the same shape as the two
     // centres above: one loader each, bound to activeSurface, and a dismissed()
     // that clears the name it was activated by. The monitor and the AI usage
-    // panel sit against the right edge like the centres; the media panel is
-    // anchored to the top edge alone, so the compositor centres it under the bar.
+    // AI usage sits against the right edge; media is centred on the output. The
+    // monitor dashboard receives the bar click's X coordinate and positions
+    // itself under that point, clamped inside the output.
     LazyLoader {
         id: monitorPaletteLoader
         active: shell.activeSurface === "monitorPalette"
 
         MonitorPalette {
             targetScreenName: shell.monitorScreenName
+            targetAnchorX: shell.monitorAnchorX
             onDismissed: shell.closeSurface("monitorPalette")
         }
     }
@@ -461,7 +535,7 @@ ShellRoot {
             // running shell, and an empty one is a session that has not
             // published the setting yet, which means the built-in launcher.
             if (String(launcherMode.text() || "").trim() === "external") {
-                shell.closeSurface("launcher");
+                shell.requestCloseSurface("launcher");
                 return;
             }
             // The monitor is resolved here, on the keypress, rather than bound
@@ -474,7 +548,7 @@ ShellRoot {
         }
 
         function closeLauncher(): void {
-            shell.closeSurface("launcher");
+            shell.requestCloseSurface("launcher");
         }
 
         function screenshot(): void {
@@ -505,8 +579,12 @@ ShellRoot {
                 shell.openSurface("session", open);
         }
 
+        // Through the surface, like every other close*: this is the session
+        // menu's only click-outside path -- garage-menu-dismiss calls it -- so
+        // clearing activeSurface here would give the menu an exit on Escape and
+        // none on the gesture it is actually dismissed with.
         function closeSession(): void {
-            shell.closeSurface("session");
+            shell.requestCloseSurface("session");
         }
 
         function closeAbout(): void {
@@ -565,7 +643,7 @@ ShellRoot {
         }
 
         function closeNotifications(): void {
-            shell.closeSurface("notificationCenter");
+            shell.requestCloseSurface("notificationCenter");
         }
 
         // The control centre, on the same three-function shape as the centre
@@ -590,7 +668,7 @@ ShellRoot {
         }
 
         function closeControlCenter(): void {
-            shell.closeSurface("controlCenter");
+            shell.requestCloseSurface("controlCenter");
         }
 
         // The three bar panels, each on the same three-function shape as the
@@ -602,13 +680,15 @@ ShellRoot {
         function monitor(): void {
             shell.toggleSurface("monitorPalette", () => {
                 shell.monitorScreenName = shell.focusedScreenName();
+                shell.monitorAnchorX = -1;
             });
         }
 
-        function monitorOn(screenName: string): void {
+        function monitorOn(screenName: string, anchorX: int): void {
             const sameScreen = shell.monitorScreenName === screenName;
             const open = () => {
                 shell.monitorScreenName = screenName;
+                shell.monitorAnchorX = anchorX;
             };
             if (sameScreen)
                 shell.toggleSurface("monitorPalette", open);
@@ -617,7 +697,7 @@ ShellRoot {
         }
 
         function closeMonitor(): void {
-            shell.closeSurface("monitorPalette");
+            shell.requestCloseSurface("monitorPalette");
         }
 
         function media(): void {
@@ -638,7 +718,7 @@ ShellRoot {
         }
 
         function closeMedia(): void {
-            shell.closeSurface("mediaPalette");
+            shell.requestCloseSurface("mediaPalette");
         }
 
         function aiUsage(): void {
@@ -659,7 +739,7 @@ ShellRoot {
         }
 
         function closeAiUsage(): void {
-            shell.closeSurface("aiPalette");
+            shell.requestCloseSurface("aiPalette");
         }
     }
 

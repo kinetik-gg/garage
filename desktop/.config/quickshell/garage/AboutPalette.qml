@@ -130,7 +130,7 @@ FloatingWindow {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.dialogTint
+        color: Theme.contentTint
 
         ContinuousRectangle {
             id: closeButton

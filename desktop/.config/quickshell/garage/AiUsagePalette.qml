@@ -27,13 +27,22 @@ PanelWindow {
 
     // True only until the one-shot process answers. There is nothing to
     // refresh after that -- the palette is destroyed and recreated by the
-    // LazyLoader that owns it every time it is reopened, which is what keeps
-    // this data from ever going stale on screen.
+    // LazyLoader that owns it every time it is reopened, so every open fetches
+    // once. What is on screen before that answer arrives is the previous open's
+    // payload out of PaletteCache, labelled as such.
     property bool loading: true
     property bool available: false
     property bool stale: false
     property var subscriptions: []
     property var today: null
+
+    // When the payload on screen was fetched, for as long as it is the one
+    // PaletteCache handed over rather than one this window fetched. Zero means
+    // there was nothing cached to open with. See the header note below: quota
+    // bars are worth showing immediately, but a bar drawn from a reading taken
+    // an hour ago is not a bar anyone should plan a session around without
+    // being told.
+    property real seededAt: 0
 
     // The clock the reset lines are measured against, as a property so they are
     // bindings on it rather than one-shot reads of Date.now(). The payload above
@@ -60,12 +69,53 @@ PanelWindow {
             usage.stale = !!payload.stale;
             usage.subscriptions = payload.subscriptions || [];
             usage.today = payload.today || null;
+            // Only a payload with something in it is worth keeping: replaying an
+            // "unavailable" answer would have the next open report a missing
+            // tokscale before it had looked for one. A failed parse falls
+            // through to the catch and leaves the previous entry alone, which is
+            // the same reasoning -- one bad run should not cost the panel the
+            // last good reading.
+            if (usage.available)
+                PaletteCache.saveAiUsage({
+                    stale: usage.stale,
+                    subscriptions: usage.subscriptions,
+                    today: usage.today
+                });
         } catch (failure) {
             usage.available = false;
             usage.subscriptions = [];
             usage.today = null;
         }
+        // Whatever the run said, it is this window's own answer now, so the
+        // header stops attributing what is on screen to the cache.
+        usage.seededAt = 0;
         usage.loading = false;
+    }
+
+    // Draw the last good payload while the helper runs. garage-ai-usage shells
+    // out to tokscale and can take a second or more over it, and the panel is
+    // opened to read a number off it -- an empty "Checking Tokscale…" pane for
+    // data that has not moved since the last look is the wrong first frame.
+    function restore() {
+        const state = PaletteCache.aiUsageState;
+        if (!state)
+            return;
+        usage.available = true;
+        usage.stale = state.stale;
+        usage.subscriptions = state.subscriptions;
+        usage.today = state.today;
+        usage.seededAt = PaletteCache.aiUsageSavedAt;
+    }
+
+    Component.onCompleted: usage.restore()
+
+    // What the header says about where the figures came from. Nothing at all
+    // once this window has its own fresh payload -- the common case, and a
+    // panel that is telling the truth has no reason to say so.
+    readonly property string sourceNote: {
+        if (usage.seededAt > 0)
+            return "Cached " + PaletteCache.formatAge(usage.seededAt, usage.now);
+        return usage.stale ? "Cached" : "";
     }
 
     function formatPercent(value) {
@@ -144,8 +194,32 @@ PanelWindow {
             + (entry.cacheRead || 0) + (entry.cacheWrite || 0);
     }
 
+    // How tall the scrolling list may grow before it scrolls instead of the
+    // window. The window is as tall as its content and the content is
+    // open-ended -- a provider list plus a row per model used today -- so
+    // without a ceiling a busy day is a panel taller than the output with its
+    // total row below the bottom edge and no way to reach it. That is what the
+    // Flickable is for; this is the height at which it starts doing its job.
+    //
+    // Measured off the output minus the fixed header this list scrolls under,
+    // and minus a further allowance for Waybar: the anchor already sits below
+    // the bar's exclusive zone, and its height is not something this window is
+    // told. `restingTop` rather than the live top margin, which travels during
+    // the entrance and would drag the ceiling with it.
+    readonly property real bodyCeiling: {
+        const target = usage.targetScreen();
+        const chrome = header.implicitHeight + headerRule.implicitHeight
+            + content.spacing * 2 + usage.contentMargin * 2;
+        return Math.max(160, (target ? target.height : 1080) - 96
+            - motion.restingTop - Theme.windowGutter - chrome);
+    }
+
     screen: usage.targetScreen()
     implicitWidth: 360
+    // Floored at 1px: a layer surface with no height is not one the
+    // compositor can show, and the column's implicit height is zero for the
+    // frame before its children are laid out.
+    implicitHeight: Math.max(1, content.implicitHeight + usage.contentMargin * 2)
     color: "transparent"
     // OnDemand rather than Exclusive, the same choice as the notification and
     // control centres: a panel the user clicks into, not a modal.
@@ -154,17 +228,28 @@ PanelWindow {
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
+    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
+    PanelMotion {
+        id: motion
+        onFinished: usage.dismissed()
+    }
+
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
+    // Top and right only. Anchoring the bottom as well made the panel as tall as
+    // the output whatever was in it, so a short quota summary sat at the top of a
+    // full-height sheet of glass.
     anchors {
         top: true
         right: true
-        bottom: true
     }
 
     // Overlay surfaces already begin below Waybar's exclusive zone, so the top
     // gutter is measured from there rather than from the top of the screen.
-    margins.top: Theme.windowGutter
+    margins.top: motion.surfaceTop
     margins.right: Theme.windowGutter
-    margins.bottom: Theme.windowGutter
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-ai-usage"
@@ -192,6 +277,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
+        opacity: motion.opacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower
@@ -202,11 +288,17 @@ PanelWindow {
         borderWidth: 1
         borderColor: Theme.frameOuter
 
-        NumberAnimation on opacity {
-            from: 0
-            to: 1
-            duration: 130
-            easing.type: Easing.OutCubic
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            color: Theme.contentTint
         }
 
         // Inner hairline one inset px in from the outer one, the double frame
@@ -225,11 +317,15 @@ PanelWindow {
         }
 
         ColumnLayout {
-            anchors.fill: parent
+            id: content
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
             anchors.margins: usage.contentMargin
             spacing: 10
 
             RowLayout {
+                id: header
                 Layout.fillWidth: true
                 spacing: 8
 
@@ -245,12 +341,13 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
 
                 // Cached data is still today's, but it is worth saying it
-                // came from garage-ai-usage's own cache rather than the
-                // subprocess that just ran -- the same distinction --stale
-                // reports on the waybar module.
+                // came from a cache rather than the subprocess that just ran --
+                // either garage-ai-usage's own, the distinction --stale reports
+                // on the waybar module, or PaletteCache while this open's run is
+                // still in flight.
                 Text {
-                    visible: usage.stale
-                    text: "Cached"
+                    visible: usage.sourceNote !== ""
+                    text: usage.sourceNote
                     color: Theme.textMuted
                     font.family: Theme.sans
                     font.pixelSize: 10
@@ -258,11 +355,17 @@ PanelWindow {
                 }
             }
 
-            MenuSeparator {}
+            MenuSeparator { id: headerRule }
 
             Flickable {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                // As tall as what it holds, up to the ceiling. fillHeight here
+                // asked for a share of a height the column does not have -- the
+                // window is sized from this content rather than the other way
+                // round since it stopped being full-output-height -- so the list
+                // collapsed to nothing and the panel rendered as a title and a
+                // rule over an empty body.
+                Layout.preferredHeight: Math.min(body.implicitHeight, usage.bodyCeiling)
                 contentWidth: width
                 contentHeight: body.implicitHeight
                 clip: true
@@ -355,6 +458,7 @@ PanelWindow {
                                         }
 
                                         ContinuousRectangle {
+                                            id: quotaWell
                                             Layout.fillWidth: true
                                             implicitHeight: 6
                                             radius: height
@@ -369,11 +473,19 @@ PanelWindow {
                                             // not have -- every provider's bar
                                             // was the same blue whether it read
                                             // 4% or 96%.
+                                            // The well by id rather than by
+                                            // `parent`: ContinuousRectangle puts
+                                            // its children in a plain content
+                                            // Item, which fills it but has no
+                                            // radius of its own -- so the fill
+                                            // was being handed undefined for its
+                                            // corners on every frame it was laid
+                                            // out in.
                                             ContinuousRectangle {
-                                                width: parent.width * Math.max(0, Math.min(1,
+                                                width: quotaWell.width * Math.max(0, Math.min(1,
                                                     (metricRow.modelData.remaining_percent || 0) / 100))
-                                                height: parent.height
-                                                radius: parent.radius
+                                                height: quotaWell.height
+                                                radius: quotaWell.radius
                                                 color: Theme.text
                                                 opacity: 0.9
                                             }
@@ -496,11 +608,15 @@ PanelWindow {
             // provider list tokscale returned nothing usable for.
             ColumnLayout {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                // Two lines tall, not half a screen. The spacers that used to
+                // centre this vertically were sized by a full-output-height
+                // panel; with the window measuring itself from this column they
+                // would each claim a share of nothing, and the panel would be a
+                // sheet of glass with a sentence somewhere in it.
+                Layout.topMargin: 12
+                Layout.bottomMargin: 12
                 visible: !usage.available
                 spacing: 8
-
-                Item { Layout.fillHeight: true }
 
                 Text {
                     Layout.fillWidth: true
@@ -524,8 +640,6 @@ PanelWindow {
                     horizontalAlignment: Text.AlignHCenter
                     renderType: Text.NativeRendering
                 }
-
-                Item { Layout.fillHeight: true }
             }
         }
     }

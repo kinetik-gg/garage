@@ -25,9 +25,13 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-from pathlib import Path
+import os
 import re
+import runpy
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
 from harness import BackendTestCase
 
@@ -135,6 +139,134 @@ class BaseSheetOwnsNoSpacing(BackendTestCase):
                               "stopped applying")
 
 
+class MonitorPanelToggle(unittest.TestCase):
+    """The bar click still opens the dashboard when runtime state is stale."""
+
+    TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
+
+    def fake_desktop(self, root: Path) -> tuple[Path, Path]:
+        bin_dir = root / "bin"
+        capture = root / "qs-call"
+        bin_dir.mkdir()
+        hyprctl = bin_dir / "hyprctl"
+        hyprctl.write_text(
+            "#!/bin/sh\n"
+            "case \"$1\" in\n"
+            "  cursorpos) printf '%s\\n' '{\"x\":150,\"y\":10}' ;;\n"
+            "  monitors) printf '%s\\n' "
+            "'[{\"name\":\"DP-1\",\"x\":0,\"y\":0,"
+            "\"width\":1920,\"height\":1080,\"scale\":1}]' ;;\n"
+            "esac\n",
+            encoding="utf-8")
+        qs = bin_dir / "qs"
+        qs.write_text(
+            "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$CAPTURE\"\n",
+            encoding="utf-8")
+        hyprctl.chmod(0o755)
+        qs.chmod(0o755)
+        return bin_dir, capture
+
+    def run_toggle(self, root: Path, *arguments: str) -> str:
+        bin_dir, capture = self.fake_desktop(root)
+        env = os.environ | {
+            "PATH": f"{bin_dir}:/usr/bin",
+            "HOME": str(root),
+            "XDG_STATE_HOME": str(root / "state"),
+            "XDG_CONFIG_HOME": str(root / "config"),
+            "CAPTURE": str(capture),
+        }
+        subprocess.run([str(self.TOGGLE), *arguments], env=env,
+                       check=True, capture_output=True, text=True)
+        return capture.read_text(encoding="utf-8")
+
+    def desktop_state(self, root: Path, fragment: str, stylesheet: str) -> None:
+        """The two generated files the anchor is computed out of."""
+        generated = root / "state" / "garage" / "generated"
+        waybar = root / "config" / "waybar"
+        generated.mkdir(parents=True)
+        waybar.mkdir(parents=True)
+        (generated / "waybar-widgets.jsonc").write_text(fragment, encoding="utf-8")
+        (waybar / "style.css").write_text(stylesheet, encoding="utf-8")
+
+    def test_the_anchor_is_the_centre_of_the_whole_metric_group(self) -> None:
+        # Two strips of 100 with 12px of padding a side: a 248px group ending
+        # 300px in from the right edge of a 1920px output. Its centre is
+        # 1920 - 300 - 124. Both numbers come out of the generated files rather
+        # than out of the script, which is the property this pins.
+        with tempfile.TemporaryDirectory() as root_text:
+            root = Path(root_text)
+            self.desktop_state(root, json.dumps({
+                "group/monitoring": {
+                    "modules": ["image#metric-cpu", "image#metric-gpu"],
+                },
+                "image#metric-cpu": {"size": 100},
+                "image#metric-gpu": {"size": 100},
+            }), "#image {\n  padding: 0 12px;\n}\n"
+                "#status-tail {\n  min-width: 300px;\n}\n")
+            call = self.run_toggle(root, "monitor", "cpu")
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1496\n", call)
+
+    def test_the_click_lands_in_the_same_place_whichever_strip_it_was(self) -> None:
+        """The reason no cursor coordinate reaches the anchor."""
+        fragment = json.dumps({
+            "group/monitoring": {
+                "modules": ["image#metric-cpu", "image#metric-gpu"],
+            },
+            "image#metric-cpu": {"size": 100},
+            "image#metric-gpu": {"size": 100},
+        })
+        stylesheet = ("#image {\n  padding: 0 12px;\n}\n"
+                      "#status-tail {\n  min-width: 300px;\n}\n")
+        anchors = set()
+        for widget in ("cpu", "gpu"):
+            with tempfile.TemporaryDirectory() as root_text:
+                root = Path(root_text)
+                self.desktop_state(root, fragment, stylesheet)
+                anchors.add(self.run_toggle(root, "monitor", widget))
+        self.assertEqual(1, len(anchors), anchors)
+
+    def test_a_broken_widget_fragment_still_opens_on_the_shipped_defaults(self) -> None:
+        # Runtime state a half-finished upgrade or a hand edit left unreadable.
+        # Under `set -e` this is the difference between a slightly misplaced
+        # dashboard and a bar click that does nothing at all.
+        with tempfile.TemporaryDirectory() as root_text:
+            root = Path(root_text)
+            self.desktop_state(root, "not json\n", "")
+            call = self.run_toggle(root, "monitor", "cpu")
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1620\n", call)
+
+    def test_the_widgetless_command_is_still_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as root_text:
+            call = self.run_toggle(Path(root_text), "monitor")
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1620\n", call)
+
+    def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
+        result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
+                                capture_output=True, text=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("usage:", result.stderr)
+
+
+class MonitorAnchorIsOneNumber(BackendTestCase):
+    """The tail width the bar lays out and the one the click reads are one value."""
+
+    TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
+
+    def test_the_generated_sheet_publishes_the_tail_width(self) -> None:
+        css = self.garage.waybar_spacing_css(
+            copy.deepcopy(self.garage.FALLBACK_DEFAULTS))
+        self.assertIn(f"min-width: {self.garage.WAYBAR_STATUS_TAIL_WIDTH}px", css,
+                      "garage-panel-toggle reads this back out of the sheet")
+
+    def test_the_scripts_fallback_is_the_same_number(self) -> None:
+        # The script cannot import the constant, so the one copy it does carry --
+        # for the case where the sheet is missing -- is checked against it here.
+        script = self.TOGGLE.read_text(encoding="utf-8")
+        self.assertIn(f"tail_width={self.garage.WAYBAR_STATUS_TAIL_WIDTH}\n", script)
+        self.assertIn(f"tail_width=${{configured_tail:-"
+                      f"{self.garage.WAYBAR_STATUS_TAIL_WIDTH}}}", script)
+
+
 class BarGlyphs(unittest.TestCase):
     """The Phosphor glyphs the bar's strips and its AI module are made of.
 
@@ -150,6 +282,10 @@ class BarGlyphs(unittest.TestCase):
     AI_USAGE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-ai-usage"
     SHELL_ICONS = REPO_ROOT / "desktop" / ".config" / "quickshell" / "garage" / "icons"
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.metrics = runpy.run_path(str(cls.METRICS))
+
     def literal(self, path: Path, name: str):
         """A module-level literal assignment, read without importing the script."""
         import ast
@@ -164,6 +300,10 @@ class BarGlyphs(unittest.TestCase):
         layouts = self.literal(self.METRICS, "LAYOUTS")
         icons = self.literal(self.METRICS, "ICON_PATHS")
         for widget, layout in layouts.items():
+            if "icon" not in layout:
+                self.assertEqual("network", widget,
+                                 "only self-labelled down/up figures omit a glyph")
+                continue
             with self.subTest(widget=widget):
                 name = layout["icon"]
                 self.assertIn(name, icons,
@@ -184,9 +324,75 @@ class BarGlyphs(unittest.TestCase):
         # figures and no line. render_widget() keys off the absence of the width.
         layouts = self.literal(self.METRICS, "LAYOUTS")
         self.assertNotIn("graph_width", layouts["network"])
+        self.assertNotIn("icon", layouts["network"],
+                         "the readings already carry individual down/up arrows")
         for widget in ("cpu", "memory", "temp", "disk", "gpu"):
             with self.subTest(widget=widget):
                 self.assertIn("graph_width", layouts[widget])
+
+    def test_strip_text_is_vertically_centred_with_its_icon(self) -> None:
+        svg = self.metrics["render_svg"]("cpu", {
+            "history": [5], "display": "5%", "active": False
+        })
+        self.assertIn("dominant-baseline: central", svg)
+        self.assertIn('<text x="48" y="11">5%</text>', svg)
+
+    def test_network_uses_two_uniform_direction_glyphs_and_no_third_icon(self) -> None:
+        svg = self.metrics["render_svg"]("network", {
+            "display": "14K", "extra": "1K", "active": False
+        })
+        scale = self.metrics["ICON_SIZE"] / 256
+        self.assertIn(f'translate(0 4) scale({scale:.6f})', svg)
+        self.assertIn(f'translate(68 4) scale({scale:.6f})', svg)
+        self.assertIn('<text x="20" y="11">14K</text>', svg)
+        self.assertIn('<text x="88" y="11" class="secondary">1K</text>', svg)
+        self.assertNotIn("↓", svg)
+        self.assertNotIn("↑", svg)
+
+    def test_a_percentage_is_plotted_where_the_percentage_says(self) -> None:
+        """The axis is linear, and that is the whole of it.
+
+        It was log1p for a while, on the theory that idle activity needs lifting
+        to be visible. What it actually did was put 1% of load at 15% of the
+        graph's height and 20% at 66%, so a card near idle drew a line thrashing
+        across the strip and a 45C package sat just under the top of its plot.
+        """
+        clamp = self.metrics["_clamp_sample"]
+        self.assertEqual(0, clamp(0))
+        self.assertEqual(100, clamp(100))
+        self.assertEqual(45, clamp(45))
+        self.assertEqual(100, clamp(140), "a reading over full scale is clamped")
+        self.assertEqual(0, clamp("not a sample"))
+
+        # And the same, as geometry: half load is half the height of the plot.
+        top, bottom = self.metrics["GRAPH_TOP"], self.metrics["GRAPH_BOTTOM"]
+        points = self.metrics["_coordinates"]([50] * 8, 0, 22)
+        self.assertAlmostEqual((top + bottom) / 2, points[0][1], places=6)
+        self.assertNotIn("history_log_scaled", self.metrics["LAYOUTS"]["disk"],
+                         "nothing is scaled twice because nothing is scaled here")
+
+    def test_a_strip_plots_about_one_point_per_pixel_of_graph(self) -> None:
+        """POINTS is 120 and a graph is 22px wide.
+
+        Drawn straight, that is five vertices per pixel column -- no more detail
+        than their mean, just more ink, and on a volatile series it renders as a
+        vertical hash instead of a line.
+        """
+        width = self.metrics["LAYOUTS"]["gpu"]["graph_width"]
+        points = self.metrics["_coordinates"](list(range(120)), 20, width)
+        self.assertLessEqual(len(points), round(width) + 1)
+        self.assertGreaterEqual(len(points), round(width) / 2)
+        # A history shorter than the graph is wide is left alone.
+        self.assertEqual(6, len(self.metrics["_coordinates"]([1] * 6, 20, width)))
+
+    def test_the_reduction_is_the_mean_rather_than_the_peak(self) -> None:
+        """A strip of bucket maxima reads as a machine permanently at full tilt."""
+        resample = self.metrics["_resample"]
+        self.assertEqual([1.5, 3.5], resample([1.0, 2.0, 3.0, 4.0], 2))
+        # The peak of the first bucket is 100; its mean is 50.
+        self.assertEqual([50.0, 0.0], resample([0.0, 100.0, 0.0, 0.0], 2))
+        # One column is not a line, so the history is left as it is.
+        self.assertEqual([0.0, 100.0], resample([0.0, 100.0], 1))
 
     def test_the_ai_module_is_one_private_use_glyph_and_asks_for_phosphor(self) -> None:
         sparkle = self.literal(self.AI_USAGE, "SPARKLE")
@@ -217,20 +423,28 @@ class BarWidgetFragment(BackendTestCase):
     def all_monitors(self, value: bool) -> dict:
         return {f"monitor_{name}": value for name in self.garage.BAR_METRICS}
 
+    def monitoring(self, fragment: dict) -> list[str]:
+        return fragment[self.garage.WAYBAR_MONITOR_GROUP]["modules"]
+
     def test_the_shipped_defaults_carry_the_three_universal_strips(self) -> None:
         # cpu, memory and network are on by default; temperature, disk and GPU are
         # not, because each depends on hardware garage-metrics may find nothing
         # for. Asserted as the whole list so an added default is a decision.
-        right = self.fragment()["modules-right"]
+        fragment = self.fragment()
+        right = fragment["modules-right"]
+        self.assertEqual([self.garage.WAYBAR_MONITOR_GROUP,
+                          self.garage.WAYBAR_STATUS_GROUP], right)
         self.assertEqual(["image#metric-cpu", "image#metric-memory",
-                          "image#metric-network", "custom/ai-usage",
-                          *self.garage.WAYBAR_MODULES_RIGHT], right)
+                          "image#metric-network"],
+                         self.monitoring(fragment))
+        self.assertEqual(["custom/ai-usage", *self.garage.WAYBAR_MODULES_RIGHT],
+                         fragment[self.garage.WAYBAR_STATUS_GROUP]["modules"])
 
     def test_every_strip_on_is_bar_metrics_order(self) -> None:
         """The order is the table's, not the order the toggles were flipped in."""
-        right = self.fragment(**self.all_monitors(True))["modules-right"]
+        fragment = self.fragment(**self.all_monitors(True))
         self.assertEqual([f"image#metric-{name}" for name in self.garage.BAR_METRICS],
-                         right[:len(self.garage.BAR_METRICS)])
+                         self.monitoring(fragment)[:len(self.garage.BAR_METRICS)])
 
     def test_with_everything_off_the_static_tail_is_still_the_whole_right_side(self) -> None:
         """The property the fragment exists for.
@@ -242,16 +456,21 @@ class BarWidgetFragment(BackendTestCase):
         """
         fragment = self.fragment(ai_usage=False, media_player=False,
                                  **self.all_monitors(False))
-        self.assertEqual(self.garage.WAYBAR_MODULES_RIGHT, fragment["modules-right"])
+        self.assertEqual([self.garage.WAYBAR_MONITOR_GROUP,
+                          self.garage.WAYBAR_STATUS_GROUP], fragment["modules-right"])
+        self.assertEqual([], self.monitoring(fragment))
+        self.assertEqual(self.garage.WAYBAR_MODULES_RIGHT,
+                         fragment[self.garage.WAYBAR_STATUS_GROUP]["modules"])
         self.assertEqual([], fragment["modules-center"])
 
     def test_the_static_tail_is_last_however_many_widgets_are_on(self) -> None:
         for departures in ({}, self.all_monitors(True), self.all_monitors(False),
                            {"ai_usage": False}, {"monitor_gpu": True}):
             with self.subTest(bar=departures):
-                right = self.fragment(**departures)["modules-right"]
+                fragment = self.fragment(**departures)
+                tail = fragment[self.garage.WAYBAR_STATUS_GROUP]["modules"]
                 self.assertEqual(self.garage.WAYBAR_MODULES_RIGHT,
-                                 right[-len(self.garage.WAYBAR_MODULES_RIGHT):])
+                                 tail[-len(self.garage.WAYBAR_MODULES_RIGHT):])
 
     def test_the_media_toggle_flips_the_centre_and_its_definition_together(self) -> None:
         on = self.fragment(media_player=True)
@@ -279,7 +498,8 @@ class BarWidgetFragment(BackendTestCase):
 
     def test_the_ai_strip_hides_itself_and_is_polled_in_minutes(self) -> None:
         on = self.fragment(ai_usage=True)
-        self.assertIn("custom/ai-usage", on["modules-right"])
+        self.assertIn("custom/ai-usage",
+                      on[self.garage.WAYBAR_STATUS_GROUP]["modules"])
         module = on["custom/ai-usage"]
         self.assertEqual("json", module["return-type"])
         # The empty text garage-ai-usage prints without tokscale only hides the
@@ -289,7 +509,8 @@ class BarWidgetFragment(BackendTestCase):
                                 "tokscale is a subprocess per tick and the figure "
                                 "moves over a billing window, not a second")
         off = self.fragment(ai_usage=False)
-        self.assertNotIn("custom/ai-usage", off["modules-right"])
+        self.assertNotIn("custom/ai-usage",
+                         off[self.garage.WAYBAR_STATUS_GROUP]["modules"])
         self.assertNotIn("custom/ai-usage", off)
 
     def test_every_metric_module_follows_the_proven_image_recipe(self) -> None:
@@ -310,8 +531,9 @@ class BarWidgetFragment(BackendTestCase):
                                  module["exec"])
                 self.assertEqual(2, module["interval"])
                 self.assertTrue(module["tooltip"])
-                self.assertEqual("$HOME/.local/bin/garage-panel-toggle monitor",
-                                 module["on-click"])
+                self.assertEqual(
+                    f"$HOME/.local/bin/garage-panel-toggle monitor {name}",
+                    module["on-click"])
                 self.assertNotIn("path", module)
 
     def test_the_metric_names_are_the_collectors_own_widgets(self) -> None:
@@ -398,9 +620,25 @@ class BarPaddingScale(BackendTestCase):
             with self.subTest(entry=name):
                 self.assertIn(f"{base * 2}px", css)
         # And nothing was left behind at its base value: every pixel the sheet
-        # declares is a doubled entry. The dot margin is cut out first because it
-        # tracks the bar height rather than the scale.
+        # declares is a doubled entry. Two blocks are cut out first because
+        # neither is spacing: the dot margin tracks the bar height, and the status
+        # tail's width is a measurement of how far that group reaches in from the
+        # edge -- see WAYBAR_STATUS_TAIL_WIDTH, which is calibrated at the shipped
+        # padding scale and does not follow this slider.
         body = re.sub(r"#workspaces button label \{[^}]*\}", "", css)
+        body = re.sub(r"#status-tail \{[^}]*\}", "", body)
+        # And the hover pill's margin, which is the dot margin's arithmetic
+        # applied to MODULE_HOVER_PILL: the bar height decides it, not this
+        # slider. Matched on the declaration rather than the selector list,
+        # which is shared with a padding rule that does scale.
+        body = re.sub(r"(?:#[\w-]+,\n)+#clock \{\n  margin-top:[^}]*\}", "", body)
+        # The menu button's square and the workspace button's vertical margin.
+        # Both are shape rather than density -- the square is MODULE_HOVER_PILL
+        # wide because that is how tall the hover tint is, and the margin centres
+        # the dot's box in the bar. The two margins in the menu block that *are*
+        # table entries are checked by the assertIn loop above.
+        body = re.sub(r"#custom-menu \{[^}]*\}", "", body)
+        body = re.sub(r"#workspaces button \{[^}]*\}", "", body)
         self.assertEqual(set(), {int(value) for value
                                  in re.findall(r"(\d+)px", body)} - doubled,
                          "a pixel value the scale did not reach")
@@ -412,25 +650,51 @@ class BarPaddingScale(BackendTestCase):
         for base, scaled in zip(tight, loose):
             self.assertLessEqual(base, scaled)
 
-    def test_the_dot_margin_follows_the_height_and_not_the_scale(self) -> None:
+    def test_the_dot_margin_follows_the_pill_and_not_the_scale(self) -> None:
         """The one value the scale must not reach.
 
-        The margin is what gives the dot's box its height, so a doubled 15px would
-        ask for a 66px box inside a 43px bar -- the bar would grow or the dots
-        would clip. It is centred against the height instead.
+        This margin is the dot's box, and the box is the button's hover tint, so
+        it is MODULE_HOVER_PILL tall whatever the density slider says. A doubled
+        margin would make one 6px dot wear a taller tint than every module
+        beside it.
         """
         pattern = re.compile(r"#workspaces button label \{\s*margin: (\d+)px 0;")
         at_one = pattern.search(self.spacing(1.0, height=43)).group(1)
         at_two = pattern.search(self.spacing(2.0, height=43)).group(1)
         self.assertEqual(at_one, at_two)
+        box = int(at_one) * 2 + self.garage.WORKSPACE_DOT
+        self.assertLessEqual(abs(box - self.garage.MODULE_HOVER_PILL), 1,
+                             "the dot's tint and every other module's are not "
+                             "the same height")
+
+    def test_the_dot_is_centred_in_the_bar_by_its_button(self) -> None:
+        """What used to be the label's job. The label sizes the tint now, so the
+        button's own margin is what puts that tint in the middle of the bar."""
+        label = re.compile(r"#workspaces button label \{\s*margin: (\d+)px 0;")
+        button = re.compile(r"#workspaces button \{\s*margin: (\d+)px 0;")
         for height in (30, 43, 60):
             with self.subTest(height=height):
-                margin = int(pattern.search(self.spacing(1.2, height)).group(1))
-                box = margin * 2 + self.garage.WORKSPACE_DOT
-                self.assertLessEqual(box, height, "the dot's box is taller than "
-                                                  "the bar it sits in")
-                self.assertGreaterEqual(box, height - 1, "and not so short that "
-                                                         "the dot is off-centre")
+                css = self.spacing(1.2, height)
+                box = (int(label.search(css).group(1)) * 2
+                       + self.garage.WORKSPACE_DOT)
+                outer = box + int(button.search(css).group(1)) * 2
+                self.assertLessEqual(outer, height,
+                                     "the dot's button is taller than the bar")
+                self.assertGreaterEqual(outer, height - 1,
+                                        "and not so short that it is off-centre")
+
+    def test_the_space_between_two_dots_belongs_to_a_button(self) -> None:
+        """The click target, which used to be the 6px dot and nothing else.
+
+        A margin put the gap outside the button, so half of what looks like a
+        row of controls answered no clicks at all. As padding it is inside.
+        """
+        css = self.spacing(1.0)
+        button = re.search(r"#workspaces button \{([^}]*)\}", css).group(1)
+        self.assertIn(f"padding: 0 {self.garage.PADDING_TABLE['workspace_gap']}px",
+                      button)
+        self.assertNotRegex(button, r"margin: 0 \d+px",
+                            "a horizontal margin here is dead bar again")
 
     def test_the_overrides_come_after_the_import(self) -> None:
         """GTK CSS resolves equal specificity by order, so this is the whole
@@ -619,7 +883,7 @@ class BarRenderers(BackendTestCase):
         config["bar"]["padding_scale"] = 2.0
         self.garage.render_bar_style(config)
         self.assertEqual(before, self.garage.WAYBAR_STYLE.stat().st_ino)
-        self.assertIn("padding-left: 26px", self.garage.WAYBAR_STYLE.read_text(
+        self.assertIn("margin-left: 12px", self.garage.WAYBAR_STYLE.read_text(
             encoding="utf-8"))
 
     def test_a_stow_link_at_the_stylesheet_is_replaced_not_written_through(self) -> None:

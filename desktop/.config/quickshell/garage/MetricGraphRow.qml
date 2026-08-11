@@ -37,7 +37,7 @@ ColumnLayout {
     property color ink: Theme.text
     property bool active: false
     property string idleLabel: "collecting…"
-    property real graphHeight: 40
+    property real graphHeight: 48
 
     Layout.fillWidth: true
     spacing: 5

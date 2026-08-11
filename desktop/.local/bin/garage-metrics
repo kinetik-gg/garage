@@ -128,7 +128,9 @@ THEME_FG = _theme_fg()
 # icon / graph / value / extra. The first column used to be the metric's name in
 # text -- CPU, MEM, TEMP -- and is a Phosphor glyph now, from the same icon set
 # the bar's bell and the shell's buttons already draw, so the width the strip
-# spends on saying which metric it is goes to the numbers instead.
+# spends on saying which metric it is goes to the numbers instead. Network is the
+# exception: its individual down/up arrows already label both figures, so a third
+# bidirectional glyph would repeat rather than identify them.
 #
 # Only the widgets with a genuine second number carry an `extra` column, and only
 # the widgets with a genuine second series draw one -- GPU, VRAM under load.
@@ -163,7 +165,9 @@ LAYOUTS = {
     "temp": {"icon": "thermometer-simple", "width": 76, "graph_x": 20, "graph_width": 22, "value_x": 48},
     "disk": {"icon": "hard-drives", "width": 91, "graph_x": 20, "graph_width": 22, "value_x": 48},
     "gpu": {"icon": "graphics-card", "width": 124, "graph_x": 20, "graph_width": 22, "value_x": 48, "extra_x": 87},
-    "network": {"icon": "arrows-down-up", "width": 127, "value_x": 20, "extra_x": 76},
+    # Two same-size direction glyphs label the individual readings; there is no
+    # third, redundant network glyph in front of the pair.
+    "network": {"width": 130, "down_icon_x": 0, "value_x": 20, "up_icon_x": 68, "extra_x": 88},
 }
 
 # The glyphs themselves, as the `d` of the single path each icon in Phosphor's
@@ -210,11 +214,13 @@ ICON_PATHS = {
         "80,144,24,24,0,0,1,56,120Zm48,0a23.74,23.74,0,0,1-2.35,10.34l-32-32A23.74,23.74,0,0,1,"
         "80,96,24,24,0,0,1,104,120Z"
     ),
-    "arrows-down-up": (
-        "M117.66,170.34a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,"
-        "11.32-11.32L72,188.69V48a8,8,0,0,1,16,0V188.69l18.34-18.35A8,8,0,0,1,117.66,"
-        "170.34Zm96-96-32-32a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32L168,67.31V208a8,8,0,"
-        "0,0,16,0V67.31l18.34,18.35a8,8,0,0,0,11.32-11.32Z"
+    "arrow-down": (
+        "M205.66,122.34l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,169.37V32"
+        "a8,8,0,0,1,16,0V169.37L194.34,111a8,8,0,0,1,11.32,11.32Z"
+    ),
+    "arrow-up": (
+        "M205.66,133.66a8,8,0,0,1-11.32,0L136,75.31V224a8,8,0,0,1-16,0V75.31L61.66,133.66"
+        "a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,133.66Z"
     ),
 }
 
@@ -795,8 +801,8 @@ def sample_widget(widget: str, state: dict, now: float) -> dict:
         return {
             "value": log_scale(down),
             "value2": log_scale(up),
-            "display": f"↓{compact_rate(down)}",
-            "extra": f"↑{compact_rate(up)}",
+            "display": compact_rate(down),
+            "extra": compact_rate(up),
             "tooltip_parts": [
                 interface,
                 f"↓ {down:,.2f} MiB/s",
@@ -934,34 +940,78 @@ def tooltip_for(widget: str, state: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _coordinates(history: list[float], graph_x: float, graph_width: float) -> list[tuple[float, float]]:
-    if len(history) == 1:
-        history = history * 2
-    span = max(1, len(history) - 1)
+def _clamp_sample(value) -> float:
+    """One stored reading as a number between 0 and 100, or 0 if it is neither."""
+    try:
+        return min(100.0, max(0.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _resample(samples: list[float], columns: int) -> list[float]:
+    """The history reduced to about one point per pixel of graph.
+
+    POINTS is 120 and a strip's graph is 22px wide, so a line drawn straight
+    from the history puts five vertices in every pixel column. On a steady
+    series that is invisible; on a volatile one -- a GPU under load moving tens
+    of percent a second -- the five disagree, and what renders is a vertical
+    hash rather than a line. There is no more detail in it than the mean, only
+    more ink: the strip does not have the pixels to say what those five samples
+    did, and the dashboard, which does, plots the same history unreduced.
+
+    The mean rather than the maximum of each bucket, because the maximum of five
+    samples is what the busiest instant did and a strip of those reads as a
+    machine permanently at full tilt.
+    """
+    if columns < 2 or len(samples) <= columns:
+        return list(samples)
+    reduced = []
+    for index in range(columns):
+        start = index * len(samples) // columns
+        end = max(start + 1, (index + 1) * len(samples) // columns)
+        bucket = samples[start:end]
+        reduced.append(sum(bucket) / len(bucket))
+    return reduced
+
+
+def _coordinates(history: list[float], graph_x: float,
+                 graph_width: float) -> list[tuple[float, float]]:
+    """The stored history as points, plotted straight.
+
+    The axis is linear because every history that needs a logarithm has already
+    had one. Throughput is stored through log_scale() at the moment it is
+    sampled, since idle is 0.01 MiB/s and an NVMe burst is 3000; the rest are
+    percentages, and a percentage is already the scale it wants to be read on.
+
+    Curving them again was worse than redundant. log1p put 1% of load at 15% of
+    the graph's height and 20% at 66%, so a card ticking over near idle drew a
+    line thrashing across the full height of the strip -- and a 45C package
+    reading sat just under the top of its graph.
+    """
+    samples = _resample([_clamp_sample(value) for value in history],
+                        max(2, int(round(graph_width)) + 1))
+    if len(samples) == 1:
+        samples = samples * 2
+    span = max(1, len(samples) - 1)
     coordinates = []
-    for index, value in enumerate(history):
-        try:
-            clamped = min(100.0, max(0.0, float(value)))
-        except (TypeError, ValueError):
-            clamped = 0.0
+    for index, value in enumerate(samples):
         x = graph_x + index * graph_width / span
-        y = GRAPH_BOTTOM - clamped / 100 * GRAPH_HEIGHT
+        y = GRAPH_BOTTOM - value / 100 * GRAPH_HEIGHT
         coordinates.append((x, y))
     return coordinates
 
 
-def _render_icon(layout: dict) -> str:
-    """The metric's Phosphor glyph, scaled out of its 256 box and centred.
-
-    One transform rather than pre-scaled path data: the arithmetic stays visible
-    and ICON_SIZE remains the only number to change if the strip's height ever
-    does. Colour and opacity are attributes on the group, like the graph's
-    strokes -- the stylesheet in render_svg() speaks for the text only.
-    """
+def _render_glyph(name: str, x: float = 0) -> str:
+    """One Phosphor glyph in the strip's shared 14px icon box."""
     top = (22 - ICON_SIZE) / 2
-    return (f'<g transform="translate(0 {top:g}) scale({ICON_SIZE / 256:.6f})" '
+    return (f'<g transform="translate({x:g} {top:g}) scale({ICON_SIZE / 256:.6f})" '
             f'fill="{THEME_FG}" fill-opacity="{ICON_OPACITY}">'
-            f'<path d="{ICON_PATHS[layout["icon"]]}"/></g>')
+            f'<path d="{ICON_PATHS[name]}"/></g>')
+
+
+def _render_icon(layout: dict) -> str:
+    """The metric's identifying glyph, when the strip needs one."""
+    return _render_glyph(layout["icon"])
 
 
 def _render_graph(layout: dict, state: dict) -> str:
@@ -1000,28 +1050,31 @@ def _render_graph(layout: dict, state: dict) -> str:
 
 
 def render_widget(widget: str, state: dict) -> str:
-    """Icon, then the graph if the widget has one, then its numbers.
+    """Optional icon and graph, then the strip's one or two readings.
 
-    A widget without `graph_width` draws no graph -- that is network, whose two
-    figures are the whole of what it has to say.
+    Network has neither: its down/up arrows label the figures directly. Keeping
+    icon and graph independently optional avoids reserving an empty leading box.
     """
     layout = LAYOUTS[widget]
     display = html.escape(str(state.get("display", "--")))
     extra = html.escape(str(state.get("extra", "")))
     extra_text = ""
     if extra and "extra_x" in layout:
-        extra_text = f'\n  <text x="{layout["extra_x"]}" y="15.5" class="secondary">{extra}</text>'
+        extra_text = f'\n  <text x="{layout["extra_x"]}" y="11" class="secondary">{extra}</text>'
 
+    icon = f"{_render_icon(layout)}\n  " if "icon" in layout else ""
+    if "down_icon_x" in layout:
+        icon = (_render_glyph("arrow-down", layout["down_icon_x"])
+                + "\n  " + _render_glyph("arrow-up", layout["up_icon_x"]) + "\n  ")
     graph = f"{_render_graph(layout, state)}\n  " if "graph_width" in layout else ""
-    return f'''{_render_icon(layout)}
-  {graph}<text x="{layout["value_x"]}" y="15.5">{display}</text>{extra_text}'''
+    return f'''{icon}{graph}<text x="{layout["value_x"]}" y="11">{display}</text>{extra_text}'''
 
 
 def render_svg(widget: str, state: dict) -> str:
     width = LAYOUTS[widget]["width"]
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="22" viewBox="0 0 {width} 22">
   <style>
-    text {{ font-family: "Plus Jakarta Sans", sans-serif; font-size: 11.5px; font-weight: 600; fill: {THEME_FG}; fill-opacity: 1.0; }}
+    text {{ font-family: "Plus Jakarta Sans", sans-serif; font-size: 11.5px; font-weight: 600; dominant-baseline: central; fill: {THEME_FG}; fill-opacity: 1.0; }}
     .secondary {{ fill-opacity: 0.75; }}
   </style>
   {render_widget(widget, state)}

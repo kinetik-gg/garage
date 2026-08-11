@@ -3,7 +3,11 @@ Description=Keep Night Shift synchronized after login and resume
 
 [Timer]
 OnBootSec=10s
-OnCalendar=*-*-* *:0/15:00
+# Every minute. The schedule the user set has minute resolution, so a quarter
+# hour of granularity meant Night Shift arriving up to fifteen minutes after the
+# time they asked for -- long enough to read as broken rather than as scheduled.
+# The work is one short-lived process that usually decides nothing has changed.
+OnCalendar=*-*-* *:*:00
 Persistent=true
 Unit=garage-night-shift.service
 

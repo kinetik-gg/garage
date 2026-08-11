@@ -40,6 +40,29 @@ PanelWindow {
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
 
+    // Where the launcher opens, every time. Both of these are held here rather
+    // than left to the compositor, which centres an unanchored layer surface on
+    // its output: centred, a surface whose height tracks the result count moved
+    // the query field up the screen with every keystroke that changed how many
+    // results there were. Anchored to the top, the field stays where it opened
+    // and the list grows downward under it.
+    // A third of the way down the output, measured from the top of the usable
+    // area rather than from the top of the screen -- an overlay surface already
+    // begins below Waybar's exclusive zone, so a margin here is measured from
+    // there. The field is what sits at this height: the list grows downward
+    // underneath it and never moves it.
+    readonly property real spawnTop: {
+        const target = launcher.targetScreen();
+        const available = target ? target.height : 1080;
+        return Math.max(Theme.windowGutter, Math.round(available / 3));
+    }
+    readonly property real spawnLeft: {
+        const target = launcher.targetScreen();
+        const available = target ? target.width : 1920;
+        return Math.max(Theme.windowGutter,
+                        (available - launcher.implicitWidth) / 2);
+    }
+
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
             const candidate = Quickshell.screens[index];
@@ -51,19 +74,58 @@ PanelWindow {
 
     screen: launcher.targetScreen()
     implicitWidth: 640
-    implicitHeight: Math.min(
-        72 + Math.max(results.count, 1) * rowHeight + 12,
-        72 + maxRows * rowHeight + 12)
+    readonly property real contentMargin: 14
+
+    // The row count the window is sized from. Deliberately not results.count.
+    //
+    // rebuild() fills the model a row at a time, and every one of those
+    // append() and remove() calls moves results.count. Sized from it directly,
+    // narrowing a nine-row list to two resized the layer surface seven times
+    // for one keystroke -- each resize a configure, a new buffer and a relayout
+    // of everything in the panel. That is what moves around while typing.
+    //
+    // Set once, at the end of a rebuild, so the window changes size exactly
+    // once no matter how many rows came or went.
+    property int rowCount: 0
+    readonly property bool listing: launcher.rowCount > 0
+    readonly property int visibleRows: Math.min(launcher.rowCount, launcher.maxRows)
+
+    // Measured off the column rather than recomputed from its parts, the way
+    // every other palette in the shell sizes itself. Arithmetic written out here
+    // -- margins plus field plus gap plus rows -- has to be kept in step with
+    // the layout by hand, and the two disagreeing is a panel whose contents hang
+    // off the bottom of the surface they are drawn on.
+    //
+    // Exactly the contents and not a pixel more, on every frame. The compositor
+    // blurs a surface rather than what is painted on it, so any height the panel
+    // is not using comes out as a blurred slab hanging below the last row.
+    implicitHeight: Math.max(1, body.implicitHeight + launcher.contentMargin * 2)
     color: "transparent"
     focusable: true
     aboveWindows: true
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
-    // Deliberately no anchors: a layer surface anchored to nothing is centred on
-    // its output by the compositor, which is where a launcher belongs. The
-    // implicit size below is the whole geometry, so the height still tracks the
-    // result count as it did when this was a window.
+    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
+    PanelMotion {
+        id: motion
+        restingTop: launcher.spawnTop
+        onFinished: launcher.dismissed()
+    }
+
+    function requestDismissal() {
+        motion.dismiss();
+    }
+
+    anchors {
+        top: true
+        left: true
+    }
+
+    // Clamped into the output on both axes, so a drag cannot put the field
+    // somewhere it can be typed into but not seen.
+    margins.left: launcher.spawnLeft
+    margins.top: motion.surfaceTop
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-launcher"
@@ -136,13 +198,17 @@ PanelWindow {
         const sum = Calculator.evaluate(text);
         if (sum !== null)
             rows.push({ kind: "calc", title: sum, subtitle: text + " — copy result",
-                        icon: "", entry: null });
+                        icon: "", entry: null, url: "" });
 
+        // Nothing until something is typed. An empty query used to rank every
+        // installed application equally, so the launcher opened onto the first
+        // eight of them in alphabetical order -- eight things the user had not
+        // asked for, one of which was selected and one Return from launching.
         const apps = [];
-        const model = DesktopEntries.applications;
-        for (let i = 0; i < model.values.length; ++i) {
+        const model = needle === "" ? null : DesktopEntries.applications;
+        for (let i = 0; model !== null && i < model.values.length; ++i) {
             const entry = model.values[i];
-            const rank = needle === "" ? (entry.noDisplay ? -1 : 1) : matches(entry, needle);
+            const rank = matches(entry, needle);
             if (rank >= 0)
                 apps.push({ rank: rank, entry: entry });
         }
@@ -151,22 +217,79 @@ PanelWindow {
         for (const app of apps.slice(0, maxRows))
             rows.push({ kind: "app", title: app.entry.name,
                         subtitle: app.entry.comment || app.entry.genericName || "",
-                        icon: app.entry.icon, entry: app.entry });
+                        icon: app.entry.icon, entry: app.entry, url: "" });
 
-        if (text !== "")
-            rows.push({ kind: "web", title: "Search for “" + text + "”",
-                        subtitle: browserResolved && browserId === ""
-                            ? "No web browser installed"
-                            : (browserEntry ? browserEntry.name : "Web search"),
-                        icon: browserEntry ? browserEntry.icon : "", entry: null });
+        // An address the user typed, and the site a bare name stands for. Both
+        // go above the search row and below the applications: someone who types
+        // "steam" with Steam installed wants the client, and someone who types
+        // "github.com" wants the site rather than a search for its name.
+        const address = WebAddress.addressFor(text);
+        const site = address === "" ? WebAddress.siteFor(text) : "";
+        const destination = address !== "" ? address
+            : (site !== "" ? "https://" + site : "");
+        const browserName = browserResolved && browserId === ""
+            ? "No web browser installed"
+            : (browserEntry ? browserEntry.name : "Web browser");
+        const openRow = destination === "" ? null
+            : { kind: "url", title: "Open " + WebAddress.displayHost(destination),
+                subtitle: browserName, icon: browserEntry ? browserEntry.icon : "",
+                entry: null, url: destination };
+        const searchRow = text === "" ? null
+            : { kind: "web", title: "Search for “" + text + "”",
+                subtitle: browserResolved && browserId === ""
+                    ? "No web browser installed"
+                    : (browserEntry ? browserEntry.name : "Web search"),
+                icon: browserEntry ? browserEntry.icon : "", entry: null, url: "" };
 
-        results.clear();
-        for (const row of rows)
-            results.append(row);
+        // Which of the two goes first, when both are offered. A named site or a
+        // confident address is what the user meant; a bare word on an unusual
+        // top-level domain parses as an address but is more often a filename,
+        // so the search takes the default and opening it stays one row down.
+        const openFirst = site !== "" || (address !== "" && WebAddress.confident(text));
+        for (const row of (openFirst ? [openRow, searchRow] : [searchRow, openRow])) {
+            if (row !== null)
+                rows.push(row);
+        }
+
+        // What each row does, kept out of the model. `entry` is a DesktopEntry --
+        // a QObject -- and a ListModel role holding one cannot be rewritten in
+        // place: set() aborts the process outright when the role's type moves,
+        // which it does the moment an application row is overwritten by a
+        // search row. The model gets strings only; this array is what activate()
+        // reads, and the two are the same length by construction.
+        launcher.rowActions = rows.map(row => ({ kind: row.kind, entry: row.entry,
+                                                 url: row.url, title: row.title }));
+
+        // Updated in place, never cleared. clear() destroys every delegate the
+        // ListView is holding and append() builds them all again, so a keystroke
+        // that changed one row tore down the whole list and rebuilt it -- and
+        // for the frame in between the list was empty. That was the flicker: the
+        // results blinking out on every character, not the window resizing
+        // around them. set() rewrites a row the ListView already has, so its
+        // delegate survives and repaints.
+        for (let index = 0; index < rows.length; ++index) {
+            const source = rows[index];
+            const row = { kind: String(source.kind),
+                          title: String(source.title || ""),
+                          subtitle: String(source.subtitle || ""),
+                          icon: String(source.icon || "") };
+            if (index < results.count)
+                results.set(index, row);
+            else
+                results.append(row);
+        }
+        while (results.count > rows.length)
+            results.remove(results.count - 1);
+        launcher.rowCount = rows.length;
         selected = 0;
     }
 
     ListModel { id: results }
+
+    // Parallel to `results`, holding the parts of a row that are not text: the
+    // desktop entry to launch and the address to open. See the note in
+    // rebuild() for why these cannot live in the model.
+    property var rowActions: []
 
     onQueryChanged: rebuild()
     onBrowserResolvedChanged: rebuild()
@@ -179,30 +302,75 @@ PanelWindow {
     }
 
     function activate(index) {
-        if (index < 0 || index >= results.count)
+        if (index < 0 || index >= results.count
+                || index >= launcher.rowActions.length)
             return;
-        const row = results.get(index);
+        const row = launcher.rowActions[index];
         if (row.kind === "app") {
             row.entry.execute();
         } else if (row.kind === "calc") {
             Quickshell.clipboardText = row.title;
-        } else if (row.kind === "web") {
+        } else if (row.kind === "web" || row.kind === "url") {
             if (browserId === "") {
                 noBrowser.visible = true;
                 return;
             }
-            Quickshell.execDetached(["xdg-open", searchUrl(query.trim())]);
+            Quickshell.execDetached(["xdg-open", row.kind === "url"
+                ? row.url : searchUrl(query.trim())]);
         }
         launcher.dismissed();
     }
 
     ContinuousRectangle {
+        id: panel
         anchors.fill: parent
-        color: Theme.dialogTint
+        opacity: motion.opacity
+        radius: Theme.cornerRadius
+        power: Theme.cornerPower
+        // Transparent under glass: garage-launcher is one of the compositor's
+        // glass layer namespaces, so the material is drawn beneath this surface
+        // and painting a body here would cover it.
+        color: Theme.panel
+        borderWidth: 1
+        borderColor: Theme.frameOuter
 
-        ColumnLayout {
+        // The body, over the glass and under everything else. Theme.panel is
+        // transparent so the compositor's material shows through, and the
+        // material alone is not a readable surface: over a bright window this
+        // panel and its text wash out together. Declared before the content so
+        // stacking order keeps it underneath without needing a z of its own.
+        ContinuousRectangle {
             anchors.fill: parent
-            anchors.margins: 14
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            color: Theme.contentTint
+        }
+
+        // Inner hairline one inset px in from the outer one, the double frame
+        // every other panel in the shell draws. insetRadius keeps the two
+        // concentric at every corner radius setting.
+        ContinuousRectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.insetRadius(panel.radius, 1)
+            power: Theme.cornerPower
+            borderWidth: 1
+            borderColor: Theme.frameInner
+        }
+
+        // Anchored rather than filled: the window's height is this column's
+        // implicit height, so the column must not be told how tall it is. Filled,
+        // it took the surface's height instead -- and whenever the surface was
+        // momentarily taller than the contents, the layout shared the surplus out
+        // between the field and the list and both drifted toward the middle of
+        // the panel until the sizes agreed again.
+        ColumnLayout {
+            id: body
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: launcher.contentMargin
             spacing: 8
 
             RowLayout {
@@ -255,8 +423,11 @@ PanelWindow {
                         renderType: Text.NativeRendering
                     }
 
-                    Keys.onDownPressed: launcher.selected =
-                        Math.min(launcher.selected + 1, results.count - 1)
+                    // Clamped at both ends: with nothing in the list at all,
+                    // count - 1 is -1, and Down landing on -1 leaves the first
+                    // row unselectable until something else resets it.
+                    Keys.onDownPressed: launcher.selected = Math.max(0,
+                        Math.min(launcher.selected + 1, results.count - 1))
                     Keys.onUpPressed: launcher.selected =
                         Math.max(launcher.selected - 1, 0)
                     Keys.onReturnPressed: launcher.activate(launcher.selected)
@@ -267,7 +438,11 @@ PanelWindow {
             ListView {
                 id: resultList
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                // Sized rather than filling: the window's height is computed
+                // from this above, so a fillHeight here would be each asking
+                // the other how tall it is.
+                Layout.preferredHeight: launcher.visibleRows * launcher.rowHeight
+                visible: launcher.listing
                 model: results
                 clip: true
                 currentIndex: launcher.selected

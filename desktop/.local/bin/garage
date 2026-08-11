@@ -132,6 +132,7 @@ LOCALE_ENV = GENERATED / "locale.env"
 WAYBAR_CLOCK = GENERATED / "waybar-clock.jsonc"
 WAYBAR_WORKSPACES = GENERATED / "waybar-workspaces.jsonc"
 WAYBAR_WIDGETS = GENERATED / "waybar-widgets.jsonc"
+REDUCE_MOTION_FILE = GENERATED / "reduce-motion"
 
 # The bar's left side, which is what the workspace indicator is toggled out of.
 # waybar cannot append to an array from an include -- an option is won by
@@ -147,6 +148,27 @@ WAYBAR_WORKSPACE_MODULE = "ext/workspaces"
 # named there would be won by there and the toggles could never add to it.
 WAYBAR_MODULES_RIGHT = ["custom/notifications", "custom/launcher",
                         "custom/control-center", "clock"]
+WAYBAR_MONITOR_GROUP = "group/monitoring"
+WAYBAR_STATUS_GROUP = "group/status-tail"
+# How far the right side's static tail reaches in from the edge of the output.
+# The metric strips are the group before it, and their own widths are known, so
+# this is the last thing the monitor dashboard needs to place itself under them
+# -- garage-panel-toggle reads it back out of the generated stylesheet.
+#
+# It is exact only while it is larger than what the tail would otherwise take.
+# GTK gives a box a minimum width and no maximum, so this pins the tail at
+# exactly this many pixels whenever its contents want fewer -- which is what
+# makes the arithmetic above a real coordinate rather than an estimate -- and is
+# ignored the moment they want more.
+#
+# The tail's own width is its text plus the padding around it, so both halves of
+# that can move: a longer clock format or a wider locale on one side,
+# bar.padding_scale on the other. Measured at 298px with the shipped clock format
+# at padding_scale 1.25, which is the widest of the scales in common use; 300 is
+# that rounded up. Past this the anchor drifts right of the group's true centre
+# by the excess, and no further -- the panel clamps itself into the output, so
+# the worst case is an off-centre dashboard, never one over an edge.
+WAYBAR_STATUS_TAIL_WIDTH = 300
 
 # The metric strips the bar can carry, in the order they sit on the right side.
 # The names are garage-metrics' own --bar-svg widgets, and each one is switched
@@ -173,9 +195,16 @@ BAR_BACKGROUNDS = ("blurred", "transparent")
 # *vertical* margin is excluded for a harder reason -- see waybar_spacing_css(),
 # where it is derived from the bar height instead.
 PADDING_TABLE = {
-    "menu_left": 13,      # #custom-menu padding-left
-    "menu_right": 20,     # #custom-menu padding-right, wider so the logo clears
-    "workspace_gap": 5,   # half the space between two workspace dots
+    # The menu button's two margins, not its padding: it is a square, and
+    # padding would stretch it back into a rectangle. See MENU_BUTTON_NUDGE.
+    # They add up with the square to exactly the width the two paddings they
+    # replaced came to, so nothing to the right of the logo moves.
+    "menu_left": 6,       # #custom-menu margin-left
+    "menu_right": 13,     # #custom-menu margin-right, wider so the logo clears
+    # Half the space between two workspace dots -- and padding on the button
+    # rather than margin around it, so the space between the dots belongs to a
+    # dot and can be clicked. As a margin it was dead bar.
+    "workspace_gap": 5,
     "module": 12,         # the horizontal padding every text module shares
     "image": 8,           # #image, which is every metric strip
     "icon": 10,           # the notification / launcher / control-centre trio
@@ -189,6 +218,47 @@ PADDING_TABLE = {
 # waybar_spacing_css() centres the dot against the bar height and needs to know
 # how much of that height the dot itself takes.
 WORKSPACE_DOT = 6
+
+# The height of the tint a module wears while the pointer is over it. Like the
+# workspace dot above, the bar height decides the rest of it: the margin above
+# and below is whatever is left over, so the pill keeps its proportions whatever
+# the bar is set to rather than growing with the padding slider. 27 against the
+# default 43 leaves 8px of bar showing at each edge, which is enough for the tint
+# to read as sitting inside the bar rather than dividing it into blocks.
+MODULE_HOVER_PILL = 27
+
+# Every module that answers the pointer, and so every module that wears the tint
+# above. The workspace dots are deliberately absent: they have a hover state of
+# their own -- the dot brightens -- and a pill behind a 6px dot would be a box
+# around a full-width button the user cannot see the edges of.
+#
+# The clock is here despite having no on-click. It is the calendar's hover
+# target, so it does answer the pointer, and a right side where every module but
+# one lights up reads as the clock being broken.
+# The menu button is square, and the tint's own height is what makes it so: a
+# hover state around the logo has to read as a button, and a rectangle around a
+# single icon reads as a slice of the bar instead.
+#
+# Its two spacings are margins rather than padding for the same reason. Padding
+# is inside the box and would stretch it back into a rectangle; a margin is
+# outside it, so the gap to the screen edge and the gap to the workspace dots
+# both survive with the square intact. See menu_left and menu_right in
+# PADDING_TABLE, which are those margins.
+#
+# The logo is a Nerd Font glyph whose ink is wider than the advance it is
+# centred on and hangs off to the right of it, so a label centred in the square
+# puts the visible mark right of centre. This is padding on the right that pushes
+# the advance back left until the ink sits in the middle, taken out of the square
+# rather than added to it. Optical correction for one glyph at one size, so it is
+# not on the density slider.
+MENU_BUTTON_NUDGE = 6
+
+WAYBAR_HOVER_MODULES = (
+    "#custom-menu", "#image", "#custom-media", "#custom-ai-usage",
+    "#custom-notifications", "#custom-launcher", "#custom-control-center",
+    "#custom-containers", "#custom-microphone", "#custom-smb", "#custom-git",
+    "#custom-monitor", "#pulseaudio", "#clock",
+)
 
 # Toolkit configs that offer no include or indirection mechanism, so a theme
 # switch has to rewrite the file itself. They are deliberately not stowed: every
@@ -1264,7 +1334,12 @@ PREFERENCE_ROUTES: dict[str, tuple] = {
     "search": ("render_search_engine",),
     "corner_radius": ("render_preferences", "apply_corner_radius"),
     "border": ("render_preferences", "apply_border"),
-    "motion": ("render_preferences", "apply_motion"),
+    # The bar is the third party to this one. Its workspace dots are the only
+    # movement outside the compositor, and waybar cannot see Hyprland's
+    # animations switch, so the stylesheet carries a Reduce Motion of its own and
+    # has to be rewritten and re-read when the setting moves.
+    "motion": ("render_preferences", "render_motion", "apply_motion",
+               "apply_bar_style"),
     "theme": ("apply_theme_if_scheme_moved",),
     "glass": ("render_preferences", "apply_glass"),
     "night_shift": ("apply_night_shift",),
@@ -2096,6 +2171,19 @@ def corner_rounding(config: dict) -> int:
     return CORNER_RADII[str(config["appearance"]["corner_radius"])]
 
 
+def render_motion(config: dict) -> None:
+    """Publish Reduce Motion for the parts of the desktop Hyprland cannot reach.
+
+    The compositor has its own switch and motion_lua() throws it. Nothing else
+    does: Waybar is a separate process with a stylesheet of its own, and the
+    shell's palettes animate themselves in QML because the entrance they want is
+    not one a layer rule can describe. Both read this marker.
+    """
+    GENERATED.mkdir(parents=True, exist_ok=True)
+    write_marker(REDUCE_MOTION_FILE,
+                 "1\n" if config["appearance"]["reduce_motion"] else "0\n")
+
+
 def render_preferences(config: dict) -> None:
     GENERATED.mkdir(parents=True, exist_ok=True)
     # Published here as well as from apply_glass so the marker exists before the
@@ -2613,7 +2701,7 @@ METRIC_STRIP_WIDTHS = {
     "temp": 76,
     "disk": 91,
     "gpu": 124,
-    "network": 127,
+    "network": 130,
 }
 
 
@@ -2631,13 +2719,14 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
     lines while the bar runs three of them reads as though all six are running.
     """
     bar = config["bar"]
-    right: list[str] = []
+    metrics: list[str] = []
+    status_tail: list[str] = []
     definitions: dict = {}
     for name in BAR_METRICS:
         if not bar[f"monitor_{name}"]:
             continue
         module = f"image#metric-{name}"
-        right.append(module)
+        metrics.append(module)
         # The one image-module form that works. `path` -- and every other
         # spelling tried -- spins waybar at 100% CPU with no bar ever drawn; see
         # the note in config.jsonc. This is exec + interval + size, probed live.
@@ -2646,10 +2735,10 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
             "size": METRIC_STRIP_WIDTHS[name],
             "interval": 2,
             "tooltip": True,
-            "on-click": "$HOME/.local/bin/garage-panel-toggle monitor",
+            "on-click": f"$HOME/.local/bin/garage-panel-toggle monitor {name}",
         }
     if bar["ai_usage"]:
-        right.append("custom/ai-usage")
+        status_tail.append("custom/ai-usage")
         # Minutes, not seconds: the figure behind it is a rolling usage total that
         # moves over a billing window, and tokscale is a subprocess per tick.
         definitions["custom/ai-usage"] = {
@@ -2660,7 +2749,15 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
             "tooltip": True,
             "on-click": "$HOME/.local/bin/garage-panel-toggle ai-usage",
         }
-    right += WAYBAR_MODULES_RIGHT
+    right = [WAYBAR_MONITOR_GROUP, WAYBAR_STATUS_GROUP]
+    definitions[WAYBAR_MONITOR_GROUP] = {
+        "orientation": "horizontal",
+        "modules": metrics,
+    }
+    definitions[WAYBAR_STATUS_GROUP] = {
+        "orientation": "horizontal",
+        "modules": status_tail + WAYBAR_MODULES_RIGHT,
+    }
     center: list[str] = []
     if bar["media_player"]:
         center.append("custom/media")
@@ -3386,6 +3483,7 @@ def render_all(config: dict) -> None:
     render_workspaces(config)
     render_bar_workspaces(config)
     render_bar_widgets(config)
+    render_motion(config)
     render_accent(config)
     render_corner_radius(config)
     render_theme(config)
@@ -3744,21 +3842,56 @@ def waybar_spacing_css(config: dict) -> str:
     scale = float(config["bar"]["padding_scale"])
     step = {name: max(0, round(base * scale)) for name, base in PADDING_TABLE.items()}
     # Centred by hand rather than left to GTK, because the margin *is* the box:
-    # the label is WORKSPACE_DOT tall and the margin is the rest of the bar.
-    dot_margin = max(0, (int(config["bar"]["height"]) - WORKSPACE_DOT) // 2)
+    # the label is WORKSPACE_DOT tall and this margin is the rest of the box.
+    #
+    # The box used to be the whole bar height, which made the dot's button as
+    # tall as the bar and its hover state a full-height block. It is the same
+    # pill as every other module now, so the dot is centred in that instead and
+    # the button carries the rest of the height as a margin below.
+    height = int(config["bar"]["height"])
+    dot_margin = max(0, (MODULE_HOVER_PILL - WORKSPACE_DOT) // 2)
+    workspace_button_margin = max(
+        0, (height - (WORKSPACE_DOT + dot_margin * 2)) // 2)
+    # Same arithmetic, same reason: the pill is MODULE_HOVER_PILL tall and this
+    # margin is the rest of the bar. Vertical only -- a horizontal margin here
+    # would move the metric strips, and the monitor dashboard is positioned from
+    # where they sit. See WAYBAR_STATUS_TAIL_WIDTH.
+    hover_margin = max(0, (height - MODULE_HOVER_PILL) // 2)
+    hover_modules = ",\n".join(WAYBAR_HOVER_MODULES)
+    workspace_transition = ("none" if config["appearance"]["reduce_motion"]
+                            else "min-width 180ms ease-out, background-color 180ms ease-out")
+    # The tint fades in unless the user has asked for no motion, in which case it
+    # appears on the frame the pointer arrives. Waybar cannot see Hyprland's
+    # animation switch, so Reduce Motion has to reach it here.
+    hover_transition = ("none" if config["appearance"]["reduce_motion"]
+                        else "background-color 130ms ease-out")
     return f'''/* Spacing from PADDING_TABLE at bar.padding_scale {scale:g}. */
+/* Square, at the width the hover tint is tall. Its spacings are the margins
+   either side rather than padding, which would go inside the square and stretch
+   it. See MENU_BUTTON_NUDGE for the right-hand padding, which is optical
+   correction for the glyph and is taken out of the square rather than added. */
 #custom-menu {{
-  padding-left: {step["menu_left"]}px;
-  padding-right: {step["menu_right"]}px;
+  min-width: {MODULE_HOVER_PILL - MENU_BUTTON_NUDGE}px;
+  padding-left: 0;
+  padding-right: {MENU_BUTTON_NUDGE}px;
+  margin-left: {step["menu_left"]}px;
+  margin-right: {step["menu_right"]}px;
 }}
 
+/* Padding, so the space between two dots is part of a button and answers a
+   click. As a margin it was outside the button, which left the target the width
+   of the dot itself -- smaller than the pointer that has to find it. */
 #workspaces button {{
-  margin: 0 {step["workspace_gap"]}px;
+  margin: {workspace_button_margin}px 0;
+  padding: 0 {step["workspace_gap"]}px;
 }}
 
-/* Not scaled: the bar height decides this one. See waybar_spacing_css(). */
+/* Not scaled: this margin *is* the dot's box, and the box is what the hover
+   tint is drawn around, so it is derived from MODULE_HOVER_PILL and the bar
+   height rather than from the density slider. See waybar_spacing_css(). */
 #workspaces button label {{
   margin: {dot_margin}px 0;
+  transition: {workspace_transition};
 }}
 
 #custom-media,
@@ -3775,6 +3908,23 @@ def waybar_spacing_css(config: dict) -> str:
 
 #image {{
   padding: 0 {step["image"]}px;
+}}
+
+/* The one number garage-panel-toggle reads back out of this sheet, so the
+   dashboard's anchor and the bar's own layout cannot disagree about it. See
+   WAYBAR_STATUS_TAIL_WIDTH. */
+#status-tail {{
+  min-width: {WAYBAR_STATUS_TAIL_WIDTH}px;
+}}
+
+/* Room for the hover tint to sit in. Carried by the modules themselves and not
+   by their hover state, so the bar does not reflow under the pointer and only
+   the colour changes. Not scaled, because the bar height decides this one the
+   same way it decides the dot margin above. See waybar_spacing_css(). */
+{hover_modules} {{
+  margin-top: {hover_margin}px;
+  margin-bottom: {hover_margin}px;
+  transition: {hover_transition};
 }}
 
 #custom-notifications,
@@ -3821,6 +3971,8 @@ def waybar_style_css(scheme: str, config: dict) -> str:
 @define-color menu_fg {bar_fg};
 @define-color module_fg {bar_fg};
 @define-color module_fg_hover {bar_fg};
+@define-color module_hover_bg alpha({bar_fg}, 0.12);
+@define-color module_press_bg alpha({bar_fg}, 0.22);
 @define-color module_fg_muted alpha({bar_fg}, 0.55);
 @define-color dot_idle rgba({dot}, 0.45);
 @define-color dot_hover rgba({dot}, 0.65);
@@ -4610,11 +4762,21 @@ def apply_motion(config: dict) -> None:
         run(["hyprctl", "reload"])
 
 
-def apply_night_shift(config: dict) -> None:
+def apply_night_shift(config: dict) -> bool:
+    """Put the current schedule into hyprsunset. True if it took.
+
+    The call is answered by hyprsunset over Hyprland's IPC, so it fails when
+    hyprsunset is not up yet -- which is exactly the case at session start,
+    where autostart.lua runs `garage apply` without waiting for it. The failure
+    was silent and the setting simply did not apply until the timer's next tick.
+    Reported instead, so the one caller that can do something about it does.
+    """
     if night_shift_active(config):
-        run(["hyprctl", "hyprsunset", "temperature", str(int(config["appearance"]["night_shift_temperature"]))])
+        temperature = str(int(config["appearance"]["night_shift_temperature"]))
+        result = run(["hyprctl", "hyprsunset", "temperature", temperature])
     else:
-        run(["hyprctl", "hyprsunset", "identity"])
+        result = run(["hyprctl", "hyprsunset", "identity"])
+    return result.returncode == 0
 
 
 def apply_preferences(config: dict, *, restart_idle: bool = True) -> None:
@@ -6511,8 +6673,12 @@ def main(argv: list[str]) -> int:
                 run(["hyprctl", "reload"])
             response(resolve_theme(config))
         elif command == "night-shift-sync":
-            apply_night_shift(load_preferences())
-            response(night_shift_active(load_preferences()))
+            config = load_preferences()
+            # One load, not three: the schedule is read against the clock and a
+            # sync that straddled a boundary would answer about a different
+            # minute than the one it applied.
+            applied = apply_night_shift(config)
+            response({"active": night_shift_active(config), "applied": applied})
         else:
             raise SettingsError(f"Unknown command: {command}")
         return 0

@@ -269,7 +269,7 @@ Scope {
 
         ContinuousRectangle {
             anchors.fill: parent
-            color: Theme.dialogTint
+            color: Theme.contentTint
 
             ColumnLayout {
                 anchors.fill: parent

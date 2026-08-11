@@ -29,6 +29,19 @@ QtObject {
     }
     readonly property real cornerPower: 3.37
 
+    // Reduce Motion, for the animations Hyprland's own switch cannot reach.
+    // Every palette in the shell animates its own entrance -- see PanelMotion --
+    // and a compositor layer rule is not what is driving those, so the setting
+    // has to arrive here as well. Off means the surface is simply there.
+    property bool reduceMotion: false
+    property FileView reduceMotionFile: FileView {
+        path: Quickshell.env("HOME") + "/.local/state/garage/generated/reduce-motion"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: theme.reduceMotion = String(text()).trim() === "1"
+    }
+
     // Radius for buttons, list rows, fields and other small controls.
     //
     // ContinuousRectangle draws radius * cornerPower / 2 and clamps at half the
@@ -96,18 +109,19 @@ QtObject {
     // them, so painting a surface here would cover it -- the same mistake the
     // terminal was making with its own background.
     readonly property color panel: solid ? bodyBase : "transparent"
-    // Content area of a glass-backed panel. Sits over the material to lift text
-    // contrast without covering it the way an opaque surface would.
+    // The body every floating surface in the shell wears, over the glass and
+    // under the content. `panel` above is transparent so the compositor's
+    // material shows through, and glass alone is not a surface anything can be
+    // read on: over a white browser page a panel with no body of its own washes
+    // out completely, and the text with it.
+    //
+    // One value, not one per kind of surface. This used to be four -- a panel
+    // tint at 90%, dialogs and the screenshot pill at 75%, menus at 25% -- and
+    // what a surface floats over has nothing to do with whether it is a menu or
+    // a dialog. They all float over the same arbitrary desktop, so they all need
+    // the same body, and four of them only meant three of the shell's surfaces
+    // were unreadable in different ways.
     readonly property color contentTint: solid ? bodyRaised : (dark ? "#e62c2c2e" : "#e6ffffff")
-    // Menu surfaces sit on glass like the panels, but need enough body for a
-    // list of short labels to stay readable while it floats over anything.
-    readonly property color menuTint: solid ? bodyRaised : (dark ? "#402c2c2e" : "#40ffffff")
-    // Dialogs and modals float over whatever raised them, so they carry more
-    // body than a menu to stay separate from the surface underneath.
-    readonly property color dialogTint: solid ? bodyRaised : (dark ? "#bf2c2c2e" : "#bfffffff")
-    // The screenshot pill floats over live desktop content with white labels on
-    // it, so it needs body of its own rather than reading as pure glass.
-    readonly property color toolbarTint: solid ? bodyRaised : (dark ? "#bf2c2c2e" : "#bfffffff")
     // Icon well in dialogs: deliberately darker than the surface it sits on, so
     // the glyph can be light and carry the contrast itself.
     readonly property color iconWell: dark ? "#59000000" : "#59000000"

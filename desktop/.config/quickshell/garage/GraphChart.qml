@@ -90,14 +90,22 @@ Item {
     // The stream carries nulls wherever a sensor has nothing to say and the
     // seeded history is whatever the bar last wrote, so neither can be trusted
     // to be plottable as it arrives.
+    // Plotted straight. Every series that needs a logarithm arrives with one
+    // already applied -- throughput goes through logScale() as it is sampled --
+    // and the rest are percentages, which are already the scale they are read
+    // on. Curving a percentage a second time put 1% of load two thirds of the
+    // way up the plot.
+    function plottedValue(sourceValue) {
+        const value = Number(sourceValue);
+        return isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    }
+
     function series(source) {
         if (!Array.isArray(source) || source.length === 0)
             return [];
         const values = [];
-        for (let index = 0; index < source.length; ++index) {
-            const value = Number(source[index]);
-            values.push(isFinite(value) ? Math.max(0, Math.min(100, value)) : 0);
-        }
+        for (let index = 0; index < source.length; ++index)
+            values.push(chart.plottedValue(source[index]));
         // One sample is not a line. Doubling it draws the flat line that value
         // deserves rather than nothing at all, which is what the bar does with a
         // one-entry history for the same reason.

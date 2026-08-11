@@ -34,11 +34,32 @@ QtObject {
         return format(value);
     }
 
+    // Grouped in thousands, because the answer is the whole point of the row and
+    // an unbroken run of digits is not one anybody can read at a glance.
+    // Separators go on the integer part only -- the fraction is a position, not
+    // a magnitude -- and the locale decides the character, so this reads the way
+    // the rest of the desktop's numbers do rather than assuming a comma.
     function format(value) {
         const rounded = Math.round(value * 1e10) / 1e10;
-        if (Number.isInteger(rounded))
-            return String(rounded);
-        return String(parseFloat(rounded.toFixed(10)));
+        const exact = Number.isInteger(rounded)
+            ? String(rounded) : String(parseFloat(rounded.toFixed(10)));
+        // Anything Number cannot round-trip is left as it came out: past 2^53
+        // the digits are already an approximation and grouping them would only
+        // make the approximation look deliberate.
+        if (!isFinite(rounded) || Math.abs(rounded) >= Number.MAX_SAFE_INTEGER
+                || exact.indexOf("e") >= 0)
+            return exact;
+        const negative = exact.charAt(0) === "-";
+        const digits = negative ? exact.slice(1) : exact;
+        const point = digits.indexOf(".");
+        const whole = point < 0 ? digits : digits.slice(0, point);
+        // The locale's point, not the one the parser happened to accept. Under a
+        // locale that groups with "." and points with "," -- most of Europe --
+        // keeping the typed character produced 1.234.567.89.
+        const fraction = point < 0
+            ? "" : Qt.locale().decimalPoint + digits.slice(point + 1);
+        return (negative ? "-" : "")
+            + Number(whole).toLocaleString(Qt.locale(), "f", 0) + fraction;
     }
 
     function skipSpace(state) {
