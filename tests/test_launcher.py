@@ -96,6 +96,10 @@ class StableLauncherSurface(unittest.TestCase):
         self.assertIn("anchors.top: fieldRow.bottom", body)
         self.assertNotIn("ColumnLayout {", body)
 
+    def test_application_rank_helper_is_imported_before_use(self) -> None:
+        self.assertIn('import "LauncherExtras.js" as LauncherExtras', self.qml)
+        self.assertIn("LauncherExtras.applicationRank(entry, needle)", self.qml)
+
 
 class LauncherGlassRouting(unittest.TestCase):
     def test_fixed_host_is_not_a_liquid_glass_surface(self) -> None:

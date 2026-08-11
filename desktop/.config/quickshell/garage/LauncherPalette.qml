@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
+import "LauncherExtras.js" as LauncherExtras
 
 // A layer surface, like every other transient palette in the shell, and unlike
 // the FloatingWindow this used to be. A toplevel is dismissed by losing focus,
