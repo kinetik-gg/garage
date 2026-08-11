@@ -72,6 +72,9 @@ relate, and where a given change belongs. See
 backend, the keybind catalog, or the plugin lifecycle — it's a map to the
 comments that already explain why each is shaped the way it is.
 
+See [`docs/LAUNCHER.md`](docs/LAUNCHER.md) for launcher queries, commands, and
+their activation behavior.
+
 ## Core setup
 
 - Hyprland compositor
