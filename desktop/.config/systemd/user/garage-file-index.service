@@ -1,0 +1,19 @@
+[Unit]
+Description=Keep the Garage launcher filename index ready
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/garage-file-index run
+Restart=on-failure
+RestartSec=5
+# Filename discovery should never compete with interactive work. Queries read
+# the last committed SQLite snapshot while this low-priority process builds the
+# next one.
+Nice=10
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+
+[Install]
+WantedBy=graphical-session.target

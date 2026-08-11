@@ -6,6 +6,10 @@ import QtQuick
 
 ShellRoot {
     id: shell
+    // Timers and the stopwatch outlive the lazy launcher surface that controls
+    // them. Holding the singleton at shell scope keeps its deadline checks and
+    // persistence active after the palette closes.
+    readonly property var timerService: TimerService
     property string sessionScreenName: ""
     property string sessionInitialAction: ""
     property string preferencesScreenName: ""

@@ -27,6 +27,7 @@ CONFIG = REPO_ROOT / "desktop" / ".config"
 LAUNCHER = CONFIG / "quickshell" / "garage" / "LauncherPalette.qml"
 LAUNCHER_EXTRAS = CONFIG / "quickshell" / "garage" / "LauncherExtras.js"
 LAUNCHER_SOURCES = CONFIG / "quickshell" / "garage" / "LauncherSources.qml"
+TIMER_SERVICE = CONFIG / "quickshell" / "garage" / "TimerService.qml"
 SESSION = CONFIG / "quickshell" / "garage" / "SessionPalette.qml"
 SHELL = CONFIG / "quickshell" / "garage" / "shell.qml"
 DECORATIONS = CONFIG / "hypr" / "config" / "decorations.lua"
@@ -72,6 +73,12 @@ class StableLauncherSurface(unittest.TestCase):
         self.assertLess(
             self.qml.index("launcher.pendingRowCount = displayedRows.length"),
             self.qml.index("launcher.rowCount = launcher.pendingRowCount"))
+
+    def test_file_results_commit_only_after_the_matching_query_finishes(self) -> None:
+        sources = LAUNCHER_SOURCES.read_text(encoding="utf-8")
+        self.assertIn("if (extraSources.filePending(launcher.query))", self.qml)
+        self.assertNotIn("fileWaits", self.qml)
+        self.assertNotIn("sources.fileResults = [];", sources)
 
     def test_filtering_rewrites_a_preallocated_model_without_changing_its_size(self) -> None:
         start = self.qml.index("function rebuild()")
@@ -224,6 +231,20 @@ process.stdout.write(JSON.stringify({expression}));
         self.assertRegex(result["digits"], r"^[0-9]{24}$")
         self.assertEqual("error", result["tooLong"]["kind"])
 
+    def test_timer_stopwatch_and_file_queries_are_unambiguous(self) -> None:
+        result = self.evaluate('({ timer: context.timerSpec("timer 1h 30m Tea"), '
+                               'tooLong: context.timerSpec("timer 8d"), '
+                               'stopwatch: context.stopwatchSpec("stopwatch lap"), '
+                               'file: context.fileSearchQuery("file launch notes"), '
+                               'plain: context.fileSearchQuery("firefox") })')
+        self.assertEqual("start", result["timer"]["mode"])
+        self.assertEqual(5_400_000, result["timer"]["durationMs"])
+        self.assertEqual("Tea", result["timer"]["label"])
+        self.assertEqual("error", result["tooLong"]["mode"])
+        self.assertEqual("lap", result["stopwatch"]["action"])
+        self.assertEqual("launch notes", result["file"])
+        self.assertIsNone(result["plain"])
+
     def test_pid_search_is_fuzzy_and_ssh_rejects_shell_syntax(self) -> None:
         result = self.evaluate('({ query: context.killQuery("kill qsh"), '
                                'processes: context.processRows("qsh", '
@@ -259,6 +280,14 @@ class LauncherActionRouting(unittest.TestCase):
         self.assertIn("signal changed()", sources)
         self.assertIn("sources.changed();", sources)
         self.assertIn("onChanged: launcher.scheduleRebuild()", LAUNCHER.read_text(encoding="utf-8"))
+
+    def test_timer_state_outlives_the_launcher_and_exact_actions_come_first(self) -> None:
+        timer = TIMER_SERVICE.read_text(encoding="utf-8")
+        shell = SHELL.read_text(encoding="utf-8")
+        self.assertIn("readonly property var timerService: TimerService", shell)
+        self.assertIn('clock-state.json', timer)
+        self.assertIn("atomicWrites: true", timer)
+        self.assertIn("[control].concat(rows)", timer)
 
 
 class LauncherBackendActions(BackendTestCase):

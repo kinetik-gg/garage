@@ -338,6 +338,96 @@ function generateUtility(spec) {
     return spec.kind === "uuid" ? uuidV4() : randomDigits(spec.length);
 }
 
+function compactDuration(milliseconds) {
+    var seconds = Math.max(0, Math.round(Number(milliseconds) / 1000));
+    var parts = [];
+    var units = [[86400, "d"], [3600, "h"], [60, "m"], [1, "s"]];
+    for (var index = 0; index < units.length; ++index) {
+        var amount = Math.floor(seconds / units[index][0]);
+        if (amount > 0 || (units[index][0] === 1 && parts.length === 0)) {
+            parts.push(String(amount) + units[index][1]);
+            seconds -= amount * units[index][0];
+        }
+    }
+    return parts.join(" ");
+}
+
+function clockDuration(milliseconds, tenths) {
+    var total = Math.max(0, Math.floor(Number(milliseconds)));
+    var hours = Math.floor(total / 3600000);
+    var minutes = Math.floor(total % 3600000 / 60000);
+    var seconds = Math.floor(total % 60000 / 1000);
+    var fraction = Math.floor(total % 1000 / 100);
+    function pad(value) { return value < 10 ? "0" + value : String(value); }
+    var text = hours > 0
+        ? String(hours) + ":" + pad(minutes) + ":" + pad(seconds)
+        : pad(minutes) + ":" + pad(seconds);
+    return tenths ? text + "." + fraction : text;
+}
+
+function timerSpec(input) {
+    var match = /^\s*timer(?:\s+(.*?))?\s*$/i.exec(String(input || ""));
+    if (!match)
+        return null;
+    var argument = String(match[1] || "").trim();
+    if (argument === "")
+        return { mode: "list" };
+    if (/^cancel$/i.test(argument))
+        return { mode: "cancel" };
+
+    var remaining = argument;
+    var milliseconds = 0;
+    var consumed = false;
+    var unitMilliseconds = { d: 86400000, h: 3600000, m: 60000, s: 1000 };
+    while (true) {
+        var duration = /^(\d+(?:\.\d+)?)\s*([dhms])(?:\s+|$)/i.exec(remaining);
+        if (!duration)
+            break;
+        consumed = true;
+        milliseconds += Number(duration[1]) * unitMilliseconds[duration[2].toLowerCase()];
+        remaining = remaining.slice(duration[0].length);
+    }
+    if (!consumed || !isFinite(milliseconds) || milliseconds < 1000
+            || milliseconds > 7 * 86400000)
+        return { mode: "error", title: "Use timer 10m or timer 1h 30m Tea",
+            subtitle: "Timers can run from one second through seven days" };
+    var label = remaining.trim() || compactDuration(milliseconds) + " timer";
+    return { mode: "start", durationMs: Math.round(milliseconds), label: label };
+}
+
+function stopwatchSpec(input) {
+    var match = /^\s*stopwatch(?:\s+(.*?))?\s*$/i.exec(String(input || ""));
+    if (!match)
+        return null;
+    var action = cleanToken(match[1] || "");
+    if (action === "")
+        return { action: "list" };
+    if (["start", "pause", "resume", "lap", "reset"].indexOf(action) >= 0)
+        return { action: action };
+    return { action: "error", title: "Use stopwatch start, pause, resume, lap, or reset",
+        subtitle: "Stopwatch controls" };
+}
+
+function fileSearchQuery(input) {
+    var match = /^\s*(?:file|files)(?:(?:\s*:\s*|\s+)(.*?))?\s*$/i.exec(String(input || ""));
+    return match ? String(match[1] || "").trim() : null;
+}
+
+function isExclusiveQuery(input) {
+    return unitConversion(input) !== null
+        || currencyRequest(input) !== null
+        || utilitySpec(input) !== null
+        || emojiRows(input, 1) !== null
+        || killQuery(input) !== null
+        || sshSpec(input) !== null
+        || powerRows(input) !== null
+        || mediaRows(input) !== null
+        || shellRows(input, false, false, false) !== null
+        || timerSpec(input) !== null
+        || stopwatchSpec(input) !== null
+        || fileSearchQuery(input) !== null;
+}
+
 var EMOJI = [
     ["❤️", "red heart", "love romance like favorite"], ["🧡", "orange heart", "love warm"],
     ["💛", "yellow heart", "love friendship happy"], ["💚", "green heart", "love nature"],

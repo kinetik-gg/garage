@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""Background filename index and low-latency query helper for Garage."""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import sqlite3
+import sys
+import threading
+import time
+import tomllib
+
+
+HOME = Path.home()
+CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache"))
+DEFAULTS_PATH = CONFIG_HOME / "garage" / "preferences.defaults.toml"
+PREFERENCES_PATH = Path(os.environ.get(
+    "GARAGE_PREFERENCES", CONFIG_HOME / "garage" / "preferences.toml"))
+DATABASE_PATH = Path(os.environ.get(
+    "GARAGE_FILE_INDEX_DB", CACHE_HOME / "garage" / "file-index.sqlite3"))
+INDEX_LOCK_PATH = Path(os.environ.get(
+    "GARAGE_FILE_INDEX_LOCK", CACHE_HOME / "garage" / "file-index.lock"))
+
+DEFAULT_DIRECTORIES = "\n".join((
+    "~/Desktop", "~/Documents", "~/Downloads", "~/Music", "~/Pictures",
+    "~/Projects", "~/repositories", "~/Videos",
+))
+FALLBACK = {
+    "enabled": True,
+    "frequency_minutes": 5,
+    "max_depth": 8,
+    "directories": DEFAULT_DIRECTORIES,
+}
+EXCLUDED_DIRECTORIES = {
+    "node_modules", "__pycache__", "target", "build", "dist", "vendor",
+}
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS files (
+    path TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_fold TEXT NOT NULL,
+    parent TEXT NOT NULL,
+    path_fold TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    modified_ns INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS files_name_fold ON files(name_fold);
+CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+
+
+class IndexError(RuntimeError):
+    """A user-readable index failure."""
+
+
+def load_toml(path: Path) -> dict:
+    try:
+        with path.open("rb") as handle:
+            value = tomllib.load(handle)
+            return value if isinstance(value, dict) else {}
+    except (FileNotFoundError, PermissionError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def under_home(path: Path) -> bool:
+    try:
+        path.relative_to(HOME.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def configured_roots(value: object) -> list[Path]:
+    if not isinstance(value, str):
+        value = DEFAULT_DIRECTORIES
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for raw in value.splitlines():
+        text = raw.strip()
+        if not text:
+            continue
+        candidate = Path(os.path.expanduser(text))
+        if not candidate.is_absolute():
+            candidate = HOME / candidate
+        candidate = candidate.resolve(strict=False)
+        key = str(candidate)
+        if not under_home(candidate) or key in seen:
+            continue
+        seen.add(key)
+        roots.append(candidate)
+    # If HOME and ~/Documents are both configured, walking both would insert
+    # the same paths twice. Keep only the broadest configured roots while
+    # preserving their user-visible order.
+    return [candidate for candidate in roots
+            if not any(parent != candidate and candidate.is_relative_to(parent)
+                       for parent in roots)]
+
+
+def configuration() -> dict:
+    section = dict(FALLBACK)
+    for path in (DEFAULTS_PATH, PREFERENCES_PATH):
+        values = load_toml(path).get("indexing", {})
+        if isinstance(values, dict):
+            section.update(values)
+    enabled = section.get("enabled")
+    interval = section.get("frequency_minutes")
+    depth = section.get("max_depth")
+    return {
+        "enabled": enabled if isinstance(enabled, bool) else FALLBACK["enabled"],
+        "frequency_minutes": interval
+            if isinstance(interval, int) and not isinstance(interval, bool)
+            and 1 <= interval <= 1440 else FALLBACK["frequency_minutes"],
+        "max_depth": depth
+            if isinstance(depth, int) and not isinstance(depth, bool)
+            and 1 <= depth <= 64 else FALLBACK["max_depth"],
+        "directories": configured_roots(section.get("directories")),
+    }
+
+
+def connect() -> sqlite3.Connection:
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    database = sqlite3.connect(DATABASE_PATH, timeout=0.25)
+    database.execute("PRAGMA journal_mode=WAL")
+    database.execute("PRAGMA synchronous=NORMAL")
+    database.execute("PRAGMA busy_timeout=250")
+    database.executescript(SCHEMA)
+    return database
+
+
+def connect_readonly() -> sqlite3.Connection:
+    """Open an existing snapshot without taking a writer lock during a scan."""
+    uri = DATABASE_PATH.resolve().as_uri() + "?mode=ro"
+    database = sqlite3.connect(uri, uri=True, timeout=0.25)
+    database.execute("PRAGMA busy_timeout=250")
+    return database
+
+
+def excluded_directory(name: str) -> bool:
+    return name.startswith(".") or name in EXCLUDED_DIRECTORIES
+
+
+def index_rows(root: Path, max_depth: int):
+    stack = [(root, 0)]
+    while stack:
+        directory, parent_depth = stack.pop()
+        try:
+            entries = list(os.scandir(directory))
+        except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
+            continue
+        entries.sort(key=lambda entry: entry.name.casefold())
+        for entry in entries:
+            if entry.name.startswith(".") or entry.is_symlink():
+                continue
+            depth = parent_depth + 1
+            try:
+                is_directory = entry.is_dir(follow_symlinks=False)
+                is_file = entry.is_file(follow_symlinks=False)
+                if not (is_directory or is_file):
+                    continue
+                stat = entry.stat(follow_symlinks=False)
+            except (FileNotFoundError, PermissionError, OSError):
+                continue
+            path = Path(entry.path)
+            parent = str(path.parent)
+            yield (
+                str(path), entry.name, entry.name.casefold(), parent,
+                str(path).casefold(), "directory" if is_directory else "file",
+                int(stat.st_mtime_ns),
+            )
+            if is_directory and depth < max_depth and not excluded_directory(entry.name):
+                stack.append((path, depth))
+
+
+def set_metadata(database: sqlite3.Connection, key: str, value: object) -> None:
+    database.execute(
+        "INSERT INTO metadata(key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, str(value)),
+    )
+
+
+def refresh_index(config: dict | None = None) -> dict:
+    config = configuration() if config is None else config
+    INDEX_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with INDEX_LOCK_PATH.open("a+", encoding="utf-8") as lock:
+        # The long-lived service and a manual Preferences refresh can arrive at
+        # the same time. Serialize them outside SQLite so neither fails on its
+        # short database busy timeout and readers keep the previous snapshot.
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        return refresh_index_locked(config)
+
+
+def refresh_index_locked(config: dict) -> dict:
+    started = time.monotonic()
+    roots = [root for root in config["directories"] if root.is_dir()]
+    database = connect()
+    count = 0
+    try:
+        database.execute("BEGIN IMMEDIATE")
+        # Readers in WAL mode keep seeing the previous committed table until
+        # this transaction commits, so a scan never exposes a half-built index.
+        database.execute("DELETE FROM files")
+        statement = (
+            "INSERT INTO files(path,name,name_fold,parent,path_fold,kind,modified_ns) "
+            "VALUES (?,?,?,?,?,?,?)"
+        )
+        batch = []
+        for root in roots:
+            for row in index_rows(root, config["max_depth"]):
+                batch.append(row)
+                if len(batch) >= 500:
+                    database.executemany(statement, batch)
+                    count += len(batch)
+                    batch.clear()
+        if batch:
+            database.executemany(statement, batch)
+            count += len(batch)
+        duration_ms = round((time.monotonic() - started) * 1000)
+        set_metadata(database, "last_scan_epoch", int(time.time()))
+        set_metadata(database, "last_scan_duration_ms", duration_ms)
+        set_metadata(database, "count", count)
+        set_metadata(database, "roots", json.dumps([str(root) for root in roots]))
+        set_metadata(database, "error", "")
+        database.commit()
+        return {"count": count, "duration_ms": duration_ms,
+                "roots": [str(root) for root in roots], "error": ""}
+    except Exception as error:
+        database.rollback()
+        try:
+            set_metadata(database, "error", str(error))
+            database.commit()
+        except sqlite3.Error:
+            pass
+        raise
+    finally:
+        database.close()
+
+
+def like_pattern(token: str) -> str:
+    escaped = token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def match_score(row: sqlite3.Row, query: str, tokens: list[str]) -> tuple:
+    name = row["name_fold"]
+    path = row["path_fold"]
+    if name == query:
+        quality = 0
+    elif name.startswith(query):
+        quality = 1
+    elif query in name:
+        quality = 2
+    elif all(token in name for token in tokens):
+        quality = 3
+    else:
+        quality = 4
+    return quality, len(name), -row["modified_ns"], path
+
+
+def display_path(path: str) -> str:
+    home = str(HOME)
+    return "~" + path[len(home):] if path == home or path.startswith(home + os.sep) else path
+
+
+def search_index(query: str, limit: int = 8) -> list[dict]:
+    text = " ".join(str(query).casefold().split())
+    if not text or not configuration()["enabled"] or not DATABASE_PATH.exists():
+        return []
+    tokens = text.split()
+    clauses = []
+    parameters: list[object] = []
+    for token in tokens:
+        clauses.append("path_fold LIKE ? ESCAPE '\\'")
+        parameters.append(like_pattern(token))
+    parameters.append(500)
+    try:
+        database = connect_readonly()
+        database.row_factory = sqlite3.Row
+        rows = database.execute(
+            "SELECT path,name,name_fold,parent,path_fold,kind,modified_ns FROM files "
+            f"WHERE {' AND '.join(clauses)} LIMIT ?", parameters).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        if "database" in locals():
+            database.close()
+    rows.sort(key=lambda row: match_score(row, text, tokens))
+    result = []
+    for row in rows[:max(1, min(int(limit), 50))]:
+        result.append({
+            "kind": row["kind"],
+            "title": row["name"],
+            "subtitle": display_path(row["parent"]),
+            "path": row["path"],
+        })
+    return result
+
+
+def indexing_now() -> bool:
+    """Report an in-flight scan without trusting a crash-prone state marker."""
+    INDEX_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with INDEX_LOCK_PATH.open("a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        return False
+
+
+def status() -> dict:
+    config = configuration()
+    metadata = {}
+    if DATABASE_PATH.exists():
+        try:
+            database = connect_readonly()
+            metadata = dict(database.execute("SELECT key,value FROM metadata").fetchall())
+            database.close()
+        except sqlite3.Error as error:
+            metadata = {"error": str(error)}
+    active = indexing_now() if config["enabled"] else False
+    error = metadata.get("error", "")
+    last_scan = int(metadata.get("last_scan_epoch", 0))
+    activity = "disabled" if not config["enabled"] else (
+        "indexing" if active else "error" if error else
+        "idle" if last_scan else "not_indexed")
+    return {
+        "enabled": config["enabled"],
+        "activity": activity,
+        "frequency_minutes": config["frequency_minutes"],
+        "max_depth": config["max_depth"],
+        "directories": [str(root) for root in config["directories"]],
+        "count": int(metadata.get("count", 0)),
+        "last_scan_epoch": last_scan,
+        "last_scan_duration_ms": int(metadata.get("last_scan_duration_ms", 0)),
+        "error": error,
+    }
+
+
+def response(data: object = None, error: str = "") -> None:
+    print(json.dumps({"ok": not error, "data": data, "error": error},
+                     ensure_ascii=False, separators=(",", ":")))
+
+
+def run_service() -> int:
+    stopped = threading.Event()
+    for name in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(name, lambda *_: stopped.set())
+    while not stopped.is_set():
+        config = configuration()
+        if not config["enabled"]:
+            return 0
+        try:
+            result = refresh_index(config)
+            print(f"garage-file-index: indexed {result['count']} entries in "
+                  f"{result['duration_ms']} ms", flush=True)
+        except (OSError, sqlite3.Error) as error:
+            print(f"garage-file-index: {error}", file=sys.stderr, flush=True)
+        stopped.wait(config["frequency_minutes"] * 60)
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    command = argv[1] if len(argv) > 1 else "run"
+    try:
+        if command == "run":
+            return run_service()
+        if command == "refresh":
+            response(refresh_index())
+        elif command == "search":
+            query = argv[2] if len(argv) > 2 else ""
+            limit = int(argv[3]) if len(argv) > 3 else 8
+            response({"rows": search_index(query, limit)})
+        elif command == "status":
+            response(status())
+        else:
+            raise IndexError("Usage: garage-file-index [run|refresh|search QUERY [LIMIT]|status]")
+        return 0
+    except (IndexError, OSError, ValueError, sqlite3.Error) as error:
+        response(error=str(error))
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

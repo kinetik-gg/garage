@@ -803,6 +803,7 @@ user_units=(
     cliphist-image.service
     xsettingsd.service
     garage-plugins-check.service # tells you when a Hyprland update broke the plugins
+    garage-file-index.service
     garage-shell.service
     garage-theme.timer
     garage-night-shift.timer

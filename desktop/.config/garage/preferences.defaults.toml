@@ -74,6 +74,16 @@ media_player = true
 terminal = ""
 builtin_launcher = true
 
+[indexing]
+# The launcher reads a committed SQLite snapshot, while this background service
+# refreshes the next one. Only names and paths are stored; file contents are
+# never opened. One directory per line keeps the editable layer a scalar (the
+# preference schema's leaf contract) while the UI still presents a real list.
+enabled = true
+frequency_minutes = 5
+max_depth = 8
+directories = "~/Desktop\n~/Documents\n~/Downloads\n~/Music\n~/Pictures\n~/Projects\n~/repositories\n~/Videos"
+
 [input]
 pointer_sensitivity = 0.0
 accel_profile = "flat"

@@ -126,7 +126,7 @@ In order:
    with a discrete GPU it writes nothing at all.
 9. **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset,
    the polkit agent, SwayOSD, cliphist, xsettingsd, the Garage shell,
-   the plugin ABI check, and the theme and Night Shift timers — and masks
+   background file indexing, the plugin ABI check, and the theme and Night Shift timers — and masks
    `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's
    notification daemon. Nothing is
    *started*: every unit is wanted by `graphical-session.target` (or

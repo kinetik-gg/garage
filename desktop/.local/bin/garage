@@ -1166,6 +1166,29 @@ PREFERENCE_SCHEMA: dict[str, dict] = {
         "default": True, "kind": "bool", "route": "launcher",
     },
 
+    # Filename-only search is maintained outside the shell by a background
+    # service. Every setting restarts that service so the newly selected roots,
+    # depth, or cadence takes effect with an immediate complete refresh. The
+    # newline-separated roots stay a scalar because this preference schema's
+    # leaves deliberately exclude list values; GeneralPane presents them as a
+    # list and never asks the user to edit the serialization.
+    "indexing.enabled": {
+        "default": True, "kind": "bool", "route": "file_index",
+    },
+    "indexing.frequency_minutes": {
+        "default": 5, "kind": "int", "minimum": 1, "maximum": 1440,
+        "route": "file_index",
+    },
+    "indexing.max_depth": {
+        "default": 8, "kind": "int", "minimum": 1, "maximum": 64,
+        "route": "file_index",
+    },
+    "indexing.directories": {
+        "default": "~/Desktop\n~/Documents\n~/Downloads\n~/Music\n~/Pictures"
+                   "\n~/Projects\n~/repositories\n~/Videos",
+        "kind": "free_string", "route": "file_index",
+    },
+
     # libinput's own range, and its own two profiles.
     "input.pointer_sensitivity": {
         "default": 0.0, "kind": "float", "minimum": -1, "maximum": 1,
@@ -1347,6 +1370,7 @@ PREFERENCE_ROUTES: dict[str, tuple] = {
     # Nothing to reload: the wrapper reads the marker on every press and the
     # shell watches it, so the switch takes effect as it is written.
     "launcher": ("render_general",),
+    "file_index": ("apply_file_index",),
     "input": ("render_preferences",
               ("run_or_raise", ["hyprctl", "reload"],
                "Unable to reload input settings")),
@@ -4805,6 +4829,25 @@ def apply_preferences(config: dict, *, restart_idle: bool = True) -> None:
     apply_night_shift(config)
     if restart_idle:
         run(["systemctl", "--user", "restart", "hypridle.service"])
+
+
+def apply_file_index(config: dict) -> None:
+    """Start, stop, or immediately refresh the background filename index."""
+    unit = "garage-file-index.service"
+    if not config["indexing"]["enabled"]:
+        run_or_raise(
+            config, ["systemctl", "--user", "disable", "--now", unit],
+            "Unable to disable background file indexing")
+        return
+    run_or_raise(
+        config, ["systemctl", "--user", "enable", unit],
+        "Unable to enable background file indexing")
+    # Restart rather than start: frequency, depth and roots are read at process
+    # startup, and a preference change should build its first new snapshot now
+    # instead of waiting for the old interval to expire.
+    run_or_raise(
+        config, ["systemctl", "--user", "restart", unit],
+        "Unable to refresh the background file index")
 
 
 def run_or_raise(config: dict, command: list[str], message: str) -> None:

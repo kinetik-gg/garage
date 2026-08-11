@@ -280,10 +280,26 @@ PanelWindow {
         }
         apps.sort((a, b) => a.rank - b.rank
             || String(a.entry.name).localeCompare(String(b.entry.name)));
-        for (const app of apps.slice(0, maxRows))
+        const fileRows = extras.exclusive
+            ? [] : extraSources.fileRowsFor(text, launcher.maxRows, false);
+        const graphicalApps = apps.filter(app => !app.entry.runInTerminal);
+        const terminalApps = apps.filter(app => app.entry.runInTerminal);
+        const graphicalLimit = fileRows.length > 0
+            ? Math.min(4, launcher.maxRows) : launcher.maxRows;
+        function appendApp(app) {
             rows.push({ kind: "app", title: app.entry.name,
                         subtitle: app.entry.comment || app.entry.genericName || "",
                         icon: app.entry.icon, entry: app.entry, url: "" });
+        }
+        for (const app of graphicalApps.slice(0, graphicalLimit))
+            appendApp(app);
+        for (const row of fileRows.slice(0, 4))
+            rows.push(row);
+        const applicationRoom = Math.max(0, launcher.maxRows
+            - Math.min(graphicalApps.length, graphicalLimit)
+            - Math.min(fileRows.length, 4));
+        for (const app of terminalApps.slice(0, applicationRoom))
+            appendApp(app);
 
         // An address the user typed, and the site a bare name stands for. Both
         // go above the search row and below the applications: someone who types
@@ -328,7 +344,9 @@ PanelWindow {
         launcher.rowActions = displayedRows.map(row => ({
             kind: row.kind, entry: row.entry, url: row.url, title: row.title,
             value: row.value, action: row.action, command: row.command,
-            pid: row.pid, target: row.target, currency: row.currency
+            pid: row.pid, target: row.target, currency: row.currency,
+            path: row.path, durationMs: row.durationMs, label: row.label,
+            timerId: row.timerId
         }));
 
         // Rewrite every preallocated slot in place. Slots beyond the current
@@ -367,13 +385,21 @@ PanelWindow {
     function scheduleRebuild() {
         geometryCommit.stop();
         launcher.pendingRowCount = launcher.rowCount;
+        extraSources.prepareFiles(launcher.query);
         rebuildTimer.restart();
     }
 
     Timer {
         id: rebuildTimer
         interval: 55
-        onTriggered: launcher.rebuild()
+        onTriggered: {
+            // A failed helper still completes with an empty answer, so there is
+            // no need for a timeout that briefly publishes app-only results.
+            // Commit exactly once, after the matching file answer is present.
+            if (extraSources.filePending(launcher.query))
+                return;
+            launcher.rebuild();
+        }
     }
 
     // A zero-result commit needs no delegate. Otherwise wait until the final
@@ -400,6 +426,7 @@ PanelWindow {
     onQueryChanged: scheduleRebuild()
     onBrowserResolvedChanged: scheduleRebuild()
     Component.onCompleted: {
+        extraSources.prepareFiles(query);
         rebuild();
         // The compositor hands the layer surface the keyboard as it maps; this
         // is what points it at the search field rather than at the window, so
@@ -424,6 +451,10 @@ PanelWindow {
             return;
         } else if (row.kind.indexOf("media-") === 0) {
             Quickshell.execDetached(row.command);
+        } else if (row.kind.indexOf("clock-") === 0) {
+            TimerService.activate(row);
+        } else if (row.kind === "file" || row.kind === "directory") {
+            Quickshell.execDetached(["xdg-open", row.path]);
         } else if (row.kind === "process") {
             Quickshell.execDetached(["kill", "-TERM", String(row.pid)]);
         } else if (row.kind === "ssh") {
