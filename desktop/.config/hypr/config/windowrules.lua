@@ -64,7 +64,10 @@ hl.window_rule({
 -- Translucent shell surfaces use compositor blur behind their own alpha.
 hl.layer_rule({
     name = "apple-dark-shell-blur",
-    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-launcher-glass|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center|garage-monitor|garage-media|garage-ai-usage)$" },
+    -- Keep the legacy garage-launcher selector until every running Quickshell
+    -- instance has reloaded the two-surface launcher. The new interactive host
+    -- is garage-launcher-host and deliberately absent from this rule.
+    match = { namespace = "^(waybar|notifications|rofi|garage-notifications|garage-launcher|garage-launcher-glass|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center|garage-monitor|garage-media|garage-ai-usage)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
@@ -101,7 +104,7 @@ hl.layer_rule({
     name = "static-shell-layers",
     -- The launcher host and its glass backing both animate through PanelMotion;
     -- neither may receive a second animation from the compositor.
-    match = { namespace = "^(waybar|rofi|garage-launcher|garage-launcher-glass|garage-session-menu|garage-session-confirmation)$" },
+    match = { namespace = "^(waybar|rofi|garage-launcher|garage-launcher-host|garage-launcher-glass|garage-session-menu|garage-session-confirmation)$" },
     no_anim = true,
 })
 hl.window_rule({ match = { class = "^([Bb]lender)$" }, opacity = "1.0 override" })

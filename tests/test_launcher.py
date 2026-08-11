@@ -51,28 +51,58 @@ class StableLauncherSurface(unittest.TestCase):
         self.assertIn(
             "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None", glass)
 
+    def test_query_results_are_debounced_and_committed_after_delegate_creation(self) -> None:
+        self.assertIn("id: rebuildTimer", self.qml)
+        self.assertIn("interval: 55", self.qml)
+        self.assertIn("id: geometryCommit", self.qml)
+        self.assertIn("resultList.itemAtIndex(last) === null", self.qml)
+        self.assertLess(
+            self.qml.index("launcher.pendingRowCount = rows.length"),
+            self.qml.index("launcher.rowCount = launcher.pendingRowCount"))
+
+    def test_field_has_an_explicit_origin_outside_vertical_layout(self) -> None:
+        body_start = self.qml.index("id: body")
+        list_end = self.qml.index("delegate: LauncherResult", body_start)
+        body = self.qml[body_start:list_end]
+
+        self.assertIn("anchors.top: parent.top", body)
+        self.assertIn("id: fieldRow", body)
+        self.assertIn("height: launcher.fieldHeight", body)
+        self.assertIn("anchors.top: fieldRow.bottom", body)
+        self.assertNotIn("ColumnLayout {", body)
+
 
 class LauncherGlassRouting(unittest.TestCase):
-    def test_only_content_sized_backing_gets_liquid_glass(self) -> None:
+    def test_fixed_host_is_not_a_liquid_glass_surface(self) -> None:
         decorations = DECORATIONS.read_text(encoding="utf-8")
         line = next(line for line in decorations.splitlines()
                     if "layer_namespaces =" in line)
 
         self.assertIn("garage-launcher-glass", line)
-        self.assertNotIn("garage-launcher,", line)
+        self.assertNotIn("garage-launcher-host", line)
+
+    def test_legacy_surface_keeps_glass_during_a_staggered_reload(self) -> None:
+        decorations = DECORATIONS.read_text(encoding="utf-8")
+        line = next(line for line in decorations.splitlines()
+                    if "layer_namespaces =" in line)
+
+        self.assertIn("garage-launcher,", line)
 
     def test_backing_gets_blur_and_both_surfaces_disable_compositor_motion(self) -> None:
         rules = WINDOW_RULES.read_text(encoding="utf-8")
         blur_start = rules.index('name = "apple-dark-shell-blur"')
         blur_end = rules.index("})", blur_start)
         blur_rule = rules[blur_start:blur_end]
+        blur_match = next(line for line in blur_rule.splitlines()
+                          if "match =" in line)
         motion_start = rules.index('name = "static-shell-layers"')
         motion_end = rules.index("})", motion_start)
         motion_rule = rules[motion_start:motion_end]
 
         self.assertIn("garage-launcher-glass", blur_rule)
-        self.assertNotIn("|garage-launcher|", blur_rule)
+        self.assertNotIn("garage-launcher-host", blur_match)
         self.assertIn("|garage-launcher|", motion_rule)
+        self.assertIn("|garage-launcher-host|", motion_rule)
         self.assertIn("|garage-launcher-glass|", motion_rule)
 
 

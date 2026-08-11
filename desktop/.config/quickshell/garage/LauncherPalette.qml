@@ -79,8 +79,15 @@ PanelWindow {
     // visible panel and its glass backing both derive their result height from
     // this completed rebuild rather than from an intermediate model state.
     property int rowCount: 0
+    property int pendingRowCount: 0
+    property int geometryWaits: 0
+    property bool resultsReady: true
     readonly property bool listing: launcher.rowCount > 0
     readonly property int visibleRows: Math.min(launcher.rowCount, launcher.maxRows)
+    readonly property int pendingVisibleRows:
+        Math.min(launcher.pendingRowCount, launcher.maxRows)
+    readonly property int renderRows:
+        Math.max(launcher.visibleRows, launcher.pendingVisibleRows)
 
     // The keyboard/content surface never changes size while the launcher is
     // open. Its changing height was the last geometry dependency shared by the
@@ -129,7 +136,11 @@ PanelWindow {
     margins.top: motion.surfaceTop
 
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "garage-launcher"
+    // The fixed host is deliberately not a glass namespace. The content-sized
+    // garage-launcher-glass surface below owns the material; keeping the two
+    // names distinct also lets an older, already-running shell retain its legacy
+    // garage-launcher glass rule while this file waits for a safe reload.
+    WlrLayershell.namespace: "garage-launcher-host"
     // OnDemand, not Exclusive. An exclusive layer keyboard is held at the
     // protocol level no matter where the pointer goes, which takes every
     // keystroke in the session for as long as the launcher is up. On demand is
@@ -227,6 +238,7 @@ PanelWindow {
     }
 
     function rebuild() {
+        launcher.resultsReady = false;
         const rows = [];
         const text = query.trim();
         const needle = text.toLowerCase();
@@ -316,7 +328,14 @@ PanelWindow {
         }
         while (results.count > rows.length)
             results.remove(results.count - 1);
-        launcher.rowCount = rows.length;
+        // Give the ListView a real viewport and at least one polish turn before
+        // publishing the new panel height. Without this staging, the layout can
+        // grow around an empty result slot, move the field, then settle back as
+        // its delegates appear a frame later.
+        launcher.pendingRowCount = rows.length;
+        launcher.geometryWaits = 0;
+        resultList.forceLayout();
+        geometryCommit.restart();
         selected = 0;
     }
 
@@ -327,8 +346,46 @@ PanelWindow {
     // rebuild() for why these cannot live in the model.
     property var rowActions: []
 
-    onQueryChanged: rebuild()
-    onBrowserResolvedChanged: rebuild()
+    // Filtering an application catalog for every key event also makes pending
+    // layouts overtake each other during quick typing. Keep the previous stable
+    // panel until the query has paused briefly, then commit one complete result
+    // set. The field itself remains immediate because its TextInput owns text.
+    function scheduleRebuild() {
+        geometryCommit.stop();
+        launcher.pendingRowCount = launcher.rowCount;
+        rebuildTimer.restart();
+    }
+
+    Timer {
+        id: rebuildTimer
+        interval: 55
+        onTriggered: launcher.rebuild()
+    }
+
+    // A zero-result commit needs no delegate. Otherwise wait until the final
+    // visible row has an item, with a bounded fallback so an offscreen or failed
+    // delegate can never hold the launcher open in a pending state forever.
+    Timer {
+        id: geometryCommit
+        // One nominal 60 Hz frame: forceLayout gets a complete scene-polish
+        // turn before the panel adopts the pending height.
+        interval: 16
+        onTriggered: {
+            resultList.forceLayout();
+            const last = launcher.pendingVisibleRows - 1;
+            if (last >= 0 && resultList.itemAtIndex(last) === null
+                    && launcher.geometryWaits < 8) {
+                launcher.geometryWaits += 1;
+                geometryCommit.restart();
+                return;
+            }
+            launcher.rowCount = launcher.pendingRowCount;
+            launcher.resultsReady = true;
+        }
+    }
+
+    onQueryChanged: scheduleRebuild()
+    onBrowserResolvedChanged: scheduleRebuild()
     Component.onCompleted: {
         rebuild();
         // The compositor hands the layer surface the keyboard as it maps; this
@@ -338,7 +395,7 @@ PanelWindow {
     }
 
     function activate(index) {
-        if (index < 0 || index >= results.count
+        if (!launcher.resultsReady || index < 0 || index >= results.count
                 || index >= launcher.rowActions.length)
             return;
         const row = launcher.rowActions[index];
@@ -363,6 +420,7 @@ PanelWindow {
         anchors.right: parent.right
         anchors.top: parent.top
         height: launcher.contentHeight
+        clip: true
         opacity: motion.opacity
         radius: Theme.cornerRadius
         power: Theme.cornerPower
@@ -397,20 +455,26 @@ PanelWindow {
             borderColor: Theme.frameInner
         }
 
-        // Anchored rather than filled: the visible panel's height follows this
-        // column, while the host surface deliberately stays taller. Filling the
-        // host would hand its surplus height to the layout and centre the field
-        // and list inside it.
-        ColumnLayout {
+        // The vertical axis is explicit. A ColumnLayout is allowed to distribute
+        // surplus or constrained height among its children while a ListView is
+        // populating; that was the transient downward push of the field. Only
+        // the field's fixed height and the committed row count participate here.
+        Item {
             id: body
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: launcher.contentMargin
-            spacing: launcher.listGap
+            implicitHeight: launcher.fieldHeight + (launcher.listing
+                ? launcher.listGap + launcher.visibleRows * launcher.rowHeight : 0)
+            height: implicitHeight
 
             RowLayout {
-                Layout.fillWidth: true
+                id: fieldRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: launcher.fieldHeight
                 spacing: 12
 
                 Item {
@@ -473,12 +537,16 @@ PanelWindow {
 
             ListView {
                 id: resultList
-                Layout.fillWidth: true
-                // Sized rather than filling: the visible panel's height is
-                // computed from this above, so a fillHeight here would be each
-                // asking the other how tall it is.
-                Layout.preferredHeight: launcher.visibleRows * launcher.rowHeight
-                visible: launcher.listing
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: fieldRow.bottom
+                anchors.topMargin: launcher.listGap
+                height: launcher.renderRows * launcher.rowHeight
+                // A pending list is real and laid out, but not exposed until its
+                // final visible delegate exists and geometryCommit publishes the
+                // matching panel height.
+                visible: launcher.renderRows > 0
+                opacity: launcher.listing && launcher.resultsReady ? 1 : 0
                 model: results
                 clip: true
                 currentIndex: launcher.selected
