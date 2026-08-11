@@ -9,7 +9,10 @@ import QtQuick.Layouts
 Scope {
     id: menu
     required property string targetScreenName
-    property string pendingAction: ""
+    // A launcher power result opens this component directly on the same
+    // confirmation UI the Arch menu uses. Normal menu opens leave it empty.
+    property string initialAction: ""
+    property string pendingAction: menu.initialAction
     property int waybarBottom: 36
     property int reservedTop: 36
 
@@ -47,7 +50,8 @@ Scope {
             "suspend": "Put this system to sleep?",
             "restart": "Restart this system?",
             "poweroff": "Shut down this system?",
-            "logout": "Log out " + Quickshell.env("USER") + "?"
+            "logout": "Log out " + Quickshell.env("USER") + "?",
+            "lock": "Lock this system?"
         };
         return titles[menu.pendingAction] || "Continue?";
     }
@@ -58,7 +62,8 @@ Scope {
             "suspend": "Sleep",
             "restart": "Restart",
             "poweroff": "Shut Down",
-            "logout": "Log Out"
+            "logout": "Log Out",
+            "lock": "Lock"
         };
         return labels[menu.pendingAction] || "Continue";
     }
@@ -69,7 +74,8 @@ Scope {
             "suspend": "The system will sleep while keeping your desktop session available.",
             "restart": "The system will restart and all running applications will close.",
             "poweroff": "The system will shut down and all running applications will close.",
-            "logout": "Your desktop session will end and all running applications will close."
+            "logout": "Your desktop session will end and all running applications will close.",
+            "lock": "The lock screen will cover this session until you authenticate again."
         };
         return descriptions[menu.pendingAction] || "Open applications may contain unsaved work.";
     }
@@ -80,7 +86,8 @@ Scope {
             "suspend": "icons/moon.svg",
             "restart": "icons/arrow-counter-clockwise.svg",
             "poweroff": "icons/power.svg",
-            "logout": "icons/sign-out.svg"
+            "logout": "icons/sign-out.svg",
+            "lock": "icons/lock-simple.svg"
         };
         return icons[menu.pendingAction] || "icons/power.svg";
     }

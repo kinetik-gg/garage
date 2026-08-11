@@ -21,8 +21,37 @@ ContinuousRectangle {
     color: selected ? Theme.accent : (pointer.containsMouse ? Theme.hover : "transparent")
 
     readonly property bool usesGlyph: kind !== "app" && iconName === ""
-    readonly property string glyph: kind === "calc"
-        ? "icons/calculator.svg" : "icons/globe.svg"
+    readonly property string glyph: {
+        const glyphs = {
+            "calc": "icons/calculator.svg",
+            "unit": "icons/arrows-down-up.svg",
+            "currency": "icons/globe.svg",
+            "currency-error": "icons/info.svg",
+            "emoji": "icons/squares-four.svg",
+            "uuid": "icons/keyboard.svg",
+            "random": "icons/arrows-clockwise.svg",
+            "process": "icons/x.svg",
+            "ssh": "icons/keyboard.svg",
+            "session-poweroff": "icons/power.svg",
+            "session-restart": "icons/arrow-counter-clockwise.svg",
+            "session-suspend": "icons/moon.svg",
+            "session-logout": "icons/sign-out.svg",
+            "session-lock": "icons/lock-simple.svg",
+            "media-play": "icons/play.svg",
+            "media-pause": "icons/pause.svg",
+            "media-stop": "icons/x.svg",
+            "media-skip": "icons/skip-forward.svg",
+            "media-mute": "icons/speaker-slash.svg",
+            "shell-settings": "icons/sliders.svg",
+            "shell-dnd": "icons/bell.svg",
+            "shell-night": "icons/moon.svg",
+            "shell-theme": "icons/palette.svg",
+            "shell-caffeine": "icons/coffee.svg",
+            "status": "icons/info.svg",
+            "error": "icons/info.svg"
+        };
+        return glyphs[row.kind] || "icons/globe.svg";
+    }
 
     RowLayout {
         anchors.fill: parent

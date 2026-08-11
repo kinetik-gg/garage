@@ -5277,6 +5277,21 @@ def display_finish(token: str, confirm: bool) -> None:
         PENDING_DISPLAY.unlink(missing_ok=True)
 
 
+def toggle_boolean_preference(dotted: str) -> bool:
+    """Atomically invert one boolean preference and apply its normal route."""
+    section, key = dotted.split(".", 1)
+    PREFERENCES_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with PREFERENCES_LOCK.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        config = load_preferences()
+        next_value = not bool(config[section][key])
+        set_nested(config, dotted, next_value)
+        validate_preferences(config)
+        save_preferences(config)
+        apply_changed_preference(config, dotted)
+    return next_value
+
+
 def action(name: str, value: object | None) -> None:
     if name == "audio.output.volume":
         run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(float(value))], check=True)
@@ -5290,6 +5305,8 @@ def action(name: str, value: object | None) -> None:
         run(["pactl", "set-default-sink", str(value)], check=True)
     elif name == "audio.input.default":
         run(["pactl", "set-default-source", str(value)], check=True)
+    elif name == "appearance.night_shift.toggle":
+        toggle_boolean_preference("appearance.night_shift_enabled")
     elif name == "glass.reset":
         # Under PREFERENCES_LOCK, exactly like `set`: this is another whole-file
         # read-modify-write, and the pane can fire it while a slider elsewhere in

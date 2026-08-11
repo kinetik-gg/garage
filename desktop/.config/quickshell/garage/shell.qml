@@ -7,6 +7,7 @@ import QtQuick
 ShellRoot {
     id: shell
     property string sessionScreenName: ""
+    property string sessionInitialAction: ""
     property string preferencesScreenName: ""
     property string preferencesSection: "general"
     property string notificationScreenName: ""
@@ -253,6 +254,34 @@ ShellRoot {
             Quickshell.execDetached(commands[action]);
     }
 
+    function confirmLauncherSessionAction(action) {
+        shell.openSurface("session", () => {
+            shell.sessionScreenName = shell.launcherScreenName;
+            shell.sessionInitialAction = action;
+        });
+    }
+
+    function runLauncherShellAction(action) {
+        if (action === "settings") {
+            shell.openWindow(preferencesLoader, () => {
+                shell.preferencesScreenName = shell.launcherScreenName;
+                shell.preferencesSection = "general";
+            });
+            return;
+        }
+        if (action === "dnd")
+            NotificationDaemon.toggleDnd();
+        else if (action === "caffeine")
+            shell.caffeine = !shell.caffeine;
+        else if (action === "night")
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/garage",
+                "action", "appearance.night_shift.toggle"]);
+        else if (action === "theme")
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/garage",
+                "set", "appearance.theme_mode", JSON.stringify(Theme.dark ? "light" : "dark")]);
+        shell.closeSurface("launcher");
+    }
+
     function openWindow(loader, configure) {
         if (configure)
             configure();
@@ -331,6 +360,9 @@ ShellRoot {
 
         LauncherPalette {
             targetScreenName: shell.launcherScreenName
+            caffeine: shell.caffeine
+            onSessionActionRequested: action => shell.confirmLauncherSessionAction(action)
+            onShellActionRequested: action => shell.runLauncherShellAction(action)
             onDismissed: shell.closeSurface("launcher")
         }
     }
@@ -406,8 +438,10 @@ ShellRoot {
 
         SessionPalette {
             targetScreenName: shell.sessionScreenName
+            initialAction: shell.sessionInitialAction
 
             onActionSelected: action => {
+                shell.sessionInitialAction = "";
                 shell.closeSurface("session");
 
                 if (action === "about") {
@@ -426,7 +460,10 @@ ShellRoot {
                 shell.runSessionAction(action);
             }
 
-            onDismissed: shell.closeSurface("session")
+            onDismissed: {
+                shell.sessionInitialAction = "";
+                shell.closeSurface("session");
+            }
         }
     }
 
@@ -562,6 +599,7 @@ ShellRoot {
         function session(): void {
             shell.toggleSurface("session", () => {
                 shell.sessionScreenName = shell.focusedScreenName();
+                shell.sessionInitialAction = "";
             });
         }
 
@@ -572,6 +610,7 @@ ShellRoot {
             const sameScreen = shell.sessionScreenName === screenName;
             const open = () => {
                 shell.sessionScreenName = screenName;
+                shell.sessionInitialAction = "";
             };
             if (sameScreen)
                 shell.toggleSurface("session", open);

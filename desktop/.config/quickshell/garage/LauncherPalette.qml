@@ -21,6 +21,8 @@ PanelWindow {
     id: launcher
 
     signal dismissed()
+    signal sessionActionRequested(string action)
+    signal shellActionRequested(string action)
 
     // The monitor the launcher was asked for on, resolved by the shell at the
     // moment of the keypress and held as a name. Deliberately not read live from
@@ -36,10 +38,14 @@ PanelWindow {
     // found, which the launcher has to say rather than silently doing nothing.
     property string browserId: ""
     property bool browserResolved: false
+    // Owned by shell.qml because the idle-inhibiting surface must outlive this
+    // palette. It is read here only to name the toggle's next state.
+    property bool caffeine: false
 
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
-    // Calculator + eight applications + open-address + web-search.
+    // Eight visible rows plus a small offscreen buffer. Every query source is
+    // sliced to this fixed model size before the string roles are rewritten.
     readonly property int maxResultRows: launcher.maxRows + 3
     readonly property real fieldHeight: 34
     readonly property real contentMargin: 14
@@ -221,6 +227,11 @@ PanelWindow {
     readonly property var browserEntry:
         browserId === "" ? null : DesktopEntries.byId(browserId)
 
+    LauncherSources {
+        id: extraSources
+        onChanged: launcher.scheduleRebuild()
+    }
+
     function searchUrl(text) {
         const template = String(engineFile.text() || "").trim()
             || "https://www.google.com/search?q=%s";
@@ -254,17 +265,23 @@ PanelWindow {
         const text = query.trim();
         const needle = text.toLowerCase();
 
-        const sum = Calculator.evaluate(text);
+        const extras = extraSources.rowsFor(text, NotificationDaemon.dnd,
+            launcher.caffeine, Theme.dark, launcher.maxRows);
+        for (const row of extras.rows)
+            rows.push(row);
+
+        const sum = extras.exclusive ? null : Calculator.evaluate(text);
         if (sum !== null)
             rows.push({ kind: "calc", title: sum, subtitle: text + " — copy result",
-                        icon: "", entry: null, url: "" });
+                        icon: "", entry: null, url: "", value: sum });
 
         // Nothing until something is typed. An empty query used to rank every
         // installed application equally, so the launcher opened onto the first
         // eight of them in alphabetical order -- eight things the user had not
         // asked for, one of which was selected and one Return from launching.
         const apps = [];
-        const model = needle === "" ? null : DesktopEntries.applications;
+        const model = needle === "" || extras.exclusive
+            ? null : DesktopEntries.applications;
         for (let i = 0; model !== null && i < model.values.length; ++i) {
             const entry = model.values[i];
             const rank = matches(entry, needle);
@@ -282,8 +299,9 @@ PanelWindow {
         // go above the search row and below the applications: someone who types
         // "steam" with Steam installed wants the client, and someone who types
         // "github.com" wants the site rather than a search for its name.
-        const address = WebAddress.addressFor(text);
-        const site = address === "" ? WebAddress.siteFor(text) : "";
+        const address = extras.exclusive ? "" : WebAddress.addressFor(text);
+        const site = extras.exclusive || address !== ""
+            ? "" : WebAddress.siteFor(text);
         const destination = address !== "" ? address
             : (site !== "" ? "https://" + site : "");
         const browserName = browserResolved && browserId === ""
@@ -293,7 +311,7 @@ PanelWindow {
             : { kind: "url", title: "Open " + WebAddress.displayHost(destination),
                 subtitle: browserName, icon: browserEntry ? browserEntry.icon : "",
                 entry: null, url: destination };
-        const searchRow = text === "" ? null
+        const searchRow = text === "" || extras.exclusive ? null
             : { kind: "web", title: "Search for “" + text + "”",
                 subtitle: browserResolved && browserId === ""
                     ? "No web browser installed"
@@ -318,7 +336,9 @@ PanelWindow {
         // reads, and it matches the committed result count by construction.
         const displayedRows = rows.slice(0, launcher.maxResultRows);
         launcher.rowActions = displayedRows.map(row => ({
-            kind: row.kind, entry: row.entry, url: row.url, title: row.title
+            kind: row.kind, entry: row.entry, url: row.url, title: row.title,
+            value: row.value, action: row.action, command: row.command,
+            pid: row.pid, target: row.target, currency: row.currency
         }));
 
         // Rewrite every preallocated slot in place. Slots beyond the current
@@ -404,8 +424,27 @@ PanelWindow {
         const row = launcher.rowActions[index];
         if (row.kind === "app") {
             row.entry.execute();
-        } else if (row.kind === "calc") {
-            Quickshell.clipboardText = row.title;
+        } else if (["calc", "unit", "currency", "emoji", "uuid", "random"].includes(row.kind)) {
+            Quickshell.clipboardText = String(row.value || row.title);
+        } else if (row.kind.indexOf("session-") === 0) {
+            launcher.sessionActionRequested(String(row.action));
+            return;
+        } else if (row.kind.indexOf("shell-") === 0) {
+            launcher.shellActionRequested(String(row.action));
+            return;
+        } else if (row.kind.indexOf("media-") === 0) {
+            Quickshell.execDetached(row.command);
+        } else if (row.kind === "process") {
+            Quickshell.execDetached(["kill", "-TERM", String(row.pid)]);
+        } else if (row.kind === "ssh") {
+            // uwsm -T resolves the terminal published by System Preferences;
+            // the validated target remains one argv value all the way to ssh.
+            Quickshell.execDetached(["uwsm", "app", "-T", "ssh", "--", row.target]);
+        } else if (row.kind === "currency-error") {
+            extraSources.retryCurrency(row.currency);
+            return;
+        } else if (row.kind === "status" || row.kind === "error") {
+            return;
         } else if (row.kind === "web" || row.kind === "url") {
             if (browserId === "") {
                 noBrowser.visible = true;
@@ -519,7 +558,7 @@ PanelWindow {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Search apps, calculate, or search the web"
+                        text: "Search apps, commands, conversions, or the web"
                         color: Theme.textDisabled
                         font: input.font
                         visible: input.text === ""
