@@ -57,8 +57,20 @@ class StableLauncherSurface(unittest.TestCase):
         self.assertIn("id: geometryCommit", self.qml)
         self.assertIn("resultList.itemAtIndex(last) === null", self.qml)
         self.assertLess(
-            self.qml.index("launcher.pendingRowCount = rows.length"),
+            self.qml.index("launcher.pendingRowCount = displayedRows.length"),
             self.qml.index("launcher.rowCount = launcher.pendingRowCount"))
+
+    def test_filtering_rewrites_a_preallocated_model_without_changing_its_size(self) -> None:
+        start = self.qml.index("function rebuild()")
+        end = self.qml.index("ListModel { id: results }", start)
+        rebuild = self.qml[start:end]
+
+        self.assertIn("results.set(index, row)", rebuild)
+        for mutation in ("results.clear", "results.append", "results.remove"):
+            with self.subTest(mutation=mutation):
+                self.assertNotIn(mutation, rebuild)
+        self.assertIn("opacity: launcher.listing ? 1 : 0", self.qml)
+        self.assertNotIn("resultsReady", self.qml)
 
     def test_field_has_an_explicit_origin_outside_vertical_layout(self) -> None:
         body_start = self.qml.index("id: body")

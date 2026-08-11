@@ -39,6 +39,8 @@ PanelWindow {
 
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
+    // Calculator + eight applications + open-address + web-search.
+    readonly property int maxResultRows: launcher.maxRows + 3
     readonly property real fieldHeight: 34
     readonly property real contentMargin: 14
     readonly property real listGap: 8
@@ -81,7 +83,6 @@ PanelWindow {
     property int rowCount: 0
     property int pendingRowCount: 0
     property int geometryWaits: 0
-    property bool resultsReady: true
     readonly property bool listing: launcher.rowCount > 0
     readonly property int visibleRows: Math.min(launcher.rowCount, launcher.maxRows)
     readonly property int pendingVisibleRows:
@@ -237,8 +238,18 @@ PanelWindow {
         return -1;
     }
 
+    // Allocate every possible result slot once. The ListView keeps the same
+    // model and delegates for the launcher's lifetime; filtering only rewrites
+    // string roles in those slots, so a keystroke never clears or shortens the
+    // model out from underneath the visible rows.
+    function ensureResultSlots() {
+        while (results.count < launcher.maxResultRows) {
+            results.append({ kind: "", title: "", subtitle: "", icon: "" });
+        }
+    }
+
     function rebuild() {
-        launcher.resultsReady = false;
+        launcher.ensureResultSlots();
         const rows = [];
         const text = query.trim();
         const needle = text.toLowerCase();
@@ -304,35 +315,28 @@ PanelWindow {
         // place: set() aborts the process outright when the role's type moves,
         // which it does the moment an application row is overwritten by a
         // search row. The model gets strings only; this array is what activate()
-        // reads, and the two are the same length by construction.
-        launcher.rowActions = rows.map(row => ({ kind: row.kind, entry: row.entry,
-                                                 url: row.url, title: row.title }));
+        // reads, and it matches the committed result count by construction.
+        const displayedRows = rows.slice(0, launcher.maxResultRows);
+        launcher.rowActions = displayedRows.map(row => ({
+            kind: row.kind, entry: row.entry, url: row.url, title: row.title
+        }));
 
-        // Updated in place, never cleared. clear() destroys every delegate the
-        // ListView is holding and append() builds them all again, so a keystroke
-        // that changed one row tore down the whole list and rebuilt it -- and
-        // for the frame in between the list was empty. That was the flicker: the
-        // results blinking out on every character, not the window resizing
-        // around them. set() rewrites a row the ListView already has, so its
-        // delegate survives and repaints.
-        for (let index = 0; index < rows.length; ++index) {
-            const source = rows[index];
-            const row = { kind: String(source.kind),
-                          title: String(source.title || ""),
-                          subtitle: String(source.subtitle || ""),
-                          icon: String(source.icon || "") };
-            if (index < results.count)
-                results.set(index, row);
-            else
-                results.append(row);
+        // Rewrite every preallocated slot in place. Slots beyond the current
+        // result count receive the same four string roles with empty values;
+        // their delegates remain alive but sit outside the committed viewport.
+        for (let index = 0; index < launcher.maxResultRows; ++index) {
+            const source = index < displayedRows.length ? displayedRows[index] : null;
+            const row = { kind: String(source ? source.kind : ""),
+                          title: String(source ? source.title || "" : ""),
+                          subtitle: String(source ? source.subtitle || "" : ""),
+                          icon: String(source ? source.icon || "" : "") };
+            results.set(index, row);
         }
-        while (results.count > rows.length)
-            results.remove(results.count - 1);
         // Give the ListView a real viewport and at least one polish turn before
         // publishing the new panel height. Without this staging, the layout can
         // grow around an empty result slot, move the field, then settle back as
         // its delegates appear a frame later.
-        launcher.pendingRowCount = rows.length;
+        launcher.pendingRowCount = displayedRows.length;
         launcher.geometryWaits = 0;
         resultList.forceLayout();
         geometryCommit.restart();
@@ -380,7 +384,6 @@ PanelWindow {
                 return;
             }
             launcher.rowCount = launcher.pendingRowCount;
-            launcher.resultsReady = true;
         }
     }
 
@@ -395,7 +398,7 @@ PanelWindow {
     }
 
     function activate(index) {
-        if (!launcher.resultsReady || index < 0 || index >= results.count
+        if (index < 0 || index >= launcher.rowCount
                 || index >= launcher.rowActions.length)
             return;
         const row = launcher.rowActions[index];
@@ -527,7 +530,7 @@ PanelWindow {
                     // count - 1 is -1, and Down landing on -1 leaves the first
                     // row unselectable until something else resets it.
                     Keys.onDownPressed: launcher.selected = Math.max(0,
-                        Math.min(launcher.selected + 1, results.count - 1))
+                        Math.min(launcher.selected + 1, launcher.rowCount - 1))
                     Keys.onUpPressed: launcher.selected =
                         Math.max(launcher.selected - 1, 0)
                     Keys.onReturnPressed: launcher.activate(launcher.selected)
@@ -546,7 +549,7 @@ PanelWindow {
                 // final visible delegate exists and geometryCommit publishes the
                 // matching panel height.
                 visible: launcher.renderRows > 0
-                opacity: launcher.listing && launcher.resultsReady ? 1 : 0
+                opacity: launcher.listing ? 1 : 0
                 model: results
                 clip: true
                 currentIndex: launcher.selected
