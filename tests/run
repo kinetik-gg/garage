@@ -38,7 +38,10 @@ class LineReporter(unittest.TestResult):
         self.unexpected_successes: list[str] = []
 
     def name_of(self, test) -> str:
-        # module.Class.method, without the unittest repr's parentheses.
+        # module.Class.method, without the unittest repr's parentheses. A failed
+        # subTest arrives wrapped in a _SubTest whose own class name says nothing;
+        # the name worth printing is the test case underneath it.
+        test = getattr(test, "test_case", test)
         return f"{test.__class__.__module__}.{test.__class__.__name__}.{test._testMethodName}"
 
     def record(self, test, verdict: str, detail: str = "") -> None:
@@ -63,6 +66,16 @@ class LineReporter(unittest.TestResult):
     def addError(self, test, err) -> None:
         super().addError(test, err)
         self.record(test, "ERROR")
+
+    def addSubTest(self, test, subtest, err) -> None:
+        super().addSubTest(test, subtest, err)
+        # Without this a failing subTest is invisible. unittest calls this once
+        # per subTest -- err is None for the ones that passed -- and does not call
+        # addSuccess for a test that had any of them fail. So the test produced no
+        # line at all and, because the verdict counts are taken from those lines,
+        # no failure either: the suite printed PASS with a real regression in it.
+        if err is not None:
+            self.record(test, "FAIL", str(subtest).removeprefix(str(test)).strip())
 
     def addSkip(self, test, reason) -> None:
         super().addSkip(test, reason)
