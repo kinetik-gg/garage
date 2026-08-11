@@ -1,5 +1,6 @@
+pragma ComponentBehavior: Bound
+
 import Quickshell
-import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
@@ -32,6 +33,10 @@ Scope {
         { key: "language", title: "Language & Region", icon: "icons/globe.svg", source: "LanguagePane.qml" },
         { key: "about", title: "About", icon: "icons/info.svg", source: "AboutPane.qml" }
     ]
+    readonly property real sidebarTopMargin: 22
+    readonly property real sidebarBottomMargin: 18
+    readonly property real sidebarMinimumHeight: sidebarContent.implicitHeight
+        + sidebarTopMargin + sidebarBottomMargin
 
     function targetScreen() {
         for (let index = 0; index < Quickshell.screens.length; ++index) {
@@ -65,8 +70,8 @@ Scope {
         id: window
         title: "System Preferences"
         implicitWidth: 720
-        implicitHeight: 640
-        minimumSize: Qt.size(560, 460)
+        implicitHeight: Math.ceil(preferences.sidebarMinimumHeight)
+        minimumSize: Qt.size(560, Math.ceil(preferences.sidebarMinimumHeight))
         color: "transparent"
 
         Rectangle {
@@ -83,15 +88,16 @@ Scope {
                     color: Theme.sidebarWell
 
                     ColumnLayout {
+                        id: sidebarContent
                         anchors.fill: parent
                         anchors.leftMargin: 14
                         anchors.rightMargin: 14
-                        anchors.topMargin: 22
-                        anchors.bottomMargin: 18
+                        anchors.topMargin: preferences.sidebarTopMargin
+                        anchors.bottomMargin: preferences.sidebarBottomMargin
                         spacing: 3
 
                         Repeater {
-                            model: preferences.categories.filter(category => category.key !== "about")
+                            model: preferences.categories
                             PreferencesSidebarItem {
                                 required property var modelData
                                 Layout.fillWidth: true
@@ -100,16 +106,6 @@ Scope {
                                 selected: preferences.currentSection === modelData.key
                                 onActivated: preferences.showSection(modelData.key)
                             }
-                        }
-
-                        Item { Layout.fillHeight: true }
-
-                        PreferencesSidebarItem {
-                            Layout.fillWidth: true
-                            title: "About"
-                            iconSource: "icons/info.svg"
-                            selected: preferences.currentSection === "about"
-                            onActivated: preferences.showSection("about")
                         }
                     }
                 }
@@ -217,6 +213,13 @@ Scope {
                         onDismissed: controller.wallpaperPickerOpen = false
                     }
 
+                    IndexDirectoryPicker {
+                        parentWindow: window
+                        pickerVisible: controller.indexDirectoryPickerOpen
+                        onChosen: path => controller.addIndexDirectory(path)
+                        onDismissed: controller.indexDirectoryPickerOpen = false
+                    }
+
                     // Only before the first snapshot. Later refreshes have a
                     // populated pane behind them, and covering it with a label
                     // read as the page resetting itself on every change.
@@ -234,7 +237,7 @@ Scope {
 
             Rectangle {
                 anchors.fill: parent
-                visible: controller.wallpaperPickerOpen
+                visible: controller.wallpaperPickerOpen || controller.indexDirectoryPickerOpen
                 color: Theme.scrim
                 z: 50
 

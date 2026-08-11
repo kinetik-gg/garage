@@ -6,6 +6,8 @@ Scope {
     id: controller
 
     readonly property string helper: Quickshell.env("HOME") + "/.local/bin/garage"
+    readonly property string indexHelper: Quickshell.env("HOME")
+        + "/.local/bin/garage-file-index"
     property var snapshot: ({
         preferences: { appearance: {}, input: {}, lock: {} },
         displays: [], audio: { outputs: [], inputs: [] },
@@ -19,6 +21,12 @@ Scope {
     // that overlay was flashing over the pane on every wallpaper change.
     property bool ready: false
     property bool wallpaperPickerOpen: false
+    property bool indexDirectoryPickerOpen: false
+    property var indexStatus: ({
+        enabled: false, activity: "loading", count: 0,
+        last_scan_epoch: 0, last_scan_duration_ms: 0, error: ""
+    })
+    readonly property bool indexRefreshing: indexRefreshProcess.running
     // Which preference the shared picker writes, and the folder it opens in. The
     // wallpaper is per appearance now, so the picker cannot know its own target.
     property string wallpaperPickerKey: "wallpaper_dark"
@@ -103,6 +111,35 @@ Scope {
             refreshTimer.restart();
     }
 
+    function addIndexDirectory(path) {
+        const value = String(path || "").trim();
+        if (value === "")
+            return;
+        const current = String(controller.preference(
+            "indexing", "directories", "")).split("\n")
+            .map(item => item.trim()).filter(Boolean);
+        if (current.indexOf(value) !== -1)
+            return;
+        controller.setPreference("indexing", "directories",
+            current.concat([value]).join("\n"));
+    }
+
+    function refreshIndexStatus() {
+        if (!indexStatusProcess.running)
+            indexStatusProcess.running = true;
+    }
+
+    function refreshIndex() {
+        if (indexRefreshProcess.running
+                || !controller.preference("indexing", "enabled", true))
+            return;
+        const next = Object.assign({}, indexStatus);
+        next.activity = "indexing";
+        next.error = "";
+        indexStatus = next;
+        indexRefreshProcess.running = true;
+    }
+
     function action(name, value) {
         const command = [helper, "action", name];
         if (value !== undefined)
@@ -151,7 +188,10 @@ Scope {
         refreshTimer.restart();
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: {
+        refresh();
+        refreshIndexStatus();
+    }
 
     Process {
         id: snapshotProcess
@@ -202,6 +242,46 @@ Scope {
     }
 
     Process {
+        id: indexStatusProcess
+        command: [controller.indexHelper, "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const response = JSON.parse(text);
+                    if (!response.ok)
+                        throw new Error(response.error || "Unable to read index status");
+                    controller.indexStatus = response.data;
+                } catch (failure) {
+                    const next = Object.assign({}, controller.indexStatus);
+                    next.activity = "error";
+                    next.error = String(failure);
+                    controller.indexStatus = next;
+                }
+            }
+        }
+    }
+
+    Process {
+        id: indexRefreshProcess
+        command: [controller.indexHelper, "refresh"]
+        onRunningChanged: if (!running) controller.refreshIndexStatus()
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const response = JSON.parse(text);
+                    if (!response.ok)
+                        throw new Error(response.error || "Unable to refresh the index");
+                } catch (failure) {
+                    const next = Object.assign({}, controller.indexStatus);
+                    next.activity = "error";
+                    next.error = String(failure);
+                    controller.indexStatus = next;
+                }
+            }
+        }
+    }
+
+    Process {
         id: displayProcess
         stdout: StdioCollector {
             onStreamFinished: {
@@ -230,6 +310,13 @@ Scope {
         id: refreshTimer
         interval: 650
         onTriggered: controller.refresh()
+    }
+
+    Timer {
+        interval: 2500
+        repeat: true
+        running: true
+        onTriggered: controller.refreshIndexStatus()
     }
 
     Timer {
