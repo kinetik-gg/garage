@@ -39,13 +39,13 @@ PanelWindow {
 
     readonly property real rowHeight: 52
     readonly property int maxRows: 8
+    readonly property real fieldHeight: 34
+    readonly property real contentMargin: 14
+    readonly property real listGap: 8
 
-    // Where the launcher opens, every time. Both of these are held here rather
-    // than left to the compositor, which centres an unanchored layer surface on
-    // its output: centred, a surface whose height tracks the result count moved
-    // the query field up the screen with every keystroke that changed how many
-    // results there were. Anchored to the top, the field stays where it opened
-    // and the list grows downward under it.
+    // Where the launcher opens, every time. Both are held here rather than left
+    // to the compositor, so the two surfaces that make up the launcher share
+    // exactly one origin and the list grows downward from it.
     // A third of the way down the output, measured from the top of the usable
     // area rather than from the top of the screen -- an overlay surface already
     // begins below Waybar's exclusive zone, so a margin here is measured from
@@ -74,37 +74,38 @@ PanelWindow {
 
     screen: launcher.targetScreen()
     implicitWidth: 640
-    readonly property real contentMargin: 14
 
-    // The row count the window is sized from. Deliberately not results.count.
-    //
-    // rebuild() fills the model a row at a time, and every one of those
-    // append() and remove() calls moves results.count. Sized from it directly,
-    // narrowing a nine-row list to two resized the layer surface seven times
-    // for one keystroke -- each resize a configure, a new buffer and a relayout
-    // of everything in the panel. That is what moves around while typing.
-    //
-    // Set once, at the end of a rebuild, so the window changes size exactly
-    // once no matter how many rows came or went.
+    // Published once after the model and its parallel action array agree. The
+    // visible panel and its glass backing both derive their result height from
+    // this completed rebuild rather than from an intermediate model state.
     property int rowCount: 0
     readonly property bool listing: launcher.rowCount > 0
     readonly property int visibleRows: Math.min(launcher.rowCount, launcher.maxRows)
 
-    // Measured off the column rather than recomputed from its parts, the way
-    // every other palette in the shell sizes itself. Arithmetic written out here
-    // -- margins plus field plus gap plus rows -- has to be kept in step with
-    // the layout by hand, and the two disagreeing is a panel whose contents hang
-    // off the bottom of the surface they are drawn on.
+    // The keyboard/content surface never changes size while the launcher is
+    // open. Its changing height was the last geometry dependency shared by the
+    // field and the result list: anchors fix their origin inside the surface,
+    // but do not make the surface resize-free when a query changes row count.
     //
-    // Exactly the contents and not a pixel more, on every frame. The compositor
-    // blurs a surface rather than what is painted on it, so any height the panel
-    // is not using comes out as a blurred slab hanging below the last row.
-    implicitHeight: Math.max(1, body.implicitHeight + launcher.contentMargin * 2)
+    // Fixing the surface itself at the largest panel height removes those
+    // configures. The panel and its input mask remain content-sized inside it;
+    // the separately mapped glassSurface below supplies the material without
+    // turning the transparent remainder of this surface into a blurred slab.
+    readonly property real surfaceHeight: launcher.contentMargin * 2
+        + launcher.fieldHeight + launcher.listGap
+        + launcher.maxRows * launcher.rowHeight
+    readonly property real bodyHeight:
+        Math.max(1, body.implicitHeight + launcher.contentMargin * 2)
+    readonly property real contentHeight: noBrowser.visible
+        ? Math.max(launcher.bodyHeight, 150 + launcher.contentMargin * 2)
+        : launcher.bodyHeight
+    implicitHeight: launcher.surfaceHeight
     color: "transparent"
     focusable: true
     aboveWindows: true
     exclusiveZone: 0
     surfaceFormat.opaque: false
+    mask: Region { item: panel }
 
     // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
     PanelMotion {
@@ -137,6 +138,41 @@ PanelWindow {
     // Escape heard without a click first. Leave this alone -- typing here works
     // today, and Exclusive is what it was before.
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+
+    // Kinetik Glass draws against a layer surface's complete logical box; it
+    // cannot use the alpha of this fixed-height host to discover the shorter
+    // panel inside it. Give the material its own content-sized, inputless
+    // surface immediately below the overlay instead. It can resize as results
+    // change because it carries no field, delegates, or layout to disturb.
+    PanelWindow {
+        id: glassSurface
+
+        screen: launcher.targetScreen()
+        implicitWidth: launcher.implicitWidth
+        implicitHeight: launcher.contentHeight
+        visible: launcher.visible
+        color: "transparent"
+        focusable: false
+        aboveWindows: true
+        exclusiveZone: 0
+        surfaceFormat.opaque: false
+        mask: Region {}
+
+        anchors {
+            top: true
+            left: true
+        }
+
+        margins.left: launcher.spawnLeft
+        margins.top: motion.surfaceTop
+
+        // Top keeps the material below the launcher's interactive Overlay
+        // surface. The full-screen dismiss catcher is also transparent, so it
+        // can remain above this surface and still pass the material through.
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.namespace: "garage-launcher-glass"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    }
 
     // The search engine is resolved by garage and published as a
     // URL template, so the launcher does not have to know the engine list.
@@ -323,13 +359,15 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: launcher.contentHeight
         opacity: motion.opacity
         radius: Theme.cornerRadius
         power: Theme.cornerPower
-        // Transparent under glass: garage-launcher is one of the compositor's
-        // glass layer namespaces, so the material is drawn beneath this surface
-        // and painting a body here would cover it.
+        // Transparent under glass: glassSurface is directly beneath this host,
+        // so the material shows through and painting a body here would cover it.
         color: Theme.panel
         borderWidth: 1
         borderColor: Theme.frameOuter
@@ -359,19 +397,17 @@ PanelWindow {
             borderColor: Theme.frameInner
         }
 
-        // Anchored rather than filled: the window's height is this column's
-        // implicit height, so the column must not be told how tall it is. Filled,
-        // it took the surface's height instead -- and whenever the surface was
-        // momentarily taller than the contents, the layout shared the surplus out
-        // between the field and the list and both drifted toward the middle of
-        // the panel until the sizes agreed again.
+        // Anchored rather than filled: the visible panel's height follows this
+        // column, while the host surface deliberately stays taller. Filling the
+        // host would hand its surplus height to the layout and centre the field
+        // and list inside it.
         ColumnLayout {
             id: body
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: launcher.contentMargin
-            spacing: 8
+            spacing: launcher.listGap
 
             RowLayout {
                 Layout.fillWidth: true
@@ -402,7 +438,7 @@ PanelWindow {
                 TextInput {
                     id: input
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 34
+                    Layout.preferredHeight: launcher.fieldHeight
                     text: launcher.query
                     onTextChanged: launcher.query = text
                     color: Theme.text
@@ -438,9 +474,9 @@ PanelWindow {
             ListView {
                 id: resultList
                 Layout.fillWidth: true
-                // Sized rather than filling: the window's height is computed
-                // from this above, so a fillHeight here would be each asking
-                // the other how tall it is.
+                // Sized rather than filling: the visible panel's height is
+                // computed from this above, so a fillHeight here would be each
+                // asking the other how tall it is.
                 Layout.preferredHeight: launcher.visibleRows * launcher.rowHeight
                 visible: launcher.listing
                 model: results
@@ -468,7 +504,7 @@ PanelWindow {
     // Shown instead of failing silently when a web search has nowhere to go.
     Rectangle {
         id: noBrowser
-        anchors.fill: parent
+        anchors.fill: panel
         visible: false
         color: Theme.scrim
 
