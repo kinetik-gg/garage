@@ -102,6 +102,24 @@ function cleanToken(value) {
     return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function applicationRank(entry, needle) {
+    if (entry.noDisplay)
+        return -1;
+    var query = cleanToken(needle);
+    var name = cleanToken(entry.name);
+    var rank = name.indexOf(query) === 0 ? 0
+        : (name.indexOf(query) >= 0 ? 1
+        : (cleanToken(entry.genericName).indexOf(query) >= 0 ? 2
+        : (cleanToken(entry.comment).indexOf(query) >= 0 ? 3 : -1)));
+    if (rank < 0)
+        return -1;
+    // Terminal=true desktop entries are valid launcher targets, but graphical
+    // applications are the primary result type. Keep CLI entries available
+    // after every matching desktop app instead of allowing an exact CLI name
+    // to displace a graphical application's descriptive match.
+    return rank + (entry.runInTerminal ? 10 : 0);
+}
+
 function formatNumber(value) {
     if (!isFinite(value))
         return "";
@@ -246,20 +264,16 @@ function commandRows(input, prefixPattern, definitions, kindPrefix, subtitle) {
             rows.push({ kind: kindPrefix + definition.action, title: definition.title,
                 subtitle: subtitle, action: definition.action, command: definition.command || null });
     }
-    return prefixed || rows.length > 0 ? rows : null;
+    return rows.length > 0 || (prefixed && term === "") ? rows : null;
 }
 
 function powerRows(input) {
-    var text = cleanToken(input);
-    var query = text === "power" || text === "system" ? text + ":" : input;
-    return commandRows(query, /^(?:power|system)\s*:\s*(.*)$/, POWER_ACTIONS,
+    return commandRows(input, /^(?:power|system)(?:(?:\s*:\s*|\s+)(.*))?$/, POWER_ACTIONS,
         "session-", "System action — confirmation required");
 }
 
 function mediaRows(input) {
-    var text = cleanToken(input);
-    var query = text === "audio" || text === "media" ? text + ":" : input;
-    return commandRows(query, /^(?:audio|media)\s*:\s*(.*)$/, MEDIA_ACTIONS,
+    return commandRows(input, /^(?:audio|media)(?:(?:\s*:\s*|\s+)(.*))?$/, MEDIA_ACTIONS,
         "media-", "Audio control");
 }
 
@@ -377,10 +391,10 @@ var EMOJI = [
 ];
 
 function emojiRows(input, limit) {
-    var match = /^\s*emoji\s*:\s*(.*?)\s*$/i.exec(String(input || ""));
+    var match = /^\s*emoji(?:(?:\s*:\s*|\s+)(.*?))?\s*$/i.exec(String(input || ""));
     if (!match)
         return null;
-    var query = cleanToken(match[1]);
+    var query = cleanToken(match[1] || "");
     var tokens = query === "" ? [] : query.split(" ");
     var matches = [];
     for (var index = 0; index < EMOJI.length; ++index) {
@@ -405,8 +419,8 @@ function emojiRows(input, limit) {
 }
 
 function killQuery(input) {
-    var match = /^\s*kill\s*:\s*(.*?)\s*$/i.exec(String(input || ""));
-    return match ? cleanToken(match[1]) : null;
+    var match = /^\s*kill(?:(?:\s*:\s*|\s+)(.*?))?\s*$/i.exec(String(input || ""));
+    return match ? cleanToken(match[1] || "") : null;
 }
 
 function parseProcessList(text) {
@@ -446,7 +460,7 @@ function fuzzyScore(candidate, needle) {
 
 function processRows(query, processes, limit) {
     if (query === "")
-        return [{ kind: "status", title: "Type a process name after kill:", subtitle: "Processes are matched fuzzily" }];
+        return [{ kind: "status", title: "Type a process name after kill", subtitle: "Processes are matched fuzzily" }];
     var matches = [];
     for (var index = 0; index < processes.length; ++index) {
         var process = processes[index];

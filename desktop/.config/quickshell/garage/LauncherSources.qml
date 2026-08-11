@@ -144,7 +144,7 @@ Scope {
             if (emoji.length > 0)
                 sources.append(rows, emoji);
             else
-                rows.push({ kind: "status", title: "No matching emoji", subtitle: "Try another keyword after emoji:" });
+                rows.push({ kind: "status", title: "No matching emoji", subtitle: "Try another keyword after emoji" });
             exclusive = true;
         }
 

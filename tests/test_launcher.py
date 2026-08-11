@@ -173,16 +173,33 @@ process.stdout.write(JSON.stringify({expression}));
         self.assertEqual("1 USD = 17,809 IDR", rows[3]["title"])
 
     def test_emoji_search_returns_copyable_keyword_matches(self) -> None:
-        rows = self.evaluate('context.emojiRows("emoji: love", 8)')
+        rows = self.evaluate('context.emojiRows("emoji love", 8)')
         self.assertGreater(len(rows), 1)
         self.assertLessEqual(len(rows), 8)
         self.assertTrue(all(row["kind"] == "emoji" for row in rows))
         self.assertTrue(all("love" in row["subtitle"] for row in rows))
         self.assertTrue(all(row["value"] in row["title"] for row in rows))
 
+    def test_application_ranking_prefers_graphical_desktop_apps(self) -> None:
+        ranks = self.evaluate('({ desktop: context.applicationRank('
+                              '{ name: "Quick GUI", genericName: "", comment: "tool", '
+                              'runInTerminal: false, noDisplay: false }, "quick"), '
+                              'desktopComment: context.applicationRank('
+                              '{ name: "Workbench", genericName: "", comment: "quick tool", '
+                              'runInTerminal: false, noDisplay: false }, "quick"), '
+                              'cliExact: context.applicationRank('
+                              '{ name: "Quick CLI", genericName: "", comment: "", '
+                              'runInTerminal: true, noDisplay: false }, "quick"), '
+                              'hidden: context.applicationRank('
+                              '{ name: "Quick Hidden", genericName: "", comment: "", '
+                              'runInTerminal: false, noDisplay: true }, "quick") })')
+        self.assertLess(ranks["desktop"], ranks["cliExact"])
+        self.assertLess(ranks["desktopComment"], ranks["cliExact"])
+        self.assertEqual(-1, ranks["hidden"])
+
     def test_power_media_and_shell_commands_are_explicit_rows(self) -> None:
-        result = self.evaluate('({ power: context.powerRows("power:"), '
-                               'media: context.mediaRows("audio:"), '
+        result = self.evaluate('({ power: context.powerRows("power"), '
+                               'media: context.mediaRows("audio"), '
                                'dnd: context.shellRows("dnd", true, false, true), '
                                'theme: context.shellRows("light", false, false, true) })')
         self.assertEqual(
@@ -204,10 +221,12 @@ process.stdout.write(JSON.stringify({expression}));
         self.assertEqual("error", result["tooLong"]["kind"])
 
     def test_pid_search_is_fuzzy_and_ssh_rejects_shell_syntax(self) -> None:
-        result = self.evaluate('({ processes: context.processRows("qsh", '
+        result = self.evaluate('({ query: context.killQuery("kill qsh"), '
+                               'processes: context.processRows("qsh", '
                                'context.parseProcessList("42 quickshell /usr/bin/quickshell -c garage\\n77 bash bash"), 8), '
                                'ssh: context.sshSpec("ssh rizki@example.com"), '
                                'unsafe: context.sshSpec("ssh host; reboot") })')
+        self.assertEqual("qsh", result["query"])
         self.assertEqual(42, result["processes"][0]["pid"])
         self.assertEqual("rizki@example.com", result["ssh"]["target"])
         self.assertEqual("error", result["unsafe"]["kind"])

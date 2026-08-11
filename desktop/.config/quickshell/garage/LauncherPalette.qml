@@ -238,17 +238,6 @@ PanelWindow {
         return template.replace("%s", encodeURIComponent(text));
     }
 
-    function matches(entry, needle) {
-        if (entry.noDisplay)
-            return -1;
-        const name = String(entry.name || "").toLowerCase();
-        if (name.startsWith(needle)) return 0;
-        if (name.includes(needle)) return 1;
-        if (String(entry.genericName || "").toLowerCase().includes(needle)) return 2;
-        if (String(entry.comment || "").toLowerCase().includes(needle)) return 3;
-        return -1;
-    }
-
     // Allocate every possible result slot once. The ListView keeps the same
     // model and delegates for the launcher's lifetime; filtering only rewrites
     // string roles in those slots, so a keystroke never clears or shortens the
@@ -284,7 +273,7 @@ PanelWindow {
             ? null : DesktopEntries.applications;
         for (let i = 0; model !== null && i < model.values.length; ++i) {
             const entry = model.values[i];
-            const rank = matches(entry, needle);
+            const rank = LauncherExtras.applicationRank(entry, needle);
             if (rank >= 0)
                 apps.push({ rank: rank, entry: entry });
         }
