@@ -1,8 +1,6 @@
 #include <gtk/gtk.h>
 
 #define GARAGE_ITEM_HOVER_CLASS "garage-shortcut-item-hover"
-#define GARAGE_PANTHEON_CLASS "garage-pantheon-files"
-#define GARAGE_FILE_LIST_CLASS "garage-file-list"
 
 typedef struct
 {
@@ -600,84 +598,6 @@ garage_install (gpointer data)
   return G_SOURCE_CONTINUE;
 }
 
-static GtkWidget *
-garage_find_style_ancestor (GtkWidget *widget, const gchar *class_name)
-{
-  GtkWidget *ancestor;
-
-  for (ancestor = widget; ancestor != NULL;
-       ancestor = gtk_widget_get_parent (ancestor))
-    if (gtk_style_context_has_class (gtk_widget_get_style_context (ancestor),
-                                     class_name))
-      return ancestor;
-  return NULL;
-}
-
-static void
-garage_prepare_pantheon_widget (GtkWidget *widget, gpointer data)
-{
-  GtkWidget *sidebar;
-
-  (void) data;
-  sidebar = garage_find_style_ancestor (widget, "sidebar");
-
-  if (gtk_style_context_has_class (gtk_widget_get_style_context (widget),
-                                   "sidebar"))
-    {
-      GtkWidget *parent = gtk_widget_get_parent (widget);
-
-      /* The sidebar and content already use different palette surfaces. The
-       * root paned handle must not add a third strip between them; Miller's
-       * own internal paned separators remain untouched. */
-      if (GTK_IS_PANED (parent))
-        gtk_style_context_add_class (gtk_widget_get_style_context (parent),
-                                     "garage-sidebar-split");
-    }
-  else if (GTK_IS_TREE_VIEW (widget) && sidebar == NULL)
-    {
-      GtkStyleContext *context = gtk_widget_get_style_context (widget);
-
-      gtk_style_context_add_class (context, GARAGE_FILE_LIST_CLASS);
-      gtk_widget_set_margin_start (widget, 12);
-      gtk_widget_set_margin_end (widget, 12);
-      G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-      gtk_tree_view_set_rules_hint (GTK_TREE_VIEW (widget), TRUE);
-      G_GNUC_END_IGNORE_DEPRECATIONS
-      if (g_object_get_data (G_OBJECT (widget),
-                             "garage-zebra-installed") == NULL)
-        {
-          g_signal_connect_after (widget, "draw",
-                                  G_CALLBACK (garage_details_draw_stripes),
-                                  NULL);
-          g_object_set_data (G_OBJECT (widget), "garage-zebra-installed",
-                             GINT_TO_POINTER (1));
-        }
-    }
-
-  if (GTK_IS_CONTAINER (widget))
-    gtk_container_foreach (GTK_CONTAINER (widget),
-                           garage_prepare_pantheon_widget, NULL);
-}
-
-static gboolean
-garage_install_pantheon (gpointer data)
-{
-  GList *windows = gtk_window_list_toplevels ();
-  GList *item;
-
-  (void) data;
-  for (item = windows; item != NULL; item = item->next)
-    {
-      GtkWidget *window = item->data;
-
-      gtk_style_context_add_class (gtk_widget_get_style_context (window),
-                                   GARAGE_PANTHEON_CLASS);
-      garage_prepare_pantheon_widget (window, NULL);
-    }
-  g_list_free (windows);
-  return G_SOURCE_CONTINUE;
-}
-
 G_MODULE_EXPORT void
 gtk_module_init (gint *argc, gchar ***argv)
 {
@@ -685,6 +605,4 @@ gtk_module_init (gint *argc, gchar ***argv)
   (void) argv;
   if (g_strcmp0 (g_get_prgname (), "thunar") == 0)
     g_timeout_add (500, garage_install, NULL);
-  else if (g_strcmp0 (g_get_prgname (), "io.elementary.files") == 0)
-    g_timeout_add (250, garage_install_pantheon, NULL);
 }

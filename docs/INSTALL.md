@@ -101,8 +101,8 @@ In order:
    its list against the repositories and reports the whole set of missing names
    at once rather than failing partway through an install.
 3. **Installs the package set** — Hyprland and its portals, Quickshell, Waybar,
-   Kitty, Fish, Rofi, SwayOSD, PipeWire, Pantheon Files, Thunar and its file
-   integrations, the GNOME utility apps it uses, fonts,
+   Kitty, Fish, Rofi, SwayOSD, PipeWire, Thunar and its file integrations,
+   the GNOME utility apps it uses, fonts,
    and the Node/Rust/C++ toolchains. NVIDIA packages are added automatically
    when NVIDIA hardware is detected.
 4. **Enables system services**: NetworkManager, Bluetooth, Docker, and SDDM — so
@@ -120,8 +120,7 @@ In order:
    Geist Mono, linked into `~/.local/share/fonts` by the same stow pass -- are
    ready for the bar (and everything else) at first login.
 7. **Writes the per-user generated files** — `~/.config/swayosd/config.toml`,
-   `~/.config/gtk-3.0/bookmarks`, Pantheon Files' first-run Miller Columns
-   preferences, and Thunar's first-run xfconf layout. These
+   `~/.config/gtk-3.0/bookmarks`, and Thunar's first-run xfconf layout. These
    are mutable or embed an absolute `$HOME`, so they are real files rather than
    links into the repository, and they are only written when absent: changing
    columns, geometry, bookmarks, or the OSD does not dirty Garage, and your

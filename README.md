@@ -75,16 +75,13 @@ comments that already explain why each is shaped the way it is.
 See [`docs/LAUNCHER.md`](docs/LAUNCHER.md) for launcher queries, commands, and
 their activation behavior.
 
-See [`docs/FILES.md`](docs/FILES.md) for the default explorer, Miller Columns,
-XDG launch routing, and the Thunar fallback.
-
 ## Core setup
 
 - Hyprland compositor
 - Kitty terminal
 - Fish shell with the Pure prompt
-- Pantheon Files as the default explorer, with native Miller Columns and Garage
-  chrome; Thunar remains the capable list-view fallback
+- Thunar file explorer, with Garage chrome, split view, archive/media actions,
+  recursive search, and background thumbnailing
 - Rofi launcher
 - Waybar status bar
 - Quickshell shell (settings UI, launcher, control panels)
