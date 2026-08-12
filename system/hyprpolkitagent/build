@@ -11,7 +11,7 @@ trap 'rm -rf -- "$scratch"' EXIT HUP INT TERM
 archive="$scratch/hyprpolkitagent-$version.tar.gz"
 curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
     --connect-timeout 20 --silent --show-error --output "$archive" \
-    "https://github.com/hyprwm/hyprpolkitagent/archive/v$version/hyprpolkitagent-$version.tar.gz"
+    "https://codeload.github.com/hyprwm/hyprpolkitagent/tar.gz/refs/tags/v$version"
 printf '%s  %s\n' "$archive_sha256" "$archive" | sha256sum --check --status
 tar -xzf "$archive" -C "$scratch"
 install -m 0644 "$script_dir/main.qml" \

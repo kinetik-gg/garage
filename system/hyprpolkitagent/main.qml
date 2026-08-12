@@ -7,36 +7,32 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: window
 
-    readonly property int sidePadding: 28
+    readonly property int sidePadding: 20
     // Upstream injects this context object before loading the QML module.
     // qmllint disable unqualified
     readonly property var agent: hpa
     // qmllint enable unqualified
     property bool blocked: false
     property bool submitted: false
+    readonly property int modalHeight: Math.max(
+        240, Math.min(320, content.implicitHeight + sidePadding * 2))
 
-    width: 560
-    height: Math.max(320, Math.min(420, content.implicitHeight + sidePadding * 2))
+    width: 380
+    height: modalHeight
     minimumWidth: width
     maximumWidth: width
-    minimumHeight: height
-    maximumHeight: height
+    minimumHeight: modalHeight
+    maximumHeight: modalHeight
     visible: true
     color: "transparent"
     flags: Qt.Dialog | Qt.FramelessWindowHint
     modality: Qt.ApplicationModal
-    title: "Authentication required"
+    title: "Authenticate"
     font.family: "Plus Jakarta Sans"
     font.pixelSize: 14
 
     function withAlpha(color, alpha) {
         return Qt.rgba(color.r, color.g, color.b, alpha);
-    }
-
-    function displayUser(identity) {
-        const value = String(identity);
-        const separator = value.lastIndexOf(":");
-        return separator >= 0 ? value.slice(separator + 1) : value;
     }
 
     function cancel() {
@@ -88,84 +84,23 @@ ApplicationWindow {
         width: window.width - window.sidePadding * 2
         spacing: 18
 
-        RowLayout {
+        Label {
             Layout.fillWidth: true
-            spacing: 14
-
-            Rectangle {
-                Layout.preferredWidth: 44
-                Layout.preferredHeight: 44
-                radius: 13
-                color: window.withAlpha(system.highlight, 0.14)
-                border.width: 1
-                border.color: window.withAlpha(system.highlight, 0.34)
-
-                Rectangle {
-                    width: 17
-                    height: 14
-                    radius: 4
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 9
-                    color: system.highlight
-                }
-
-                Rectangle {
-                    width: 12
-                    height: 13
-                    radius: 6
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: 8
-                    color: "transparent"
-                    border.width: 3
-                    border.color: system.highlight
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-
-                Label {
-                    Layout.fillWidth: true
-                    text: "Authentication required"
-                    color: system.windowText
-                    font.pixelSize: 21
-                    font.weight: Font.DemiBold
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: "Authorize as " + window.displayUser(window.agent.getUser())
-                    color: window.withAlpha(system.windowText, 0.62)
-                    font.pixelSize: 13
-                    elide: Text.ElideRight
-                }
-            }
+            text: "Authenticate"
+            color: system.windowText
+            font.pixelSize: 20
+            font.weight: Font.DemiBold
         }
 
-        Rectangle {
+        Label {
             Layout.fillWidth: true
-            implicitHeight: requestMessage.implicitHeight + 24
-            radius: 10
-            color: window.withAlpha(system.alternateBase, 0.74)
-            border.width: 1
-            border.color: window.withAlpha(system.windowText, 0.09)
-
-            Label {
-                id: requestMessage
-
-                anchors.fill: parent
-                anchors.margins: 12
-                text: window.agent.getMessage()
-                color: window.withAlpha(system.windowText, 0.78)
-                font.pixelSize: 13
-                lineHeight: 1.22
-                wrapMode: Text.Wrap
-                maximumLineCount: 3
-                elide: Text.ElideRight
-            }
+            text: window.agent.getMessage()
+            color: window.withAlpha(system.windowText, 0.68)
+            font.pixelSize: 13
+            lineHeight: 1.22
+            wrapMode: Text.Wrap
+            maximumLineCount: 3
+            elide: Text.ElideRight
         }
 
         ColumnLayout {
@@ -281,8 +216,9 @@ ApplicationWindow {
 
         property bool primary: false
 
-        implicitWidth: Math.max(112, contentItem.implicitWidth + 28)
-        implicitHeight: 40
+        implicitWidth: Math.max(control.primary ? 148 : 104,
+                                contentItem.implicitWidth + 24)
+        implicitHeight: 42
         leftPadding: 14
         rightPadding: 14
         font.pixelSize: 13
@@ -307,13 +243,10 @@ ApplicationWindow {
                                 : system.highlight)
                 : (control.down
                     ? window.withAlpha(system.buttonText, 0.14)
-                    : (control.hovered
+                    : (control.hovered || control.activeFocus
                        ? window.withAlpha(system.buttonText, 0.09)
-                       : window.withAlpha(system.buttonText, 0.05)))
-            border.width: control.primary || control.activeFocus ? 1 : 0
-            border.color: control.primary
-                ? window.withAlpha(system.highlightedText, 0.22)
-                : window.withAlpha(system.highlight, 0.76)
+                       : "transparent"))
+            border.width: 0
         }
     }
 }

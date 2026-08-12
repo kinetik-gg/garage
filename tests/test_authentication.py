@@ -22,17 +22,36 @@ class AuthenticationModal(unittest.TestCase):
         self.qml = QML.read_text(encoding="utf-8")
 
     def test_geometry_and_typography_are_bounded_not_font_metric_multiplied(self) -> None:
-        self.assertIn("width: 560", self.qml)
-        self.assertIn("Math.max(320, Math.min(420", self.qml)
+        self.assertIn("width: 380", self.qml)
+        self.assertIn("readonly property int modalHeight: Math.max(", self.qml)
+        self.assertIn("240, Math.min(320", self.qml)
+        self.assertIn("minimumHeight: modalHeight", self.qml)
+        self.assertIn("maximumHeight: modalHeight", self.qml)
         self.assertIn('font.family: "Plus Jakarta Sans"', self.qml)
-        self.assertIn("font.pixelSize: 21", self.qml)
+        self.assertIn("font.pixelSize: 20", self.qml)
         self.assertNotIn("FontMetrics", self.qml)
 
-    def test_request_is_compact_but_keeps_the_action_context(self) -> None:
+    def test_actions_are_borderless_with_a_true_ghost_cancel(self) -> None:
+        button = self.qml.split("component GarageButton: Button", 1)[1]
+        self.assertIn("border.width: 0", button)
+        self.assertIn(': "transparent"', button)
+        self.assertNotIn("control.primary || control.activeFocus", button)
+
+    def test_prompt_keeps_the_reason_without_an_extra_card(self) -> None:
+        self.assertIn('text: "Authenticate"', self.qml)
         self.assertIn("text: window.agent.getMessage()", self.qml)
         self.assertIn("maximumLineCount: 3", self.qml)
-        self.assertIn("Text.Wrap", self.qml)
-        self.assertIn('text: "Authorize as "', self.qml)
+        self.assertIn("wrapMode: Text.Wrap", self.qml)
+        self.assertNotIn('text: "Authorize as "', self.qml)
+        self.assertNotIn("displayUser", self.qml)
+        self.assertNotIn("requestMessage", self.qml)
+        reason = self.qml.split("text: window.agent.getMessage()", 1)[1]
+        self.assertNotIn("Rectangle {", reason.split("ColumnLayout {", 1)[0])
+
+    def test_primary_action_has_room_for_both_labels(self) -> None:
+        button = self.qml.split("component GarageButton: Button", 1)[1]
+        self.assertIn("control.primary ? 148 : 104", button)
+        self.assertIn("implicitHeight: 42", button)
 
     def test_password_goes_directly_to_upstream_and_is_never_logged(self) -> None:
         self.assertIn('agent.setResult("auth:" + passwordField.text)', self.qml)
@@ -56,7 +75,7 @@ class AuthenticationModal(unittest.TestCase):
     def test_modal_uses_the_generated_qt_palette_for_primary_surfaces(self) -> None:
         self.assertIn("SystemPalette", self.qml)
         for role in ("system.window", "system.windowText", "system.base",
-                     "system.alternateBase", "system.highlight"):
+                     "system.highlight"):
             with self.subTest(role=role):
                 self.assertIn(role, self.qml)
 
@@ -70,7 +89,7 @@ class AuthenticationIntegration(unittest.TestCase):
             build,
         )
         self.assertIn("sha256sum --check --status", build)
-        self.assertIn("hyprwm/hyprpolkitagent/archive", build)
+        self.assertIn("codeload.github.com/hyprwm/hyprpolkitagent", build)
         self.assertIn('install -m 0644 "$script_dir/main.qml"', build)
         self.assertIn('mv -f -- "$target.new" "$target"', build)
 
