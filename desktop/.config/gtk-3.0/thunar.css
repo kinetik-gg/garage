@@ -24,7 +24,6 @@ window.thunar,
   background-color: alpha(@headerbar_bg_color, 0.88);
   color: @headerbar_fg_color;
   border: 0;
-  border-bottom: 1px solid @sidebar_border_color;
   box-shadow: none;
 }
 
@@ -43,7 +42,8 @@ window.thunar,
 
 .thunar headerbar toolbar {
   padding: 4px 8px 4px 10px;
-  border-bottom: 0;
+  border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
 }
 
 .thunar headerbar .garage-header-split {
@@ -52,6 +52,7 @@ window.thunar,
 
 .thunar headerbar .garage-sidebar-header {
   background-color: @sidebar_bg_color;
+  border: 0;
 }
 
 .thunar toolbar separator {

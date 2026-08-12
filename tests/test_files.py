@@ -76,6 +76,16 @@ class ThunarTheme(unittest.TestCase):
         self.assertNotIn("border-right", shortcuts)
         self.assertNotIn(".standard-view scrolledwindow {", self.css)
 
+    def test_toolbar_divider_belongs_only_to_the_content_column(self) -> None:
+        header = self.css.split(".thunar headerbar {", 1)[1].split("}", 1)[0]
+        toolbar = self.css.split(".thunar headerbar toolbar {", 1)[1].split("}", 1)[0]
+        sidebar_header = self.css.split(
+            ".thunar headerbar .garage-sidebar-header {", 1
+        )[1].split("}", 1)[0]
+        self.assertNotIn("border-bottom", header)
+        self.assertIn("border-bottom: 1px solid @sidebar_border_color", toolbar)
+        self.assertIn("border: 0", sidebar_header)
+
     def test_statusbar_surface_is_full_width_but_text_remains_padded(self) -> None:
         statusbar = self.css.split(".thunar statusbar {", 1)[1].split("}", 1)[0]
         self.assertIn("padding: 0", statusbar)
