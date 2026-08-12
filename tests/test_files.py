@@ -108,7 +108,9 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("garage-shortcut-item-hover", module)
         self.assertIn("gtk_tree_model_get_column_type", module)
         self.assertIn("garage_details_draw_stripes", module)
-        self.assertIn("gtk_widget_set_margin_start", module)
+        self.assertIn("gtk_header_bar_set_custom_title", module)
+        self.assertIn("garage-sidebar-header", module)
+        self.assertIn("gtk_menu_button_get_popup", module)
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
 
@@ -141,16 +143,19 @@ class ThunarIntegration(unittest.TestCase):
         root = ET.parse(THUNAR_DEFAULTS).getroot()
         properties = {item.attrib["name"]: item.attrib["value"]
                       for item in root.findall("property")}
+        self.assertEqual("ThunarDetailsView", properties["default-view"])
+        self.assertEqual("ThunarDetailsView", properties["last-view"])
         self.assertEqual("true", properties["misc-use-csd"])
         self.assertEqual("true", properties["misc-symbolic-icons-in-toolbar"])
         self.assertEqual("true", properties["misc-symbolic-icons-in-sidepane"])
         self.assertEqual("true", properties["last-statusbar-visible"])
         toolbar = properties["last-toolbar-items"]
-        self.assertEqual("THUNAR_ZOOM_LEVEL_50_PERCENT",
+        self.assertEqual("THUNAR_ZOOM_LEVEL_25_PERCENT",
                          properties["last-details-view-zoom-level"])
         visible = ("back:1", "forward:1", "location-bar:1",
                    "view-switcher:1", "search:1", "menu:1")
         hidden = ("open-parent:0", "open-home:0", "toggle-split-view:0")
+        self.assertIn("view-as-compact-list:0", toolbar)
         for item in visible + hidden:
             with self.subTest(item=item):
                 self.assertIn(item, toolbar)
