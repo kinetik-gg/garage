@@ -46,11 +46,25 @@ class ThunarTheme(unittest.TestCase):
         self.assertIn("-GtkTreeView-vertical-separator: 10px", self.css)
         self.assertIn("-GtkTreeView-horizontal-separator: 14px", self.css)
         self.assertIn(".shortcuts-pane scrolledwindow", self.css)
+        self.assertIn("margin: 12px 10px", self.css)
 
     def test_paned_drag_target_does_not_render_as_a_thick_border(self) -> None:
         separator = self.css.split(".thunar paned > separator", 1)[1].split("}", 1)[0]
         self.assertIn("background: transparent", separator)
+        self.assertIn("background-image: none", separator)
         self.assertIn("border: 0", separator)
+
+    def test_sidebar_and_content_meet_without_an_artificial_gutter(self) -> None:
+        shortcuts = self.css.split(".thunar .shortcuts-pane {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("border-right", shortcuts)
+        self.assertNotIn(".standard-view scrolledwindow {", self.css)
+
+    def test_statusbar_surface_is_full_width_but_text_remains_padded(self) -> None:
+        statusbar = self.css.split(".thunar statusbar {", 1)[1].split("}", 1)[0]
+        self.assertIn("padding: 0", statusbar)
+        self.assertIn(".thunar statusbar box", self.css)
+        label = self.css.split(".thunar statusbar label {", 1)[1].split("}", 1)[0]
+        self.assertIn("padding: 7px 14px", label)
 
 
 class ThunarIntegration(unittest.TestCase):

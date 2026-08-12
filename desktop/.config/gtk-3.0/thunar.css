@@ -165,12 +165,11 @@ window.thunar,
 .thunar .shortcuts-pane {
   margin: 0;
   border: 0;
-  border-right: 1px solid @sidebar_border_color;
   border-radius: 0;
 }
 
 .thunar .shortcuts-pane scrolledwindow {
-  padding: 14px 10px;
+  padding: 0;
   background: transparent;
   border: 0;
 }
@@ -182,6 +181,7 @@ window.thunar,
 
 .thunar .shortcuts-pane treeview.view,
 .thunar treeview.sidebar {
+  margin: 12px 10px;
   -GtkTreeView-horizontal-separator: 10px;
   -GtkTreeView-vertical-separator: 10px;
 }
@@ -209,6 +209,7 @@ window.thunar,
   min-width: 0;
   min-height: 0;
   background: transparent;
+  background-image: none;
   border: 0;
 }
 
@@ -227,10 +228,6 @@ window.thunar,
   margin: 0;
   border: 0;
   border-radius: 0;
-}
-
-.thunar .standard-view scrolledwindow {
-  padding: 0 12px;
 }
 
 .thunar .standard-view treeview.view {
@@ -354,7 +351,7 @@ window.thunar,
 .thunar statusbar {
   min-height: 30px;
   margin: 0;
-  padding: 3px 14px;
+  padding: 0;
   color: @theme_unfocused_fg_color;
   background-color: alpha(@view_bg_color, 0.88);
   border: 0;
@@ -363,7 +360,16 @@ window.thunar,
 }
 
 .thunar statusbar frame,
+.thunar statusbar box {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
 .thunar statusbar label {
+  padding: 7px 14px;
+  background: transparent;
   border: 0;
 }
 
