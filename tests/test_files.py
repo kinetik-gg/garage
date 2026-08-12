@@ -81,7 +81,7 @@ class ThunarTheme(unittest.TestCase):
         self.assertNotIn("border-right", shortcuts)
         self.assertNotIn(".standard-view scrolledwindow {", self.css)
 
-    def test_toolbar_divider_belongs_only_to_the_content_column(self) -> None:
+    def test_toolbar_matches_the_column_header_without_a_divider(self) -> None:
         toolbar = self.css.split(
             ".thunar .garage-content-shell > toolbar {", 1
         )[1].split("}", 1)[0]
@@ -93,8 +93,10 @@ class ThunarTheme(unittest.TestCase):
         self.assertNotIn("border-bottom", toolbar)
         self.assertNotIn("garage-sidebar-header", self.css)
 
-    def test_address_is_one_flat_click_to_edit_breadcrumb(self) -> None:
-        breadcrumb = self.css.split(".thunar .garage-breadcrumb,", 1)[1]
+    def test_address_keeps_native_segments_without_internal_controls(self) -> None:
+        breadcrumb = self.css.split(
+            ".thunar .garage-breadcrumb {", 1
+        )[1].split("}", 1)[0]
         self.assertIn("background: transparent", breadcrumb)
         self.assertIn("border: 0", breadcrumb)
 
@@ -136,11 +138,15 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("gtk_menu_button_get_popup", module)
         self.assertIn("garage_install_breadcrumb", module)
         self.assertIn("entry-requested", module)
+        self.assertIn("ThunarLocationButton", module)
+        self.assertIn("gtk_container_forall", module)
+        self.assertIn('g_object_set (controller, "current-directory", NULL', module)
         self.assertIn("garage_center_statusbar", module)
-        self.assertIn("thunarx_file_info_get_location", module)
+        self.assertIn("gtk_widget_set_margin_start (widget, 14)", module)
+        self.assertIn("gtk_widget_set_margin_end (widget, 14)", module)
+        self.assertNotIn("thunarx_file_info_get_location", module)
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
-        self.assertIn("gtk+-3.0 thunarx-3", bootstrap)
 
     def test_every_thunar_launch_path_loads_the_integration(self) -> None:
         wrapper = THUNAR_WRAPPER.read_text(encoding="utf-8")

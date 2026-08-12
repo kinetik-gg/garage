@@ -1,5 +1,4 @@
 #include <gtk/gtk.h>
-#include <thunarx/thunarx.h>
 
 #define GARAGE_ITEM_HOVER_CLASS "garage-shortcut-item-hover"
 
@@ -328,136 +327,174 @@ garage_hide_compact_view (GtkWidget *widget)
   g_list_free (items);
 }
 
-static gchar *
-garage_breadcrumb_text (GObject *directory)
+static void
+garage_collect_location_button (GtkWidget *widget, gpointer data)
 {
-  GFile *location;
-  gchar *path;
-  gchar *result;
-  const gchar *home;
-  gsize home_length;
+  GList **buttons = data;
 
-  if (directory == NULL || !THUNARX_IS_FILE_INFO (directory))
-    return g_strdup ("");
-
-  location = thunarx_file_info_get_location (THUNARX_FILE_INFO (directory));
-  if (location == NULL)
-    return g_strdup ("");
-  path = g_file_get_path (location);
-  if (path == NULL)
-    result = g_file_get_parse_name (location);
-  else
-    {
-      home = g_get_home_dir ();
-      home_length = strlen (home);
-      if (g_str_has_prefix (path, home)
-          && (path[home_length] == '\0' || path[home_length] == G_DIR_SEPARATOR))
-        {
-          gchar *home_name = g_path_get_basename (home);
-          const gchar *relative = path + home_length;
-          gchar **parts;
-          gchar *joined;
-
-          while (*relative == G_DIR_SEPARATOR)
-            relative++;
-          parts = g_strsplit (relative, G_DIR_SEPARATOR_S, -1);
-          joined = g_strjoinv (" / ", parts);
-          result = *joined == '\0'
-                   ? g_strdup (home_name)
-                   : g_strdup_printf ("%s / %s", home_name, joined);
-          g_free (joined);
-          g_strfreev (parts);
-          g_free (home_name);
-        }
-      else
-        result = g_filename_display_name (path);
-      g_free (path);
-    }
-  g_object_unref (location);
-  return result;
+  if (g_strcmp0 (G_OBJECT_TYPE_NAME (widget), "ThunarLocationButton") == 0)
+    *buttons = g_list_prepend (*buttons, widget);
 }
 
 static void
-garage_breadcrumb_clicked (GtkButton *button, gpointer data)
+garage_destroy_child (GtkWidget *widget, gpointer data)
+{
+  (void) data;
+  gtk_widget_destroy (widget);
+}
+
+static void
+garage_breadcrumb_request_entry (GtkButton *button, gpointer data)
 {
   (void) button;
+
+  /* Force Thunar's cached native controller to rebuild its path buttons when
+   * the temporary text entry hands control back. */
+  g_object_set (data, "current-directory", NULL, NULL);
   g_signal_emit_by_name (data, "entry-requested", NULL);
 }
 
 static void
-garage_unref_closure_data (gpointer data, GClosure *closure)
+garage_populate_breadcrumb (GtkWidget *box, GtkWidget *location_bar)
 {
-  (void) closure;
-  g_object_unref (data);
+  GtkWidget *controller;
+  GObject *directory = NULL;
+  GList *buttons = NULL;
+  GList *item;
+  gboolean first = TRUE;
+
+  controller = g_object_get_data (G_OBJECT (box),
+                                  "garage-breadcrumb-controller");
+  if (controller == NULL)
+    return;
+
+  g_object_get (location_bar, "current-directory", &directory, NULL);
+  if (directory != NULL)
+    {
+      /* The segments were removed from the controller on the previous pass,
+       * so its internal list is intentionally empty. Rebuild it even when the
+       * requested directory object is unchanged. */
+      g_object_set (controller, "current-directory", NULL, NULL);
+      g_object_set (controller, "current-directory", directory, NULL);
+    }
+
+  /* Thunar exposes its real folder segments plus three internal controls from
+   * the same custom container. Collect only ThunarLocationButton instances:
+   * these retain the native click, drag/drop, and directory-change behavior;
+   * the two triangle scrollers and pencil filler never enter Garage's row. */
+  gtk_container_forall (GTK_CONTAINER (controller),
+                        garage_collect_location_button, &buttons);
+  gtk_container_foreach (GTK_CONTAINER (box), garage_destroy_child, NULL);
+
+  for (item = buttons; item != NULL; item = item->next)
+    {
+      GtkWidget *segment = item->data;
+
+      if (!first)
+        {
+          GtkWidget *separator = gtk_label_new ("/");
+          gtk_style_context_add_class (gtk_widget_get_style_context (separator),
+                                       "garage-breadcrumb-separator");
+          gtk_box_pack_start (GTK_BOX (box), separator, FALSE, FALSE, 2);
+          gtk_widget_show (separator);
+        }
+      g_object_ref (segment);
+      gtk_container_remove (GTK_CONTAINER (controller), segment);
+      gtk_box_pack_start (GTK_BOX (box), segment, FALSE, FALSE, 0);
+      gtk_widget_show (segment);
+      g_object_unref (segment);
+      first = FALSE;
+    }
+
+  {
+    GtkWidget *filler = gtk_button_new ();
+    gtk_widget_set_hexpand (filler, TRUE);
+    gtk_widget_set_halign (filler, GTK_ALIGN_FILL);
+    gtk_widget_set_tooltip_text (filler, "Click to type a location");
+    gtk_style_context_add_class (gtk_widget_get_style_context (filler),
+                                 "garage-breadcrumb-filler");
+    g_signal_connect (filler, "clicked",
+                      G_CALLBACK (garage_breadcrumb_request_entry), controller);
+    gtk_box_pack_start (GTK_BOX (box), filler, TRUE, TRUE, 0);
+    gtk_widget_show (filler);
+  }
+
+  g_list_free (buttons);
+  if (directory != NULL)
+    g_object_unref (directory);
+}
+
+static gboolean
+garage_refresh_breadcrumb (gpointer data)
+{
+  GtkWidget *box = data;
+  GtkWidget *location_bar = gtk_widget_get_parent (box);
+
+  g_object_set_data (G_OBJECT (box), "garage-breadcrumb-refresh", NULL);
+  if (location_bar != NULL
+      && g_strcmp0 (G_OBJECT_TYPE_NAME (location_bar),
+                    "ThunarLocationBar") == 0)
+    garage_populate_breadcrumb (box, location_bar);
+  return G_SOURCE_REMOVE;
+}
+
+static void
+garage_queue_breadcrumb_refresh (GObject    *location_bar,
+                                 GParamSpec *property,
+                                 gpointer    data)
+{
+  GtkWidget *box = data;
+
+  (void) location_bar;
+  (void) property;
+  if (g_object_get_data (G_OBJECT (box),
+                         "garage-breadcrumb-refresh") == NULL)
+    {
+      g_object_set_data (G_OBJECT (box), "garage-breadcrumb-refresh",
+                         GINT_TO_POINTER (1));
+      g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, garage_refresh_breadcrumb,
+                       g_object_ref (box), g_object_unref);
+    }
 }
 
 static void
 garage_install_breadcrumb (GtkWidget *location_bar)
 {
   GtkWidget *child;
-  GtkWidget *button;
-  GtkWidget *label;
-  GObject *directory = NULL;
-  gchar *text;
+  GtkWidget *box;
 
   child = gtk_bin_get_child (GTK_BIN (location_bar));
   if (child == NULL)
     return;
 
-  g_object_get (location_bar, "current-directory", &directory, NULL);
-  text = garage_breadcrumb_text (directory);
   if (g_object_get_data (G_OBJECT (child), "garage-breadcrumb") != NULL)
-    {
-      label = gtk_bin_get_child (GTK_BIN (child));
-      if (GTK_IS_LABEL (label))
-        gtk_label_set_text (GTK_LABEL (label), text);
-      g_free (text);
-      if (directory != NULL)
-        g_object_unref (directory);
-      return;
-    }
+    return;
 
   /* Leave Thunar's temporary text entry alone while the user is editing or
    * searching. It restores the native location-buttons widget when editing
-   * finishes, and the periodic installer replaces that widget with this one
-   * flat, full-width breadcrumb again. */
+   * finishes, and the periodic installer extracts its real path segments into
+   * Garage's triangle-free row again. */
   if (g_strcmp0 (G_OBJECT_TYPE_NAME (child), "ThunarLocationButtons") != 0)
-    {
-      g_free (text);
-      if (directory != NULL)
-        g_object_unref (directory);
-      return;
-    }
+    return;
 
-  if (directory != NULL)
-    g_object_set (child, "current-directory", directory, NULL);
   g_object_ref (child);
   gtk_container_remove (GTK_CONTAINER (location_bar), child);
 
-  button = gtk_button_new ();
-  label = gtk_label_new (text);
-  gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
-  gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_MIDDLE);
-  gtk_widget_set_hexpand (label, TRUE);
-  gtk_widget_set_halign (label, GTK_ALIGN_FILL);
-  gtk_container_add (GTK_CONTAINER (button), label);
-  gtk_widget_set_hexpand (button, TRUE);
-  gtk_widget_set_halign (button, GTK_ALIGN_FILL);
-  gtk_widget_set_tooltip_text (button, "Click to type a location");
-  gtk_style_context_add_class (gtk_widget_get_style_context (button),
+  box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_widget_set_hexpand (box, TRUE);
+  gtk_widget_set_halign (box, GTK_ALIGN_FILL);
+  gtk_style_context_add_class (gtk_widget_get_style_context (box),
                                "garage-breadcrumb");
-  g_object_set_data (G_OBJECT (button), "garage-breadcrumb",
+  g_object_set_data (G_OBJECT (box), "garage-breadcrumb",
                      GINT_TO_POINTER (1));
-  g_signal_connect_data (button, "clicked",
-                         G_CALLBACK (garage_breadcrumb_clicked), child,
-                         garage_unref_closure_data, 0);
-  gtk_container_add (GTK_CONTAINER (location_bar), button);
-  gtk_widget_show (label);
-  gtk_widget_show (button);
-
-  g_free (text);
-  if (directory != NULL)
-    g_object_unref (directory);
+  g_object_set_data_full (G_OBJECT (box), "garage-breadcrumb-controller",
+                          child, g_object_unref);
+  g_signal_connect_object (location_bar, "notify::current-directory",
+                           G_CALLBACK (garage_queue_breadcrumb_refresh),
+                           box, 0);
+  gtk_container_add (GTK_CONTAINER (location_bar), box);
+  garage_populate_breadcrumb (box, location_bar);
+  gtk_widget_show (box);
 }
 
 static void
@@ -507,6 +544,8 @@ garage_find_widgets (GtkWidget *widget, gpointer data)
     garage_set_widget (&chrome->sidepane, widget);
   else if (GTK_IS_TREE_VIEW (widget) && garage_is_standard_view (widget))
     {
+      gtk_widget_set_margin_start (widget, 14);
+      gtk_widget_set_margin_end (widget, 14);
       G_GNUC_BEGIN_IGNORE_DEPRECATIONS
       gtk_tree_view_set_rules_hint (GTK_TREE_VIEW (widget), TRUE);
       G_GNUC_END_IGNORE_DEPRECATIONS

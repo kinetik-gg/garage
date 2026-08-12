@@ -4,8 +4,8 @@
  * from a toolbar, a tree and a status bar. This sheet gives those pieces one
  * hierarchy while leaving the file manager's capability intact. Its spacing
  * follows Garage System Preferences: a quiet recessed sidebar, an
- * uninterrupted content surface, 42-ish pixel controls and an address that
- * reads like a title until it is edited.
+ * uninterrupted content surface, 42-ish pixel controls and a flat native
+ * breadcrumb row whose empty area switches to direct location entry.
  * Every colour comes from Garage's generated GTK palette, and every selector
  * is scoped to Thunar so other GTK3 applications retain the base theme.
  */
@@ -112,14 +112,41 @@ window.thunar,
   color: @theme_unfocused_fg_color;
 }
 
-.thunar .garage-breadcrumb,
-.thunar .garage-breadcrumb:hover,
-.thunar .garage-breadcrumb:active,
-.thunar .garage-breadcrumb:checked {
+.thunar .garage-breadcrumb {
   min-height: 32px;
-  padding: 0 8px;
+  padding: 0 4px;
   margin: 0;
   color: @view_fg_color;
+  background: transparent;
+  border: 0;
+}
+
+.thunar .garage-breadcrumb > .location-button {
+  min-height: 30px;
+  padding: 0 4px;
+  margin: 0;
+  background: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.thunar .garage-breadcrumb > .location-button:hover {
+  background-color: alpha(@view_fg_color, 0.07);
+}
+
+.thunar .garage-breadcrumb > .garage-breadcrumb-separator {
+  padding: 0 1px;
+  color: @theme_unfocused_fg_color;
+}
+
+.thunar .garage-breadcrumb > .garage-breadcrumb-filler,
+.thunar .garage-breadcrumb > .garage-breadcrumb-filler:hover,
+.thunar .garage-breadcrumb > .garage-breadcrumb-filler:active {
+  min-height: 30px;
+  padding: 0;
+  margin: 0;
   background: transparent;
   background-image: none;
   border: 0;
