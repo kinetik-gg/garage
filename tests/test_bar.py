@@ -297,6 +297,20 @@ class MediaPalettePlacement(unittest.TestCase):
                 self.assertIn('endsWith(".playerctld")', source)
 
 
+class MediaPaletteArtwork(unittest.TestCase):
+    """The full-size cover remains a subtle, stable part of the glass."""
+
+    def test_cover_is_blurred_cropped_and_masked_behind_the_controls(self) -> None:
+        palette = MEDIA_PALETTE_QML.read_text(encoding="utf-8")
+        self.assertIn("id: backdropArt", palette)
+        self.assertIn("fillMode: Image.PreserveAspectCrop", palette)
+        self.assertIn("retainWhileLoading: true", palette)
+        self.assertIn("source: backdropArt", palette)
+        self.assertIn("blurEnabled: true", palette)
+        self.assertIn("maskSource: backdropMask", palette)
+        self.assertIn("opacity: 0.3", palette)
+
+
 class MonitorAnchorIsOneNumber(BackendTestCase):
     """The tail width the bar lays out and the one the click reads are one value."""
 

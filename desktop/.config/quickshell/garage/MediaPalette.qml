@@ -3,6 +3,7 @@ import Quickshell.Services.Mpris
 import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
 import QtQuick.Layouts
 
 // The standalone now-playing palette: artwork, transport, a seek bar and a
@@ -234,6 +235,65 @@ PanelWindow {
             radius: Theme.insetRadius(panel.radius, 1)
             power: Theme.cornerPower
             color: Theme.contentTint
+        }
+
+        // Let the current cover colour the glass without replacing it. The
+        // source crops to the whole surface -- no letterboxing -- and stays
+        // alive while the next asynchronous cover loads, avoiding a blank
+        // flash at track boundaries. MultiEffect applies the blur and the
+        // superellipse mask in one pass before the result is blended at 30%.
+        Item {
+            id: artworkBackdrop
+            anchors.fill: parent
+
+            property bool hasArtwork: false
+
+            Image {
+                id: backdropArt
+                anchors.fill: parent
+                source: media.artUrl
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                retainWhileLoading: true
+                sourceSize.width: 720
+                sourceSize.height: 720
+                smooth: true
+                mipmap: true
+                visible: false
+                onSourceChanged: {
+                    if (source === "")
+                        artworkBackdrop.hasArtwork = false;
+                }
+                onStatusChanged: {
+                    if (status === Image.Ready)
+                        artworkBackdrop.hasArtwork = true;
+                    else if (status === Image.Error || status === Image.Null)
+                        artworkBackdrop.hasArtwork = false;
+                }
+            }
+
+            ContinuousRectangle {
+                id: backdropMask
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: Theme.insetRadius(panel.radius, 1)
+                power: Theme.cornerPower
+                color: "white"
+                visible: false
+            }
+
+            MultiEffect {
+                anchors.fill: parent
+                source: backdropArt
+                visible: artworkBackdrop.hasArtwork
+                opacity: 0.3
+                autoPaddingEnabled: false
+                blurEnabled: true
+                blur: 1.0
+                blurMax: 48
+                maskEnabled: true
+                maskSource: backdropMask
+            }
         }
 
         // Inner hairline one inset px in from the outer one, the double
