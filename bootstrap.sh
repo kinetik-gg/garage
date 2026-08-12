@@ -251,7 +251,7 @@ fi
 # ---------------------------------------------------------------------------
 
 packages=(
-    base-devel git stow cmake meson cpio pkgconf linux-headers
+    base-devel git curl stow cmake meson cpio pkgconf linux-headers
     hyprland uwsm xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
     hypridle hyprlock hyprpaper hyprpolkitagent hyprsunset
     waybar quickshell rofi kitty fish fisher
@@ -550,6 +550,15 @@ else
         "${thunar_module_libs[@]}"
 fi
 record "built Garage's Thunar-only GTK integration"
+
+# The packaged polkit agent keeps its QML inside the executable, so it cannot be
+# themed or replaced from ~/.config. Build the same checksum-pinned upstream
+# release with Garage's compact modal and install it in the user's private
+# prefix; the tracked systemd drop-in selects this binary without replacing the
+# distro package that owns the authentication backend and its dependencies.
+run "$repo_dir/system/hyprpolkitagent/build" \
+    "$HOME/.local/lib/garage/hyprpolkitagent"
+record "built Garage's polkit authentication modal"
 
 # ---------------------------------------------------------------------------
 # Per-user generated files

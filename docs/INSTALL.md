@@ -119,6 +119,8 @@ In order:
    runs `fc-cache` so the bundled fonts -- Phosphor, Plus Jakarta Sans, and
    Geist Mono, linked into `~/.local/share/fonts` by the same stow pass -- are
    ready for the bar (and everything else) at first login.
+   It also builds Garage's authentication modal from the checksum-pinned
+   `hyprpolkitagent` 0.1.3 backend into the user's private prefix.
 7. **Writes the per-user generated files** — `~/.config/swayosd/config.toml`,
    `~/.config/gtk-3.0/bookmarks`, and Thunar's first-run xfconf layout. These
    are mutable or embed an absolute `$HOME`, so they are real files rather than

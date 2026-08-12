@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+version=0.1.3
+archive_sha256=a8fa714b92d47331f056b608cb731dd1f5cc3845a9109cb22c6e6eb55b4eac84
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+target=${1:-"$HOME/.local/lib/garage/hyprpolkitagent"}
+scratch=$(mktemp -d /tmp/garage-hyprpolkitagent.XXXXXX)
+trap 'rm -rf -- "$scratch"' EXIT HUP INT TERM
+
+archive="$scratch/hyprpolkitagent-$version.tar.gz"
+curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
+    --connect-timeout 20 --silent --show-error --output "$archive" \
+    "https://github.com/hyprwm/hyprpolkitagent/archive/v$version/hyprpolkitagent-$version.tar.gz"
+printf '%s  %s\n' "$archive_sha256" "$archive" | sha256sum --check --status
+tar -xzf "$archive" -C "$scratch"
+install -m 0644 "$script_dir/main.qml" \
+    "$scratch/hyprpolkitagent-$version/qml/main.qml"
+
+cmake -Wno-author -S "$scratch/hyprpolkitagent-$version" -B "$scratch/build" \
+    -D CMAKE_BUILD_TYPE=Release
+cmake --build "$scratch/build" --parallel
+
+target_dir=$(dirname -- "$target")
+install -d "$target_dir"
+install -m 0755 "$scratch/build/hyprpolkitagent" "$target.new"
+mv -f -- "$target.new" "$target"

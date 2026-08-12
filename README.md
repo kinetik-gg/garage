@@ -75,6 +75,9 @@ comments that already explain why each is shaped the way it is.
 See [`docs/LAUNCHER.md`](docs/LAUNCHER.md) for launcher queries, commands, and
 their activation behavior.
 
+See [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) for Garage's scoped
+polkit modal and the checksum-pinned upstream backend it retains.
+
 ## Core setup
 
 - Hyprland compositor
