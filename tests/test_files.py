@@ -85,8 +85,18 @@ class ThunarTheme(unittest.TestCase):
         toolbar = self.css.split(
             ".thunar .garage-content-shell > toolbar {", 1
         )[1].split("}", 1)[0]
-        self.assertIn("border-bottom: 1px solid @sidebar_border_color", toolbar)
+        header = self.css.split(
+            ".thunar treeview.view header button {", 1
+        )[1].split("}", 1)[0]
+        self.assertIn("background-color: alpha(@view_bg_color, 0.98)", toolbar)
+        self.assertIn("background-color: alpha(@view_bg_color, 0.98)", header)
+        self.assertNotIn("border-bottom", toolbar)
         self.assertNotIn("garage-sidebar-header", self.css)
+
+    def test_address_is_one_flat_click_to_edit_breadcrumb(self) -> None:
+        breadcrumb = self.css.split(".thunar .garage-breadcrumb,", 1)[1]
+        self.assertIn("background: transparent", breadcrumb)
+        self.assertIn("border: 0", breadcrumb)
 
     def test_statusbar_surface_is_full_width_but_text_remains_padded(self) -> None:
         statusbar = self.css.split(".thunar statusbar {", 1)[1].split("}", 1)[0]
@@ -124,8 +134,13 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("garage-content-shell", module)
         self.assertIn("gtk_container_remove", module)
         self.assertIn("gtk_menu_button_get_popup", module)
+        self.assertIn("garage_install_breadcrumb", module)
+        self.assertIn("entry-requested", module)
+        self.assertIn("garage_center_statusbar", module)
+        self.assertIn("thunarx_file_info_get_location", module)
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
+        self.assertIn("gtk+-3.0 thunarx-3", bootstrap)
 
     def test_every_thunar_launch_path_loads_the_integration(self) -> None:
         wrapper = THUNAR_WRAPPER.read_text(encoding="utf-8")

@@ -41,14 +41,13 @@ window.thunar,
 }
 
 .thunar .garage-content-shell {
-  background-color: alpha(@headerbar_bg_color, 0.88);
+  background-color: alpha(@view_bg_color, 0.98);
 }
 
 .thunar .garage-content-shell > toolbar {
   padding: 4px 8px 4px 10px;
-  background-color: alpha(@headerbar_bg_color, 0.88);
+  background-color: alpha(@view_bg_color, 0.98);
   border: 0;
-  border-bottom: 1px solid @sidebar_border_color;
 }
 
 .thunar toolbar separator {
@@ -111,6 +110,21 @@ window.thunar,
   background-image: none;
   box-shadow: none;
   color: @theme_unfocused_fg_color;
+}
+
+.thunar .garage-breadcrumb,
+.thunar .garage-breadcrumb:hover,
+.thunar .garage-breadcrumb:active,
+.thunar .garage-breadcrumb:checked {
+  min-height: 32px;
+  padding: 0 8px;
+  margin: 0;
+  color: @view_fg_color;
+  background: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .thunar .location-button:hover,

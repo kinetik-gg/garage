@@ -541,8 +541,8 @@ run mkdir -p -- "$thunar_module_dir"
 if ((dry_run)); then
     info "[dry-run] compile Garage's Thunar GTK module"
 else
-    read -r -a thunar_module_cflags <<<"$(pkg-config --cflags gtk+-3.0)"
-    read -r -a thunar_module_libs <<<"$(pkg-config --libs gtk+-3.0)"
+    read -r -a thunar_module_cflags <<<"$(pkg-config --cflags gtk+-3.0 thunarx-3)"
+    read -r -a thunar_module_libs <<<"$(pkg-config --libs gtk+-3.0 thunarx-3)"
     run cc -O2 -shared -fPIC -Wall -Wextra -Werror \
         "${thunar_module_cflags[@]}" \
         -o "$thunar_module_dir/garage-thunar.so" \
