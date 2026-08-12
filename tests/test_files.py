@@ -18,6 +18,11 @@ THUNAR_MODULE = REPO_ROOT / "system" / "gtk-modules" / "garage-thunar.c"
 UWSM_ENV = REPO_ROOT / "desktop" / ".config" / "uwsm" / "env"
 HYPR_VARIABLES = REPO_ROOT / "desktop" / ".config" / "hypr" / "config" / "variables.lua"
 FILES_OPENER = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-open-files"
+THUNAR_WRAPPER = REPO_ROOT / "desktop" / ".local" / "bin" / "thunar"
+THUNAR_SYSTEMD_DROPIN = (
+    REPO_ROOT / "desktop" / ".config" / "systemd" / "user"
+    / "thunar.service.d" / "garage.conf"
+)
 
 
 class ThunarTheme(unittest.TestCase):
@@ -106,6 +111,14 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("gtk_widget_set_margin_start", module)
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
+
+    def test_every_thunar_launch_path_loads_the_integration(self) -> None:
+        wrapper = THUNAR_WRAPPER.read_text(encoding="utf-8")
+        dropin = THUNAR_SYSTEMD_DROPIN.read_text(encoding="utf-8")
+        self.assertIn("garage-thunar.so", wrapper)
+        self.assertIn('exec /usr/bin/thunar "$@"', wrapper)
+        self.assertIn("ExecStart=", dropin)
+        self.assertIn("ExecStart=%h/.local/bin/thunar --daemon", dropin)
 
     def test_bootstrap_installs_the_complete_thunar_stack(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
