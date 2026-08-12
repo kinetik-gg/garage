@@ -259,6 +259,7 @@ packages=(
     grim slurp satty hyprpicker
     networkmanager bluez bluez-utils
     pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol cava
+    pantheon-files
     thunar thunar-archive-plugin thunar-media-tags-plugin tumbler
     catfish file-roller ffmpegthumbnailer gvfs gvfs-smb
     gnome-text-editor gnome-calculator loupe
@@ -531,11 +532,11 @@ record "linked the tracked configuration with stow --no-folding"
 # stow -- are found at first login.
 run fc-cache
 
-# Thunar's shortcuts headers and rows share one GTK3 CSS node, and its CSD
-# toolbar has no structural relationship with the resizable side pane. Compile
-# the narrowly scoped module that supplies those two missing semantics, plus
-# Finder-like ruled rows, against the GTK version installed above. It is loaded
-# by the UWSM environment and returns immediately in every process but Thunar.
+# GTK CSS cannot distinguish Thunar's shortcut headings from its rows or attach
+# spacing and Finder-like stripes to Pantheon's dynamically created Miller
+# columns. Compile the narrowly scoped file-manager module that supplies those
+# semantics against the installed GTK version. It returns immediately outside
+# Thunar and Pantheon Files.
 thunar_module_dir="${XDG_DATA_HOME:-$HOME/.local/share}/garage/gtk-modules"
 run mkdir -p -- "$thunar_module_dir"
 if ((dry_run)); then
@@ -549,7 +550,7 @@ else
         "$repo_dir/system/gtk-modules/garage-thunar.c" \
         "${thunar_module_libs[@]}"
 fi
-record "built Garage's Thunar-only GTK integration"
+record "built Garage's GTK file-manager integration"
 
 # ---------------------------------------------------------------------------
 # Per-user generated files
@@ -605,6 +606,21 @@ if [[ ! -e $thunar_config && ! -L $thunar_config ]]; then
     record "seeded Garage's first-run Thunar layout"
 else
     info "keeping the existing Thunar layout"
+fi
+
+# Pantheon Files stores mutable view choices in dconf. Give a new Garage install
+# its native Miller Columns layout, small content zoom and roomier columns, but
+# never overwrite a layout the user has already chosen.
+pantheon_view_key="/io/elementary/files/preferences/default-viewmode"
+pantheon_view_value="$(dconf read "$pantheon_view_key" 2>/dev/null || true)"
+if [[ -z $pantheon_view_value ]]; then
+    run gsettings set io.elementary.files.preferences default-viewmode miller_columns
+    run gsettings set io.elementary.files.column-view zoom-level small
+    run gsettings set io.elementary.files.column-view preferred-column-width 220
+    run gsettings set io.elementary.files.preferences sidebar-width 252
+    record "seeded Garage's first-run Pantheon Files layout"
+else
+    info "keeping the existing Pantheon Files layout"
 fi
 
 if [[ ! -e "${HOME}/.local/share/wallpaper/current" ]]; then

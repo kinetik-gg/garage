@@ -1,4 +1,4 @@
-"""Thunar is Garage's cohesive, capable file explorer rather than a GTK extra."""
+"""Pantheon Files is Garage's Miller-column explorer; Thunar is the fallback."""
 
 from __future__ import annotations
 
@@ -11,12 +11,17 @@ import xml.etree.ElementTree as ET
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 THUNAR_CSS = REPO_ROOT / "desktop" / ".config" / "gtk-3.0" / "thunar.css"
+PANTHEON_CSS = (
+    REPO_ROOT / "desktop" / ".config" / "gtk-3.0" / "pantheon-files.css"
+)
 MIMEAPPS = REPO_ROOT / "desktop" / ".config" / "mimeapps.list"
 THUNAR_DEFAULTS = REPO_ROOT / "templates" / "thunar.xml"
 BOOTSTRAP = REPO_ROOT / "bootstrap.sh"
+GARAGE_BACKEND = REPO_ROOT / "desktop" / ".local" / "bin" / "garage"
 THUNAR_MODULE = REPO_ROOT / "system" / "gtk-modules" / "garage-thunar.c"
 UWSM_ENV = REPO_ROOT / "desktop" / ".config" / "uwsm" / "env"
 HYPR_VARIABLES = REPO_ROOT / "desktop" / ".config" / "hypr" / "config" / "variables.lua"
+HYPR_BINDS = REPO_ROOT / "desktop" / ".config" / "hypr" / "config" / "binds.lua"
 FILES_OPENER = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-open-files"
 THUNAR_WRAPPER = REPO_ROOT / "desktop" / ".local" / "bin" / "thunar"
 THUNAR_SYSTEMD_DROPIN = (
@@ -109,20 +114,89 @@ class ThunarTheme(unittest.TestCase):
         self.assertIn("padding: 7px 14px", label)
 
 
-class ThunarIntegration(unittest.TestCase):
-    def test_thunar_owns_folder_and_network_locations(self) -> None:
+class PantheonTheme(unittest.TestCase):
+    def setUp(self) -> None:
+        self.css = PANTHEON_CSS.read_text(encoding="utf-8")
+
+    def test_every_rule_is_scoped_to_pantheon_files(self) -> None:
+        structural = re.sub(r"/\*.*?\*/", "", self.css, flags=re.DOTALL)
+        for group in re.findall(r"([^{}]+)\{", structural):
+            for selector in group.split(","):
+                with self.subTest(selector=selector.strip()):
+                    self.assertIn("garage-pantheon-files", selector.lower())
+
+    def test_structure_uses_the_generated_palette_only(self) -> None:
+        self.assertIsNone(re.search(r"#[0-9a-fA-F]{3,8}\b", self.css))
+        self.assertIsNone(re.search(r"\brgba?\(\s*\d", self.css))
+        for role in ("@window_bg_color", "@sidebar_bg_color", "@view_bg_color",
+                     "@accent_bg_color"):
+            with self.subTest(role=role):
+                self.assertIn(role, self.css)
+
+    def test_sidebar_and_miller_columns_have_room_to_breathe(self) -> None:
+        sidebar = self.css.split(
+            ".garage-pantheon-files .sidebar {", 1
+        )[1].split("}", 1)[0]
+        content = self.css.split(
+            ".garage-pantheon-files treeview.view.garage-file-list {", 1
+        )[1].split("}", 1)[0]
+        self.assertIn("padding: 12px 10px", sidebar)
+        self.assertIn("-GtkTreeView-vertical-separator: 10px", content)
+        self.assertIn("-GtkTreeView-horizontal-separator: 14px", content)
+
+    def test_sidebar_headings_are_inert_while_rows_have_item_hover(self) -> None:
+        heading_group = self.css.split(
+            ".garage-pantheon-files .sidebar button.expander,", 1
+        )[1].split("{", 1)[1].split("}", 1)[0]
+        self.assertIn("background: transparent", heading_group)
+        self.assertIn(
+            ".garage-pantheon-files .sidebar row:hover:not(:selected)", self.css
+        )
+
+    def test_sidebar_split_has_no_artificial_gutter(self) -> None:
+        split = self.css.split(
+            ".garage-pantheon-files paned.garage-sidebar-split {", 1
+        )[1].split("}", 1)[0]
+        separator = self.css.split(
+            ".garage-pantheon-files paned.garage-sidebar-split > separator {", 1
+        )[1].split("}", 1)[0]
+        self.assertIn("-GtkPaned-handle-size: 0", split)
+        self.assertIn("min-width: 0", separator)
+        self.assertIn("background: transparent", separator)
+        self.assertIn("border: 0", separator)
+
+
+class FileExplorerIntegration(unittest.TestCase):
+    def test_gtk_entrypoint_imports_pantheon_and_has_no_nautilus_residue(self) -> None:
+        backend = GARAGE_BACKEND.read_text(encoding="utf-8")
+        self.assertIn('@import url("pantheon-files.css");', backend)
+        self.assertNotIn('@import url("nautilus.css");', backend)
+        self.assertFalse(
+            (REPO_ROOT / "desktop" / ".config" / "gtk-4.0" / "nautilus.css").exists()
+        )
+
+    def test_pantheon_owns_folder_and_network_locations(self) -> None:
         parser = configparser.ConfigParser(interpolation=None)
         parser.read(MIMEAPPS, encoding="utf-8")
         defaults = parser["Default Applications"]
-        self.assertEqual("thunar.desktop", defaults["inode/directory"])
-        self.assertEqual("thunar.desktop", defaults["x-scheme-handler/smb"])
+        self.assertEqual("io.elementary.files.desktop", defaults["inode/directory"])
+        self.assertEqual(
+            "io.elementary.files.desktop", defaults["x-scheme-handler/smb"]
+        )
         self.assertNotIn("org.gnome.Nautilus.desktop", defaults.values())
 
     def test_file_manager_binding_resolves_the_xdg_default_at_launch(self) -> None:
         variables = HYPR_VARIABLES.read_text(encoding="utf-8")
+        binds = HYPR_BINDS.read_text(encoding="utf-8")
         opener = FILES_OPENER.read_text(encoding="utf-8")
         self.assertIn("garage-open-files", variables)
         self.assertNotIn("nautilus", variables.lower())
+        self.assertNotIn("pantheon", variables.lower())
+        self.assertNotIn("thunar", variables.lower())
+        self.assertIn(
+            'bind(mainMod .. " + E",          "Open the file manager",', binds
+        )
+        self.assertIn("launchPrefix .. FILE_MANAGER", binds)
         self.assertIn('xdg-open "${1:-$HOME}"', opener)
 
     def test_thunar_module_supplies_structure_gtk_css_cannot_express(self) -> None:
@@ -148,6 +222,15 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
 
+    def test_module_scopes_pantheon_and_prepares_dynamic_miller_columns(self) -> None:
+        module = THUNAR_MODULE.read_text(encoding="utf-8")
+        self.assertIn('"io.elementary.files"', module)
+        self.assertIn("garage-pantheon-files", module)
+        self.assertIn("garage-file-list", module)
+        self.assertIn("garage-sidebar-split", module)
+        self.assertIn("garage_install_pantheon", module)
+        self.assertIn("garage_prepare_pantheon_widget", module)
+
     def test_every_thunar_launch_path_loads_the_integration(self) -> None:
         wrapper = THUNAR_WRAPPER.read_text(encoding="utf-8")
         dropin = THUNAR_SYSTEMD_DROPIN.read_text(encoding="utf-8")
@@ -156,15 +239,31 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("ExecStart=", dropin)
         self.assertIn("ExecStart=%h/.local/bin/thunar --daemon", dropin)
 
-    def test_bootstrap_installs_the_complete_thunar_stack(self) -> None:
+    def test_bootstrap_installs_pantheon_and_the_complete_thunar_fallback(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
         package_block = bootstrap.split("packages=(", 1)[1].split("\n)", 1)[0]
-        for package in ("thunar", "thunar-archive-plugin",
+        for package in ("pantheon-files", "thunar", "thunar-archive-plugin",
                         "thunar-media-tags-plugin", "tumbler", "catfish",
                         "file-roller", "ffmpegthumbnailer", "gvfs-smb"):
             with self.subTest(package=package):
                 self.assertRegex(package_block, rf"\b{re.escape(package)}\b")
         self.assertNotRegex(package_block, r"\bnautilus\b")
+
+    def test_first_run_pantheon_layout_uses_native_miller_columns(self) -> None:
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        self.assertIn(
+            "gsettings set io.elementary.files.preferences "
+            "default-viewmode miller_columns", bootstrap
+        )
+        self.assertIn(
+            "gsettings set io.elementary.files.column-view zoom-level small",
+            bootstrap,
+        )
+        self.assertIn(
+            "gsettings set io.elementary.files.column-view "
+            "preferred-column-width 220", bootstrap
+        )
+        self.assertIn("keeping the existing Pantheon Files layout", bootstrap)
 
     def test_first_run_defaults_are_copied_but_never_linked(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")

@@ -1,0 +1,226 @@
+/* Garage's Pantheon Files surface.
+ *
+ * Pantheon Files supplies the interaction model Garage wants -- including
+ * native Miller columns -- while this sheet brings its spacing and hierarchy
+ * into line with System Preferences and the Thunar fallback. The GTK module
+ * adds the top-level scope and file-list classes at runtime, so none of these
+ * rules leak into another GTK3 application. Every colour is a generated Garage
+ * palette role and therefore follows light/dark appearance changes.
+ */
+
+/* Window and quiet, content-oriented chrome ------------------------------ */
+
+window.garage-pantheon-files,
+.garage-pantheon-files {
+  background-color: alpha(@window_bg_color, 0.96);
+  color: @window_fg_color;
+}
+
+.garage-pantheon-files headerbar {
+  min-height: 50px;
+  padding: 0 12px;
+  background-color: alpha(@view_bg_color, 0.98);
+  color: @headerbar_fg_color;
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files headerbar:backdrop {
+  background-color: alpha(@view_bg_color, 0.94);
+}
+
+.garage-pantheon-files headerbar button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 2px 7px;
+  margin: 0 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+  transition: 120ms ease-out;
+}
+
+.garage-pantheon-files headerbar button:hover {
+  background-color: alpha(@view_fg_color, 0.09);
+}
+
+.garage-pantheon-files headerbar button:active,
+.garage-pantheon-files headerbar button:checked {
+  background-color: alpha(@view_fg_color, 0.15);
+}
+
+.garage-pantheon-files headerbar button:disabled {
+  color: @theme_unfocused_fg_color;
+  background: transparent;
+}
+
+.garage-pantheon-files headerbar entry,
+.garage-pantheon-files headerbar .pathbar {
+  min-height: 34px;
+  padding: 0 10px;
+  color: @view_fg_color;
+  background-color: transparent;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.garage-pantheon-files headerbar entry:focus {
+  background-color: alpha(@view_fg_color, 0.07);
+  box-shadow: inset 0 0 0 1px alpha(@accent_bg_color, 0.60);
+}
+
+.garage-pantheon-files tabbar {
+  min-height: 34px;
+  padding: 0 10px;
+  background-color: alpha(@view_bg_color, 0.98);
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files tabbar tab {
+  min-height: 30px;
+  margin: 2px 2px 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+}
+
+.garage-pantheon-files tabbar tab:checked {
+  background-color: alpha(@view_fg_color, 0.08);
+}
+
+/* Calm sidebar ----------------------------------------------------------- */
+
+.garage-pantheon-files .sidebar {
+  min-width: 232px;
+  padding: 12px 10px;
+  color: @sidebar_fg_color;
+  background-color: alpha(@sidebar_bg_color, 0.98);
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files .sidebar scrolledwindow,
+.garage-pantheon-files .sidebar viewport,
+.garage-pantheon-files .sidebar list {
+  color: @sidebar_fg_color;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files .sidebar button.expander,
+.garage-pantheon-files .sidebar button.expander:hover,
+.garage-pantheon-files .sidebar button.expander:active,
+.garage-pantheon-files .sidebar button.expander:checked {
+  min-height: 28px;
+  margin: 6px 2px 2px;
+  padding: 2px 8px;
+  color: @theme_unfocused_fg_color;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.garage-pantheon-files .sidebar row {
+  min-height: 36px;
+  margin: 2px 0;
+  padding: 0 10px;
+  color: @sidebar_fg_color;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+}
+
+.garage-pantheon-files .sidebar row:hover:not(:selected) {
+  background-color: alpha(@sidebar_fg_color, 0.08);
+}
+
+.garage-pantheon-files .sidebar row:selected {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
+
+.garage-pantheon-files .sidebar actionbar {
+  padding: 8px 0 0;
+  color: @sidebar_fg_color;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files paned.garage-sidebar-split {
+  -GtkPaned-handle-size: 0;
+}
+
+.garage-pantheon-files paned.garage-sidebar-split > separator {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* Miller columns and list content --------------------------------------- */
+
+.garage-pantheon-files treeview.view.garage-file-list {
+  -GtkTreeView-vertical-separator: 10px;
+  -GtkTreeView-horizontal-separator: 14px;
+  color: @view_fg_color;
+  background-color: alpha(@view_bg_color, 0.98);
+  border: 0;
+}
+
+.garage-pantheon-files treeview.view.garage-file-list:hover:not(:selected) {
+  background-color: alpha(@view_fg_color, 0.06);
+}
+
+.garage-pantheon-files treeview.view.garage-file-list:selected {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+  border-radius: 6px;
+}
+
+.garage-pantheon-files treeview.view.garage-file-list header button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: @theme_unfocused_fg_color;
+  background-color: alpha(@view_bg_color, 0.98);
+  border: 0;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.garage-pantheon-files treeview.view.garage-file-list header button:hover {
+  color: @view_fg_color;
+  background-color: alpha(@view_fg_color, 0.06);
+}
+
+.garage-pantheon-files statusbar {
+  min-height: 34px;
+  padding: 0 14px;
+  color: @theme_unfocused_fg_color;
+  background-color: alpha(@view_bg_color, 0.98);
+  border: 0;
+  box-shadow: none;
+}
+
+.garage-pantheon-files scrollbar {
+  background: transparent;
+}
+
+.garage-pantheon-files scrollbar slider {
+  min-width: 5px;
+  min-height: 5px;
+  border-radius: 999px;
+  background-color: alpha(@view_fg_color, 0.28);
+}
+
+.garage-pantheon-files scrollbar slider:hover {
+  background-color: alpha(@view_fg_color, 0.42);
+}
