@@ -187,6 +187,14 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
 
+    def test_thunar_structure_is_installed_before_widgets_are_painted(self) -> None:
+        module = THUNAR_MODULE.read_text(encoding="utf-8")
+        self.assertIn('garage_add_widget_hook ("realize")', module)
+        self.assertIn('garage_add_widget_hook ("map")', module)
+        self.assertIn("g_signal_add_emission_hook", module)
+        self.assertIn("garage-installing", module)
+        self.assertNotIn("g_timeout_add", module)
+
     def test_every_thunar_launch_path_loads_the_integration(self) -> None:
         wrapper = THUNAR_WRAPPER.read_text(encoding="utf-8")
         dropin = THUNAR_SYSTEMD_DROPIN.read_text(encoding="utf-8")

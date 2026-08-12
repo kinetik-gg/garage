@@ -597,34 +597,93 @@ garage_find_widgets (GtkWidget *widget, gpointer data)
     gtk_container_foreach (GTK_CONTAINER (widget), garage_find_widgets, data);
 }
 
-static gboolean
-garage_install (gpointer data)
+static void
+garage_install_window (GtkWidget *window)
 {
-  GList *windows = gtk_window_list_toplevels ();
-  GList *item;
+  GarageWindowChrome *chrome;
 
-  (void) data;
-  for (item = windows; item != NULL; item = item->next)
+  if (window == NULL
+      || g_strcmp0 (G_OBJECT_TYPE_NAME (window), "ThunarWindow") != 0
+      || g_object_get_data (G_OBJECT (window), "garage-installing") != NULL)
+    return;
+
+  /* Realize/map hooks can fire recursively while the toolbar and breadcrumb
+   * are moved into their Garage-owned containers. One complete pass already
+   * sees the constructed widget tree, so nested hooks must simply stand by. */
+  g_object_set_data (G_OBJECT (window), "garage-installing",
+                     GINT_TO_POINTER (1));
+
+  chrome = g_object_get_data (G_OBJECT (window), "garage-window-chrome");
+  if (chrome == NULL)
     {
-      GtkWidget *window = item->data;
-      GarageWindowChrome *chrome;
-
-      if (g_strcmp0 (G_OBJECT_TYPE_NAME (window), "ThunarWindow") != 0)
-        continue;
-
-      chrome = g_object_get_data (G_OBJECT (window), "garage-window-chrome");
-      if (chrome == NULL)
-        {
-          chrome = g_new0 (GarageWindowChrome, 1);
-          g_object_set_data_full (G_OBJECT (window), "garage-window-chrome",
-                                  chrome, garage_window_chrome_free);
-        }
-
-      garage_find_widgets (window, chrome);
-      garage_own_toolbar (chrome);
+      chrome = g_new0 (GarageWindowChrome, 1);
+      g_object_set_data_full (G_OBJECT (window), "garage-window-chrome",
+                              chrome, garage_window_chrome_free);
     }
-  g_list_free (windows);
-  return G_SOURCE_CONTINUE;
+
+  garage_find_widgets (window, chrome);
+  garage_own_toolbar (chrome);
+  g_object_set_data (G_OBJECT (window), "garage-installing", NULL);
+}
+
+static gboolean
+garage_is_install_trigger (GtkWidget *widget)
+{
+  const gchar *type_name = G_OBJECT_TYPE_NAME (widget);
+
+  return GTK_IS_TOOLBAR (widget)
+         || g_strcmp0 (type_name, "ThunarWindow") == 0
+         || g_strcmp0 (type_name, "ThunarShortcutsPane") == 0
+         || g_strcmp0 (type_name, "ThunarShortcutsView") == 0
+         || g_strcmp0 (type_name, "ThunarTreePane") == 0
+         || g_strcmp0 (type_name, "ThunarTreeView") == 0
+         || g_strcmp0 (type_name, "ThunarLocationBar") == 0
+         || g_strcmp0 (type_name, "ThunarLocationButtons") == 0
+         || g_strcmp0 (type_name, "ThunarStatusbar") == 0
+         || g_strcmp0 (type_name, "ThunarDetailsView") == 0;
+}
+
+static gboolean
+garage_widget_ready (GSignalInvocationHint *hint,
+                     guint                  n_param_values,
+                     const GValue          *param_values,
+                     gpointer               data)
+{
+  GtkWidget *widget;
+  GtkWidget *window;
+
+  (void) hint;
+  (void) data;
+  if (n_param_values == 0)
+    return TRUE;
+
+  widget = g_value_get_object (&param_values[0]);
+  if (!GTK_IS_WIDGET (widget) || !garage_is_install_trigger (widget))
+    return TRUE;
+
+  if (g_strcmp0 (G_OBJECT_TYPE_NAME (widget), "ThunarWindow") == 0)
+    window = widget;
+  else
+    window = gtk_widget_get_toplevel (widget);
+  garage_install_window (window);
+  return TRUE;
+}
+
+static void
+garage_add_widget_hook (const gchar *signal_name)
+{
+  gpointer widget_class;
+  guint signal_id;
+
+  /* GTK loads modules before GtkWidget's class has necessarily registered its
+   * lifecycle signals. Initializing the class here makes the lookup concrete;
+   * without it both IDs are zero and no hook is installed. */
+  widget_class = g_type_class_ref (GTK_TYPE_WIDGET);
+  signal_id = g_signal_lookup (signal_name, GTK_TYPE_WIDGET);
+  if (signal_id != 0)
+    g_signal_add_emission_hook (signal_id, 0, garage_widget_ready,
+                                NULL, NULL);
+  g_type_class_unref (widget_class);
 }
 
 G_MODULE_EXPORT void
@@ -633,5 +692,12 @@ gtk_module_init (gint *argc, gchar ***argv)
   (void) argc;
   (void) argv;
   if (g_strcmp0 (g_get_prgname (), "thunar") == 0)
-    g_timeout_add (500, garage_install, NULL);
+    {
+      /* The old 500ms polling pass let Thunar paint its native structure and
+       * visibly jump into the Garage structure later. Realize runs after the
+       * widget tree exists but before its first map; map covers panes or native
+       * controllers that Thunar reuses while switching views. */
+      garage_add_widget_hook ("realize");
+      garage_add_widget_hook ("map");
+    }
 }
