@@ -105,9 +105,10 @@ In order:
    the GNOME utility apps it uses, fonts,
    and the Node/Rust/C++ toolchains. NVIDIA packages are added automatically
    when NVIDIA hardware is detected.
-4. **Enables system services**: NetworkManager, Bluetooth, Docker, and SDDM — so
-   the reboot at the end lands in a graphical login — and sets `fish` as your
-   login shell.
+4. **Installs Garage's sign-in surface, then enables system services.** The
+   complete root-owned SDDM theme is staged and atomically published before
+   NetworkManager, Bluetooth, Docker, and SDDM are enabled, so the reboot at the
+   end lands in the Garage login screen. It then sets `fish` as your login shell.
 5. **Creates the home directory layout** (`~/Documents`, `~/repositories`, and
    the rest of the XDG set).
 6. **Clears the way, then links the configuration.** It works out exactly what
@@ -157,6 +158,9 @@ the first login takes a few seconds longer than the ones after it.
 
 The settings CLI that renders and manages preferences is `garage`
 (`~/.local/bin/garage`), with helper commands prefixed `garage-`.
+
+SDDM and Hyprlock ownership, monitor routing, power confirmation, and safe test
+procedures are documented in [SESSION-SURFACES.md](SESSION-SURFACES.md).
 
 ## The window material gate
 

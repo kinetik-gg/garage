@@ -1,0 +1,11 @@
+[SddmGreeterTheme]
+Name=Garage
+Description=Garage's native sign-in surface
+Author=Kinetik
+License=MIT
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=garage
+Theme-API=2.0

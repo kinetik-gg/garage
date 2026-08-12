@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Install Garage's root-owned SDDM presentation as one staged payload.
+
+set -euo pipefail
+
+if [[ ${EUID} -ne 0 ]]; then
+    printf 'error: run this installer as root\n' >&2
+    exit 1
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_dir="$(cd -- "$script_dir/../.." && pwd)"
+theme_root=/usr/share/sddm/themes
+target="$theme_root/garage"
+dropin=/etc/sddm.conf.d/10-garage.conf
+stage="$(mktemp -d "${TMPDIR:-/tmp}/garage-sddm.XXXXXX")"
+
+cleanup() {
+    rm -rf -- "$stage"
+}
+trap cleanup EXIT HUP INT TERM
+
+install -d -m 0755 "$stage/theme/icons"
+install -m 0644 \
+    "$script_dir/garage/Main.qml" \
+    "$script_dir/garage/GarageAction.qml" \
+    "$script_dir/garage/GarageField.qml" \
+    "$script_dir/garage/metadata.desktop" \
+    "$script_dir/garage/theme.conf" \
+    "$script_dir/garage/LICENSE" \
+    "$script_dir/garage/ATTRIBUTION.md" \
+    "$stage/theme/"
+install -m 0644 "$script_dir/garage/icons/"*.svg "$stage/theme/icons/"
+install -m 0644 "$repo_dir/desktop/Wallpaper/Dark/ggykb5c7oeQ.jpg" \
+    "$stage/theme/background.jpg"
+install -m 0644 "$repo_dir/desktop/.local/share/fonts/PlusJakartaSans.ttf" \
+    "$stage/theme/PlusJakartaSans.ttf"
+install -m 0644 "$repo_dir/desktop/.local/share/fonts/PJS-OFL.txt" \
+    "$stage/theme/PJS-OFL.txt"
+
+# A content-addressed directory plus an atomic symlink flip means an already
+# selected Garage theme can never observe a half-copied update.
+payload_id="$(tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+    -cf - -C "$stage/theme" . | sha256sum | cut -c1-16)"
+release="$theme_root/.garage-$payload_id"
+link="$theme_root/.garage-link-$$"
+install -d -m 0755 "$theme_root" /etc/sddm.conf.d
+if [[ ! -d $release ]]; then
+    unpublished="$theme_root/.garage-new-$payload_id-$$"
+    install -d -m 0755 "$unpublished"
+    cp -aT -- "$stage/theme" "$unpublished"
+    find "$unpublished" -type d -exec chmod 0755 {} +
+    find "$unpublished" -type f -exec chmod 0644 {} +
+    mv -- "$unpublished" "$release"
+fi
+ln -s -- "$release" "$link"
+mv -Tf -- "$link" "$target"
+install -m 0644 "$script_dir/10-garage.conf" "$dropin"
