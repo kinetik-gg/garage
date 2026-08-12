@@ -233,12 +233,12 @@ class MonitorPanelToggle(unittest.TestCase):
             root = Path(root_text)
             self.desktop_state(root, "not json\n", "")
             call = self.run_toggle(root, "monitor", "cpu")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1616\n", call)
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
 
     def test_the_widgetless_command_is_still_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as root_text:
             call = self.run_toggle(Path(root_text), "monitor")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1616\n", call)
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
 
     def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
         result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
@@ -700,9 +700,11 @@ class BarPaddingScale(BackendTestCase):
         css = self.spacing(1.2)
         edge = round(self.garage.PADDING_TABLE["edge"] * 1.2)
         menu = re.search(r"#custom-menu \{([^}]*)\}", css).group(1)
-        clock = re.search(r"#clock \{\s*padding-right: (\d+)px;\s*\}", css)
+        clock = re.findall(r"#clock \{([^}]*)\}", css)[-1]
         self.assertIn(f"margin-left: {edge}px", menu)
-        self.assertEqual(edge, int(clock.group(1)))
+        self.assertIn(f"margin-right: {edge}px", clock)
+        self.assertNotIn("padding-right", clock,
+                         "clock padding paints its hover tint into the edge gutter")
 
     def test_the_overrides_come_after_the_import(self) -> None:
         """GTK CSS resolves equal specificity by order, so this is the whole

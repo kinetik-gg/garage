@@ -164,11 +164,12 @@ WAYBAR_STATUS_GROUP = "group/status-tail"
 # The tail's own width is its text plus the padding around it, so both halves of
 # that can move: a longer clock format or a wider locale on one side,
 # bar.padding_scale on the other. The previous 298px measurement at padding_scale
-# 1.25 gains 4px from the larger right edge; 304 is that 302px result rounded up.
+# 1.25 included 19px of clock padding. Keeping 15px of inner clock padding and
+# moving the 22px outer gutter into a margin makes that 316px; 320 rounds it up.
 # Past this the anchor drifts right of the group's true centre
 # by the excess, and no further -- the panel clamps itself into the output, so
 # the worst case is an off-centre dashboard, never one over an edge.
-WAYBAR_STATUS_TAIL_WIDTH = 304
+WAYBAR_STATUS_TAIL_WIDTH = 320
 
 # The metric strips the bar can carry, in the order they sit on the right side.
 # The names are garage-metrics' own --bar-svg widgets, and each one is switched
@@ -197,9 +198,8 @@ BAR_BACKGROUNDS = ("blurred", "transparent")
 PADDING_TABLE = {
     # One gutter for both physical screen edges. It is deliberately part of the
     # scale: increasing bar density should loosen the frame around the complete
-    # bar at the same rate as the room between its modules. The menu carries it
-    # as a margin because that button must remain square; the clock carries it
-    # as padding because it is the final text module.
+    # bar at the same rate as the room between its modules. Both consumers carry
+    # it as a margin, so neither edge gutter becomes part of a hover background.
     "edge": 18,
     # Inner gap after the menu. A margin rather than padding so the logo's hover
     # tint remains square; see MENU_BUTTON_NUDGE.
@@ -3964,7 +3964,7 @@ def waybar_spacing_css(config: dict) -> str:
 }}
 
 #clock {{
-  padding-right: {step["edge"]}px;
+  margin-right: {step["edge"]}px;
 }}
 
 tooltip {{
