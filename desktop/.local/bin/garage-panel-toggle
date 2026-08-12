@@ -52,6 +52,10 @@ output=$(jq -nr \
 
 [ -n "$output" ] || exit 1
 
+state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+stylesheet="$config_home/waybar/style.css"
+
 # The monitor dashboard is anchored under the centre of Waybar's metric group.
 # The status tail follows that group and reaches a known distance in from the
 # right edge of the output, so the group's centre is the output's width, less
@@ -60,10 +64,7 @@ output=$(jq -nr \
 # in the same place. Both numbers are read back out of what Garage generated --
 # see WAYBAR_STATUS_TAIL_WIDTH and bar_widget_modules().
 if [ "$1" = monitor ]; then
-    state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
-    config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
     fragment="$state_home/garage/generated/waybar-widgets.jsonc"
-    stylesheet="$config_home/waybar/style.css"
     # The fallbacks are the shipped defaults. A missing or hand-edited runtime
     # file must not turn a bar click into a no-op under `set -e`; losing these
     # only costs the anchor its accuracy, and the panel clamps itself into the
@@ -109,21 +110,74 @@ if [ "$1" = monitor ]; then
         ')
     qs -c garage ipc call shell "$fn" "$output" "$anchor_x" || true
 elif [ "$1" = media ]; then
-    # A now-playing label changes width with every title, so there is no stable
-    # generated width from which to derive its centre. The click itself is a
-    # truthful point inside that label. Convert its compositor-global X into the
-    # selected output's local coordinates; MediaPalette centres on it and clamps
-    # the surface away from the output edges, just like MonitorPalette.
-    anchor_x=$(jq -nr \
-        --argjson cursor "$cursor" \
-        --argjson monitors "$monitors" \
-        --arg output "$output" '
-            first(
-                $monitors[]
-                | select(.name == $output)
-                | (($cursor.x - .x) | floor)
-            )
-        ')
+    # The label changes width with every title, so neither its centre nor the
+    # pointer position is a stable anchor. Align the palette's left edge with
+    # the media module's stable leading edge instead. This is the left-side
+    # counterpart of the monitoring-group calculation above: read the generated
+    # bar geometry, add the workspace buttons that are actually present on this
+    # output, then hand MediaPalette the centre of its own fixed 360px width.
+    # The fallbacks are the generated defaults at padding_scale 1.2/1.25.
+    menu_margin_left=22
+    menu_min_width=21
+    menu_padding_right=6
+    menu_margin_right=16
+    workspace_padding=6
+    media_margin_left=16
+    workspace_dot=6
+    active_extra=14
+    palette_width=360
+    if [ -r "$stylesheet" ]; then
+        configured=$(sed -n \
+            '/^#custom-menu {/,/^}/s/.*margin-left: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        menu_margin_left=${configured:-22}
+        configured=$(sed -n \
+            '/^#custom-menu {/,/^}/s/.*min-width: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        menu_min_width=${configured:-21}
+        configured=$(sed -n \
+            '/^#custom-menu {/,/^}/s/.*padding-right: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        menu_padding_right=${configured:-6}
+        configured=$(sed -n \
+            '/^#custom-menu {/,/^}/s/.*margin-right: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        menu_margin_right=${configured:-16}
+        configured=$(sed -n \
+            '/^#workspaces button {/,/^}/s/.*padding: 0 \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        workspace_padding=${configured:-6}
+        configured=$(sed -n \
+            '/^#custom-media {/,/^}/s/.*margin-left: \([0-9][0-9]*\)px;.*/\1/p' \
+            "$stylesheet")
+        media_margin_left=${configured:-16}
+    fi
+
+    show_workspaces=true
+    left_fragment="$state_home/garage/generated/waybar-workspaces.jsonc"
+    if [ -r "$left_fragment" ]; then
+        if configured=$(jq -er \
+            'if .["modules-left"] | index("ext/workspaces") then "true" else "false" end' \
+            "$left_fragment" 2>/dev/null); then
+            show_workspaces=$configured
+        fi
+    fi
+
+    workspace_width=0
+    if [ "$show_workspaces" = true ]; then
+        workspaces=$(hyprctl workspaces -j)
+        workspace_count=$(jq -nr \
+            --argjson workspaces "$workspaces" \
+            --arg output "$output" '
+                [$workspaces[] | select(.monitor == $output)] | length
+            ')
+        if [ "$workspace_count" -gt 0 ]; then
+            workspace_width=$((workspace_count * (workspace_dot + workspace_padding * 2) + active_extra))
+        fi
+    fi
+
+    media_left=$((menu_margin_left + menu_min_width + menu_padding_right + menu_margin_right + workspace_width + media_margin_left))
+    anchor_x=$((media_left + palette_width / 2))
     qs -c garage ipc call shell "$fn" "$output" "$anchor_x" || true
 else
     # Letting qs fail to stderr keeps a missing function visible instead of

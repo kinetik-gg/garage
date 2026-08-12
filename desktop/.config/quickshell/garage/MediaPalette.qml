@@ -64,7 +64,11 @@ PanelWindow {
         return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
     }
 
-    readonly property var players: Mpris.players ? Mpris.players.values : []
+    // playerctld exposes a proxy player whose identity and metadata mirror the
+    // real player. Keeping it would produce two identical Spotify/browser
+    // segments and send controls through an unnecessary second hop.
+    readonly property var players: Mpris.players ? Mpris.players.values.filter(
+        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
 
     // Pinned by the selector below; falls back to the playing-over-paused
     // rule MediaCard uses -- for the same reason MediaCard uses it, a

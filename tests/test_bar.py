@@ -43,6 +43,7 @@ CONFIG_JSONC = WAYBAR / "config.jsonc"
 BASE_CSS = WAYBAR / "waybar-base.css"
 SHELL_DIR = REPO_ROOT / "desktop" / ".config" / "quickshell" / "garage"
 MEDIA_PALETTE_QML = SHELL_DIR / "MediaPalette.qml"
+MEDIA_CARD_QML = SHELL_DIR / "MediaCard.qml"
 SHELL_QML = SHELL_DIR / "shell.qml"
 
 # The scripts this wave superseded. garage-metrics answers for all four now, and
@@ -148,7 +149,7 @@ class BarPanelToggle(unittest.TestCase):
 
     TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
 
-    def fake_desktop(self, root: Path) -> tuple[Path, Path]:
+    def fake_desktop(self, root: Path, cursor_x: int = 150) -> tuple[Path, Path]:
         bin_dir = root / "bin"
         capture = root / "qs-call"
         bin_dir.mkdir()
@@ -156,10 +157,15 @@ class BarPanelToggle(unittest.TestCase):
         hyprctl.write_text(
             "#!/bin/sh\n"
             "case \"$1\" in\n"
-            "  cursorpos) printf '%s\\n' '{\"x\":150,\"y\":10}' ;;\n"
+            f"  cursorpos) printf '%s\\n' '{{\"x\":{cursor_x},\"y\":10}}' ;;\n"
             "  monitors) printf '%s\\n' "
             "'[{\"name\":\"DP-1\",\"x\":0,\"y\":0,"
             "\"width\":1920,\"height\":1080,\"scale\":1}]' ;;\n"
+            "  workspaces) printf '%s\\n' "
+            "'[{\"name\":\"1\",\"monitor\":\"DP-1\"},"
+            "{\"name\":\"2\",\"monitor\":\"DP-1\"},"
+            "{\"name\":\"3\",\"monitor\":\"DP-1\"},"
+            "{\"name\":\"4\",\"monitor\":\"DP-1\"}]' ;;\n"
             "esac\n",
             encoding="utf-8")
         qs = bin_dir / "qs"
@@ -170,8 +176,8 @@ class BarPanelToggle(unittest.TestCase):
         qs.chmod(0o755)
         return bin_dir, capture
 
-    def run_toggle(self, root: Path, *arguments: str) -> str:
-        bin_dir, capture = self.fake_desktop(root)
+    def run_toggle(self, root: Path, *arguments: str, cursor_x: int = 150) -> str:
+        bin_dir, capture = self.fake_desktop(root, cursor_x)
         env = os.environ | {
             "PATH": f"{bin_dir}:/usr/bin",
             "HOME": str(root),
@@ -244,10 +250,13 @@ class BarPanelToggle(unittest.TestCase):
             call = self.run_toggle(Path(root_text), "monitor")
         self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
 
-    def test_media_uses_the_click_inside_its_variable_width_label(self) -> None:
-        with tempfile.TemporaryDirectory() as root_text:
-            call = self.run_toggle(Path(root_text), "media")
-        self.assertEqual("-c garage ipc call shell mediaOn DP-1 150\n", call)
+    def test_media_uses_one_group_anchor_wherever_the_label_is_clicked(self) -> None:
+        calls = set()
+        for cursor_x in (180, 420):
+            with tempfile.TemporaryDirectory() as root_text:
+                calls.add(self.run_toggle(Path(root_text), "media",
+                                          cursor_x=cursor_x))
+        self.assertEqual({"-c garage ipc call shell mediaOn DP-1 347\n"}, calls)
 
     def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
         result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
@@ -272,6 +281,20 @@ class MediaPalettePlacement(unittest.TestCase):
         self.assertIn("? media.targetAnchorX - media.implicitWidth / 2", palette)
         self.assertRegex(palette, r"anchors\s*\{\s*top: true\s*left: true\s*\}")
         self.assertIn("margins.left: media.surfaceLeft", palette)
+
+    def test_the_click_calculation_uses_the_palettes_real_width(self) -> None:
+        palette = MEDIA_PALETTE_QML.read_text(encoding="utf-8")
+        script = BarPanelToggle.TOGGLE.read_text(encoding="utf-8")
+        qml_width = int(re.search(r"implicitWidth:\s*(\d+)", palette).group(1))
+        script_width = int(re.search(r"palette_width=(\d+)", script).group(1))
+        self.assertEqual(qml_width, script_width)
+
+    def test_playerctld_is_not_presented_as_a_second_real_player(self) -> None:
+        for path in (MEDIA_PALETTE_QML, MEDIA_CARD_QML):
+            with self.subTest(component=path.name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn('candidate.dbusName || ""', source)
+                self.assertIn('endsWith(".playerctld")', source)
 
 
 class MonitorAnchorIsOneNumber(BackendTestCase):

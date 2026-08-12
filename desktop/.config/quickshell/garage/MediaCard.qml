@@ -10,7 +10,10 @@ import QtQuick.Layouts
 ContinuousRectangle {
     id: card
 
-    readonly property var players: Mpris.players ? Mpris.players.values : []
+    // playerctld mirrors the selected real player on its own MPRIS name. It is
+    // transport plumbing, not a second listening session.
+    readonly property var players: Mpris.players ? Mpris.players.values.filter(
+        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
 
     // Whatever is playing, else the first player on the bus. Browsers register a
     // player per tab and leave the paused ones behind, so "the first one" alone
