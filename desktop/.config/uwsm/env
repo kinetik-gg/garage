@@ -8,12 +8,12 @@ export HYPRCURSOR_SIZE=24
 export XCURSOR_THEME="macOS"
 export XCURSOR_SIZE=24
 
-# GTK3 cannot express two Thunar-only interactions in CSS: its shortcuts pane
-# exposes every row through one treeview node, and its CSD toolbar spans the
-# whole window instead of the content pane. This tiny module is a no-op outside
-# Thunar; bootstrap compiles it for the installed GTK version. The dedicated
-# Thunar wrapper also sets this variable because terminal and D-Bus activation
-# do not reliably inherit a graphical session's original environment.
+# GTK3 cannot express the Thunar-only structure Garage needs: shortcuts headers
+# and items share one treeview node, Tree mode uses a separate pane/view pair,
+# and the toolbar otherwise spans the whole window instead of the content pane.
+# This tiny module is a no-op outside Thunar; bootstrap compiles it for the
+# installed GTK version. The dedicated Thunar wrapper also sets this variable
+# because terminal and D-Bus activation do not reliably inherit the session.
 garage_thunar_module="${XDG_DATA_HOME:-$HOME/.local/share}/garage/gtk-modules/garage-thunar.so"
 if [ -r "$garage_thunar_module" ]; then
 	export GTK_MODULES="${GTK_MODULES:+$GTK_MODULES:}$garage_thunar_module"

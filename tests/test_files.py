@@ -47,6 +47,7 @@ class ThunarTheme(unittest.TestCase):
 
     def test_all_primary_surfaces_have_an_explicit_hierarchy(self) -> None:
         for selector in ("headerbar", ".location-bar", ".shortcuts-pane",
+                         ".garage-tree-pane",
                          ".standard-view", "notebook > header", ".preview-pane",
                          "statusbar", "scrollbar slider"):
             with self.subTest(selector=selector):
@@ -65,6 +66,22 @@ class ThunarTheme(unittest.TestCase):
         )[1].split("}", 1)[0]
         self.assertIn("background-color: transparent", neutral)
         self.assertIn("garage-shortcut-item-hover", self.css)
+
+    def test_tree_sidebar_has_its_own_padding_and_row_treatment(self) -> None:
+        tree_pane = self.css.split(
+            ".thunar .garage-tree-pane {", 1
+        )[1].split("}", 1)[0]
+        self.assertIn("padding: 12px 10px", tree_pane)
+        self.assertIn("treeview.view.garage-tree-view", self.css)
+        self.assertIn(
+            ".garage-tree-pane treeview.view.garage-tree-view:hover:not(:selected)",
+            self.css,
+        )
+        self.assertIn(
+            ".garage-tree-pane treeview.view.garage-tree-view expander", self.css
+        )
+        self.assertIn(".sidebar:not(.shortcuts-pane) > treeview.view", self.css)
+        self.assertNotIn("treeview.sidebar", self.css)
 
     def test_paned_handle_reserves_no_visual_gutter(self) -> None:
         paned = self.css.split(".thunar paned {", 1)[1].split("}", 1)[0]
@@ -145,6 +162,11 @@ class ThunarIntegration(unittest.TestCase):
         environment = UWSM_ENV.read_text(encoding="utf-8")
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("garage-shortcut-item-hover", module)
+        self.assertIn("ThunarTreePane", module)
+        self.assertIn("ThunarTreeView", module)
+        self.assertIn("garage-tree-pane", module)
+        self.assertIn("garage-tree-view", module)
+        self.assertIn("gtk_tree_view_set_level_indentation", module)
         self.assertIn("gtk_tree_model_get_column_type", module)
         self.assertIn("garage_details_draw_stripes", module)
         self.assertIn("gtk_paned_pack2", module)

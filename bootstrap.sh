@@ -531,11 +531,11 @@ record "linked the tracked configuration with stow --no-folding"
 # stow -- are found at first login.
 run fc-cache
 
-# Thunar's shortcuts headers and rows share one GTK3 CSS node, and its CSD
-# toolbar has no structural relationship with the resizable side pane. Compile
-# the narrowly scoped module that supplies those two missing semantics, plus
-# Finder-like ruled rows, against the GTK version installed above. It is loaded
-# by the UWSM environment and returns immediately in every process but Thunar.
+# Thunar's shortcuts headers and rows share one GTK3 CSS node, Tree mode exposes
+# a separate pane/view pair, and its CSD toolbar has no structural relationship
+# with either resizable side pane. Compile the narrowly scoped module that
+# supplies those missing semantics, plus Finder-like ruled rows, against the GTK
+# version installed above. It returns immediately in every process but Thunar.
 thunar_module_dir="${XDG_DATA_HOME:-$HOME/.local/share}/garage/gtk-modules"
 run mkdir -p -- "$thunar_module_dir"
 if ((dry_run)); then

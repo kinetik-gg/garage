@@ -1,6 +1,8 @@
 #include <gtk/gtk.h>
 
 #define GARAGE_ITEM_HOVER_CLASS "garage-shortcut-item-hover"
+#define GARAGE_TREE_PANE_CLASS "garage-tree-pane"
+#define GARAGE_TREE_VIEW_CLASS "garage-tree-view"
 
 typedef struct
 {
@@ -34,6 +36,18 @@ garage_is_standard_view (GtkWidget *widget)
                                      "standard-view"))
       return TRUE;
   return FALSE;
+}
+
+static gboolean
+garage_is_tree_pane (GtkWidget *widget)
+{
+  return g_strcmp0 (G_OBJECT_TYPE_NAME (widget), "ThunarTreePane") == 0;
+}
+
+static gboolean
+garage_is_tree_view (GtkWidget *widget)
+{
+  return g_strcmp0 (G_OBJECT_TYPE_NAME (widget), "ThunarTreeView") == 0;
 }
 
 static void
@@ -526,7 +540,22 @@ garage_find_widgets (GtkWidget *widget, gpointer data)
 
   garage_hide_compact_view (widget);
 
-  if (garage_is_shortcuts_view (widget))
+  if (garage_is_tree_pane (widget))
+    {
+      gtk_style_context_add_class (gtk_widget_get_style_context (widget),
+                                   GARAGE_TREE_PANE_CLASS);
+      garage_set_widget (&chrome->sidepane, widget);
+    }
+  else if (garage_is_tree_view (widget))
+    {
+      /* Tree mode uses a different widget from the Places pane and does not
+       * inherit its CSS node. Give the hierarchy its own stable styling hook
+       * and slightly open up nested paths without changing expansion state. */
+      gtk_style_context_add_class (gtk_widget_get_style_context (widget),
+                                   GARAGE_TREE_VIEW_CLASS);
+      gtk_tree_view_set_level_indentation (GTK_TREE_VIEW (widget), 10);
+    }
+  else if (garage_is_shortcuts_view (widget))
     {
       if (g_object_get_data (G_OBJECT (widget), "garage-hover-installed") == NULL)
         {

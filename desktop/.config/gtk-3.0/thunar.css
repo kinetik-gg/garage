@@ -200,7 +200,7 @@ window.thunar,
 
 .thunar .sidebar,
 .thunar .shortcuts-pane,
-.thunar treeview.sidebar,
+.thunar .garage-tree-pane,
 .thunar .shortcuts-pane treeview.view {
   min-width: 232px;
   background-color: @sidebar_bg_color;
@@ -215,47 +215,78 @@ window.thunar,
   border-radius: 0;
 }
 
-.thunar .shortcuts-pane scrolledwindow {
+.thunar .garage-tree-pane {
+  margin: 0;
+  padding: 12px 10px;
+  border: 0;
+  border-radius: 0;
+}
+
+/* The class above is supplied by Garage's GTK module. Keep the structural
+ * fallback so a Tree pane that was already open while the module was upgraded
+ * receives the same inset immediately; the Places pane excludes itself via
+ * its native shortcuts-pane class. */
+.thunar .sidebar:not(.shortcuts-pane) {
+  margin: 0;
+  padding: 12px 10px;
+  border: 0;
+  border-radius: 0;
+}
+
+.thunar .shortcuts-pane scrolledwindow,
+.thunar .garage-tree-pane scrolledwindow {
   padding: 0;
   background: transparent;
   border: 0;
 }
 
 .thunar .shortcuts-pane viewport,
-.thunar .shortcuts-pane treeview.view {
+.thunar .shortcuts-pane treeview.view,
+.thunar .garage-tree-pane viewport,
+.thunar .garage-tree-pane treeview.view {
   background: transparent;
 }
 
 .thunar .shortcuts-pane treeview.view,
-.thunar treeview.sidebar {
+.thunar .garage-tree-pane treeview.view.garage-tree-view,
+.thunar .sidebar:not(.shortcuts-pane) > treeview.view {
   margin: 0;
   border: 0;
   -GtkTreeView-horizontal-separator: 10px;
   -GtkTreeView-vertical-separator: 10px;
 }
 
-.thunar .shortcuts-pane treeview.view:hover:not(:selected),
-.thunar treeview.sidebar:hover:not(:selected) {
+.thunar .shortcuts-pane treeview.view:hover:not(:selected) {
   background-color: transparent;
 }
 
 .thunar .shortcuts-pane treeview.view.garage-shortcut-item-hover:hover:not(:selected),
-.thunar treeview.sidebar.garage-shortcut-item-hover:hover:not(:selected) {
+.thunar .garage-tree-pane treeview.view.garage-tree-view:hover:not(:selected),
+.thunar .sidebar:not(.shortcuts-pane) > treeview.view:hover:not(:selected) {
   background-color: alpha(@sidebar_fg_color, 0.07);
   border-radius: 8px;
 }
 
 .thunar .shortcuts-pane treeview.view:selected,
-.thunar treeview.sidebar:selected {
+.thunar .garage-tree-pane treeview.view.garage-tree-view:selected,
+.thunar .sidebar:not(.shortcuts-pane) > treeview.view:selected {
   background-color: @accent_bg_color;
   color: @accent_fg_color;
   border-radius: 8px;
 }
 
 .thunar .shortcuts-pane treeview.view:selected:backdrop,
-.thunar treeview.sidebar:selected:backdrop {
+.thunar .garage-tree-pane treeview.view.garage-tree-view:selected:backdrop,
+.thunar .sidebar:not(.shortcuts-pane) > treeview.view:selected:backdrop {
   background-color: @theme_unfocused_selected_bg_color;
   color: @theme_unfocused_selected_fg_color;
+}
+
+.thunar .garage-tree-pane treeview.view.garage-tree-view expander,
+.thunar .sidebar:not(.shortcuts-pane) > treeview.view expander {
+  min-width: 16px;
+  min-height: 16px;
+  color: @theme_unfocused_fg_color;
 }
 
 .thunar paned {
