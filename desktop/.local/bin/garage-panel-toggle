@@ -108,6 +108,23 @@ if [ "$1" = monitor ]; then
             )
         ')
     qs -c garage ipc call shell "$fn" "$output" "$anchor_x" || true
+elif [ "$1" = media ]; then
+    # A now-playing label changes width with every title, so there is no stable
+    # generated width from which to derive its centre. The click itself is a
+    # truthful point inside that label. Convert its compositor-global X into the
+    # selected output's local coordinates; MediaPalette centres on it and clamps
+    # the surface away from the output edges, just like MonitorPalette.
+    anchor_x=$(jq -nr \
+        --argjson cursor "$cursor" \
+        --argjson monitors "$monitors" \
+        --arg output "$output" '
+            first(
+                $monitors[]
+                | select(.name == $output)
+                | (($cursor.x - .x) | floor)
+            )
+        ')
+    qs -c garage ipc call shell "$fn" "$output" "$anchor_x" || true
 else
     # Letting qs fail to stderr keeps a missing function visible instead of
     # silently doing nothing; either way the compositor binding still succeeds.

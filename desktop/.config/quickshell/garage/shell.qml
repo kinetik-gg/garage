@@ -22,6 +22,9 @@ ShellRoot {
     // A negative value means a keybind opened the dashboard, so it uses screen centre.
     property real monitorAnchorX: -1
     property string mediaScreenName: ""
+    // Monitor-local click position for the variable-width media label. A keybind
+    // has no bar click and leaves this negative for output-centred placement.
+    property real mediaAnchorX: -1
     property string aiUsageScreenName: ""
 
     // Which transient surface is on screen, by name, or "" for none.
@@ -495,10 +498,9 @@ ShellRoot {
 
     // The three panels the bar's own modules open, on the same shape as the two
     // centres above: one loader each, bound to activeSurface, and a dismissed()
-    // that clears the name it was activated by. The monitor and the AI usage
-    // AI usage sits against the right edge; media is centred on the output. The
-    // monitor dashboard receives the bar click's X coordinate and positions
-    // itself under that point, clamped inside the output.
+    // that clears the name it was activated by. AI usage sits against the right
+    // edge. Media and monitor receive a monitor-local X from the bar click and
+    // centre themselves under it, clamped inside the output.
     LazyLoader {
         id: monitorPaletteLoader
         active: shell.activeSurface === "monitorPalette"
@@ -516,6 +518,7 @@ ShellRoot {
 
         MediaPalette {
             targetScreenName: shell.mediaScreenName
+            targetAnchorX: shell.mediaAnchorX
             onDismissed: shell.closeSurface("mediaPalette")
         }
     }
@@ -746,13 +749,15 @@ ShellRoot {
         function media(): void {
             shell.toggleSurface("mediaPalette", () => {
                 shell.mediaScreenName = shell.focusedScreenName();
+                shell.mediaAnchorX = -1;
             });
         }
 
-        function mediaOn(screenName: string): void {
+        function mediaOn(screenName: string, anchorX: int): void {
             const sameScreen = shell.mediaScreenName === screenName;
             const open = () => {
                 shell.mediaScreenName = screenName;
+                shell.mediaAnchorX = anchorX;
             };
             if (sameScreen)
                 shell.toggleSurface("mediaPalette", open);

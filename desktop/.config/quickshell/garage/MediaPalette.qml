@@ -6,16 +6,14 @@ import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
 
 // The standalone now-playing palette: artwork, transport, a seek bar and a
-// player switcher, floating over the middle of the bar with a spectrum
+// player switcher, floating beneath the bar's now-playing readout with a spectrum
 // running quietly behind it. MediaCard in the control centre is the compact
 // row version of the same Mpris logic; this is the richer surface for
 // reaching for while nothing else is open.
 //
-// A layer surface anchored to the top edge alone, the same idiom
-// ScreenshotPalette uses on the bottom edge: a PanelWindow anchored on one
-// side only is centred across the rest of the output by the compositor, so
-// this lands in the middle of the screen under the bar rather than pinned
-// to a corner.
+// The horizontal placement follows MonitorPalette: the bar click supplies a
+// monitor-local X, the surface centres itself on that point, and the result is
+// clamped into the output. A keyboard launch supplies -1 and uses output centre.
 //
 // The contract mirrors ControlCenterPalette's: targetScreenName, a
 // dismissed() signal, an OnDemand overlay layer surface. holdOpen is new --
@@ -44,6 +42,7 @@ PanelWindow {
     id: media
 
     required property string targetScreenName
+    required property real targetAnchorX
 
     signal dismissed()
 
@@ -155,6 +154,16 @@ PanelWindow {
     exclusiveZone: 0
     surfaceFormat.opaque: false
 
+    readonly property real surfaceLeft: {
+        const target = media.targetScreen();
+        const available = target ? target.width : 1920;
+        const desired = media.targetAnchorX >= 0
+            ? media.targetAnchorX - media.implicitWidth / 2
+            : (available - media.implicitWidth) / 2;
+        return Math.max(Theme.windowGutter, Math.min(desired,
+            available - media.implicitWidth - Theme.windowGutter));
+    }
+
     // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
     PanelMotion {
         id: motion
@@ -167,9 +176,11 @@ PanelWindow {
 
     anchors {
         top: true
+        left: true
     }
 
     margins.top: motion.surfaceTop
+    margins.left: media.surfaceLeft
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "garage-media"

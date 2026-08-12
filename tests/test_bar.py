@@ -7,9 +7,10 @@ rule -- and waybar's own merge rule makes that awkward in a way worth pinning:
 
   * an option named in ~/.config/waybar/config.jsonc is won by that file, and an
     include can only supply an option the naming file left out. So height,
-    modules-center and modules-right have to be absent from config.jsonc for the
-    fragment to decide them at all. That absence is a property of a *tracked*
-    file, and nothing but a test will notice it coming back;
+    modules-left, modules-center and modules-right have to be absent from
+    config.jsonc for the fragment to decide them at all. That absence is a
+    property of a *tracked* file, and nothing but a test will notice it coming
+    back;
   * GTK CSS has no arithmetic, so a scaled padding is a generated padding. The
     base sheet must therefore name none of the values in PADDING_TABLE, or the
     scale would be silently overridden for whichever one it kept.
@@ -40,6 +41,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WAYBAR = REPO_ROOT / "desktop" / ".config" / "waybar"
 CONFIG_JSONC = WAYBAR / "config.jsonc"
 BASE_CSS = WAYBAR / "waybar-base.css"
+SHELL_DIR = REPO_ROOT / "desktop" / ".config" / "quickshell" / "garage"
+MEDIA_PALETTE_QML = SHELL_DIR / "MediaPalette.qml"
+SHELL_QML = SHELL_DIR / "shell.qml"
 
 # The scripts this wave superseded. garage-metrics answers for all four now, and
 # a config.jsonc that still names one would point the bar at a file that is gone.
@@ -139,8 +143,8 @@ class BaseSheetOwnsNoSpacing(BackendTestCase):
                               "stopped applying")
 
 
-class MonitorPanelToggle(unittest.TestCase):
-    """The bar click still opens the dashboard when runtime state is stale."""
+class BarPanelToggle(unittest.TestCase):
+    """Bar clicks reach their output-local anchors even with stale state."""
 
     TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
 
@@ -240,11 +244,34 @@ class MonitorPanelToggle(unittest.TestCase):
             call = self.run_toggle(Path(root_text), "monitor")
         self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
 
+    def test_media_uses_the_click_inside_its_variable_width_label(self) -> None:
+        with tempfile.TemporaryDirectory() as root_text:
+            call = self.run_toggle(Path(root_text), "media")
+        self.assertEqual("-c garage ipc call shell mediaOn DP-1 150\n", call)
+
     def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
         result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
                                 capture_output=True, text=True)
         self.assertNotEqual(0, result.returncode)
         self.assertIn("usage:", result.stderr)
+
+
+class MediaPalettePlacement(unittest.TestCase):
+    """The media click's anchor survives the IPC-to-surface handoff."""
+
+    def test_the_shell_forwards_the_media_anchor(self) -> None:
+        shell = SHELL_QML.read_text(encoding="utf-8")
+        self.assertIn("property real mediaAnchorX: -1", shell)
+        self.assertIn("targetAnchorX: shell.mediaAnchorX", shell)
+        self.assertIn("function mediaOn(screenName: string, anchorX: int)", shell)
+        self.assertIn("shell.mediaAnchorX = anchorX", shell)
+
+    def test_the_surface_centres_on_the_anchor_and_clamps_to_the_output(self) -> None:
+        palette = MEDIA_PALETTE_QML.read_text(encoding="utf-8")
+        self.assertIn("required property real targetAnchorX", palette)
+        self.assertIn("? media.targetAnchorX - media.implicitWidth / 2", palette)
+        self.assertRegex(palette, r"anchors\s*\{\s*top: true\s*left: true\s*\}")
+        self.assertIn("margins.left: media.surfaceLeft", palette)
 
 
 class MonitorAnchorIsOneNumber(BackendTestCase):
@@ -472,17 +499,36 @@ class BarWidgetFragment(BackendTestCase):
                 self.assertEqual(self.garage.WAYBAR_MODULES_RIGHT,
                                  tail[-len(self.garage.WAYBAR_MODULES_RIGHT):])
 
-    def test_the_media_toggle_flips_the_centre_and_its_definition_together(self) -> None:
+    def left(self, **departures) -> dict:
+        config = copy.deepcopy(self.garage.FALLBACK_DEFAULTS)
+        config["bar"].update(departures)
+        self.garage.render_bar_workspaces(config)
+        return json.loads(self.garage.WAYBAR_WORKSPACES.read_text(encoding="utf-8"))
+
+    def test_the_media_toggle_places_it_after_workspaces_and_flips_its_definition(self) -> None:
         on = self.fragment(media_player=True)
-        self.assertEqual(["custom/media"], on["modules-center"])
+        self.assertEqual([], on["modules-center"])
+        self.assertEqual([*self.garage.WAYBAR_MODULES_LEFT,
+                          self.garage.WAYBAR_WORKSPACE_MODULE,
+                          "custom/media"],
+                         self.left(media_player=True)["modules-left"])
         self.assertIn("custom/media", on)
         self.assertEqual("$HOME/.local/bin/garage-panel-toggle media",
                          on["custom/media"]["on-click"])
         off = self.fragment(media_player=False)
         self.assertEqual([], off["modules-center"])
+        self.assertNotIn("custom/media",
+                         self.left(media_player=False)["modules-left"])
         self.assertNotIn("custom/media", off,
                          "a definition for a module nobody lists reads as though "
                          "its exec is still running every two seconds")
+
+        without_workspaces = copy.deepcopy(self.garage.FALLBACK_DEFAULTS)
+        without_workspaces["workspaces"]["indicator"] = False
+        self.garage.render_bar_workspaces(without_workspaces)
+        left = json.loads(self.garage.WAYBAR_WORKSPACES.read_text(encoding="utf-8"))
+        self.assertEqual([*self.garage.WAYBAR_MODULES_LEFT, "custom/media"],
+                         left["modules-left"])
 
     def test_the_media_module_keeps_its_transport_controls(self) -> None:
         # Moved out of config.jsonc, so everything but on-click has to arrive
@@ -696,6 +742,16 @@ class BarPaddingScale(BackendTestCase):
         self.assertNotRegex(button, r"margin: 0 \d+px",
                             "a horizontal margin here is dead bar again")
 
+    def test_the_workspace_cluster_has_the_same_gap_on_both_sides(self) -> None:
+        css = self.spacing(1.2)
+        gap = round(self.garage.PADDING_TABLE["menu_right"] * 1.2)
+        menu = re.search(r"#custom-menu \{([^}]*)\}", css).group(1)
+        media = re.search(r"#custom-media \{([^}]*)\}", css).group(1)
+        self.assertIn(f"margin-right: {gap}px", menu)
+        self.assertIn(f"margin-left: {gap}px", media)
+        self.assertNotIn("padding-left", media,
+                         "media padding would paint its hover tint across the gap")
+
     def test_both_outer_edges_share_the_scaled_gutter(self) -> None:
         css = self.spacing(1.2)
         edge = round(self.garage.PADDING_TABLE["edge"] * 1.2)
@@ -877,6 +933,14 @@ class BarRenderers(BackendTestCase):
         self.garage.render_bar_widgets(self.config())
         written = sorted(path.name for path in self.garage.GENERATED.iterdir())
         self.assertEqual(["waybar-widgets.jsonc"], written)
+
+    def test_applying_widgets_republishes_media_position_before_reloading(self) -> None:
+        source = inspect.getsource(self.garage.apply_bar_widgets)
+        left = source.index("render_bar_workspaces(config)")
+        widgets = source.index("render_bar_widgets(config)")
+        reload_position = source.index("reload_bar()")
+        self.assertLess(left, widgets)
+        self.assertLess(widgets, reload_position)
 
     def test_render_bar_style_writes_only_the_stylesheet(self) -> None:
         self.garage.render_bar_style(self.config())

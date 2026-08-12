@@ -66,7 +66,7 @@ monitor_gpu = false
 # The AI token-usage readout. Safe to leave on: it prints nothing at all when the
 # tokscale CLI is not installed, and the module hides itself on an empty text.
 ai_usage = true
-# The now-playing readout, which is the whole of the bar's centre. It also hides
+# The now-playing readout immediately after the workspace indicator. It hides
 # itself when no player is running.
 media_player = true
 

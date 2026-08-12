@@ -134,11 +134,11 @@ WAYBAR_WORKSPACES = GENERATED / "waybar-workspaces.jsonc"
 WAYBAR_WIDGETS = GENERATED / "waybar-widgets.jsonc"
 REDUCE_MOTION_FILE = GENERATED / "reduce-motion"
 
-# The bar's left side, which is what the workspace indicator is toggled out of.
+# The bar's left side, where the workspace and media toggles take effect.
 # waybar cannot append to an array from an include -- an option is won by
 # whichever file names it first, and config.jsonc is read before anything it
 # includes -- so the whole list has to be published here for either variant of
-# it to reach the bar. custom/menu is carried along unchanged.
+# either module to reach the bar. custom/menu is carried along unchanged.
 WAYBAR_MODULES_LEFT = ["custom/menu"]
 WAYBAR_WORKSPACE_MODULE = "ext/workspaces"
 
@@ -201,8 +201,9 @@ PADDING_TABLE = {
     # bar at the same rate as the room between its modules. Both consumers carry
     # it as a margin, so neither edge gutter becomes part of a hover background.
     "edge": 18,
-    # Inner gap after the menu. A margin rather than padding so the logo's hover
-    # tint remains square; see MENU_BUTTON_NUDGE.
+    # Gap on both sides of the workspace cluster: after the menu and before the
+    # media readout. A margin rather than padding keeps each hover tint inside
+    # its own control; see MENU_BUTTON_NUDGE.
     "menu_right": 13,
     # Half the space between two workspace dots -- and padding on the button
     # rather than margin around it, so the space between the dots belongs to a
@@ -1394,8 +1395,8 @@ PREFERENCE_ROUTES: dict[str, tuple] = {
     # The two bar routes. Both end at reload_bar() and neither touches the
     # compositor: the bar is a layer surface with its own config and its own
     # stylesheet, and nothing in Hyprland reads either. They stay apart because
-    # they write different files -- the stylesheet and the module fragment -- and
-    # a shared route would make each writer responsible for the other's content.
+    # one writes stylesheet state while the other writes module-layout state;
+    # media spans two module fragments, but still has nothing to do with CSS.
     "bar_style": ("apply_bar_style",),
     "bar_widgets": ("apply_bar_widgets",),
 }
@@ -2689,11 +2690,11 @@ def render_workspaces(config: dict) -> None:
 
 
 def render_bar_workspaces(config: dict) -> None:
-    """Publish the bar's left side, with or without the workspace indicator.
+    """Publish the bar's left side: menu, workspaces, then media.
 
     A fragment of its own rather than more of waybar-clock.jsonc: that one is
-    written by render_region on a region change and this one by a workspaces
-    change, and sharing a file would make each writer responsible for
+    written by render_region on a region change and this one by workspace and
+    media changes, and sharing a file would make each writer responsible for
     reproducing the other's content or silently drop it.
 
     Only modules-left is published. `persistent-workspaces` used to be spelled
@@ -2710,6 +2711,8 @@ def render_bar_workspaces(config: dict) -> None:
     modules = list(WAYBAR_MODULES_LEFT)
     if config["workspaces"]["indicator"]:
         modules.append(WAYBAR_WORKSPACE_MODULE)
+    if config["bar"]["media_player"]:
+        modules.append("custom/media")
     atomic_write(WAYBAR_WORKSPACES,
                  json.dumps({"modules-left": modules}, indent=2) + "\n")
 
@@ -2731,7 +2734,7 @@ METRIC_STRIP_WIDTHS = {
 
 
 def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
-    """The bar's right side and centre, as (right, centre, definitions).
+    """The bar's right side, empty centre and widget definitions.
 
     Split out from the renderer so the order can be asserted without writing a
     file. The order is BAR_METRICS' order, then the AI strip, then
@@ -2785,10 +2788,9 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
     }
     center: list[str] = []
     if bar["media_player"]:
-        center.append("custom/media")
-        # Moved here from config.jsonc verbatim but for on-click, which used to
-        # re-enter the script to raise the player and now opens the panel. The
-        # scroll and middle-click transport controls are unchanged.
+        # Listed after the workspace indicator by render_bar_workspaces(). Its
+        # definition remains in this widget-owned fragment so the exec and all
+        # transport bindings still switch off with bar.media_player.
         definitions["custom/media"] = {
             "exec": "$HOME/.config/waybar/media-status.py",
             "return-type": "json",
@@ -2805,7 +2807,7 @@ def bar_widget_modules(config: dict) -> tuple[list[str], list[str], dict]:
 
 
 def render_bar_widgets(config: dict) -> None:
-    """Publish the bar's height, its centre and its whole right side.
+    """Publish the bar's height, empty centre and its whole right side.
 
     A third fragment rather than more of either existing one, by the same rule
     render_bar_workspaces() states: waybar-clock.jsonc is written on a region
@@ -3919,6 +3921,12 @@ def waybar_spacing_css(config: dict) -> str:
   transition: {workspace_transition};
 }}
 
+/* Mirror the menu-to-workspaces gap on the far side of the workspace cluster.
+   Outside the media control so its hover tint does not paint across the gap. */
+#custom-media {{
+  margin-left: {step["menu_right"]}px;
+}}
+
 #custom-media,
 #custom-containers,
 #custom-microphone,
@@ -4610,10 +4618,12 @@ def apply_bar_style(config: dict) -> None:
 def apply_bar_widgets(config: dict) -> None:
     """Republish the bar's widgets and have the bar re-read them.
 
-    Paired with its own renderer like apply_bar_workspaces() above, and for the
-    same reason: reload_bar() takes no configuration of its own, and a route step
-    is always handed one.
+    Media's definition is widget-owned while its place immediately after the
+    workspace indicator is left-side-owned, so a media toggle has to republish
+    both fragments before the one reload. The other widget toggles harmlessly
+    reproduce the unchanged left fragment.
     """
+    render_bar_workspaces(config)
     render_bar_widgets(config)
     reload_bar()
 
