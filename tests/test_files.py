@@ -65,9 +65,14 @@ class ThunarTheme(unittest.TestCase):
         self.assertIn("background-color: transparent", neutral)
         self.assertIn("garage-shortcut-item-hover", self.css)
 
-    def test_paned_drag_target_does_not_render_as_a_thick_border(self) -> None:
+    def test_paned_handle_reserves_no_visual_gutter(self) -> None:
+        paned = self.css.split(".thunar paned {", 1)[1].split("}", 1)[0]
         separator = self.css.split(".thunar paned > separator", 1)[1].split("}", 1)[0]
-        self.assertIn("background-color: @view_bg_color", separator)
+        self.assertIn("-GtkPaned-handle-size: 0", paned)
+        self.assertIn("min-width: 0", separator)
+        self.assertIn("margin: 0", separator)
+        self.assertIn("padding: 0", separator)
+        self.assertIn("background-color: transparent", separator)
         self.assertIn("background-image: none", separator)
         self.assertIn("border: 0", separator)
 

@@ -217,12 +217,19 @@ window.thunar,
   color: @theme_unfocused_selected_fg_color;
 }
 
+.thunar paned {
+  -GtkPaned-handle-size: 0;
+}
+
 .thunar paned > separator {
   min-width: 0;
   min-height: 0;
-  background-color: @view_bg_color;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
   background-image: none;
   border: 0;
+  box-shadow: none;
 }
 
 /* File canvas, details and icon views ----------------------------------- */
