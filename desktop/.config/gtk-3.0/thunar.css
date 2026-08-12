@@ -157,13 +157,14 @@ window.thunar,
 .thunar treeview.sidebar,
 .thunar .shortcuts-pane treeview.view {
   min-width: 232px;
-  background-color: alpha(@sidebar_bg_color, 0.90);
+  background-color: @sidebar_bg_color;
   color: @sidebar_fg_color;
   border: 0;
 }
 
 .thunar .shortcuts-pane {
   margin: 0;
+  padding: 12px 10px;
   border: 0;
   border-radius: 0;
 }
@@ -181,13 +182,19 @@ window.thunar,
 
 .thunar .shortcuts-pane treeview.view,
 .thunar treeview.sidebar {
-  margin: 12px 10px;
+  margin: 0;
+  border: 0;
   -GtkTreeView-horizontal-separator: 10px;
   -GtkTreeView-vertical-separator: 10px;
 }
 
 .thunar .shortcuts-pane treeview.view:hover:not(:selected),
 .thunar treeview.sidebar:hover:not(:selected) {
+  background-color: transparent;
+}
+
+.thunar .shortcuts-pane treeview.view.garage-shortcut-item-hover:hover:not(:selected),
+.thunar treeview.sidebar.garage-shortcut-item-hover:hover:not(:selected) {
   background-color: alpha(@sidebar_fg_color, 0.07);
   border-radius: 8px;
 }
@@ -208,7 +215,7 @@ window.thunar,
 .thunar paned > separator {
   min-width: 0;
   min-height: 0;
-  background: transparent;
+  background-color: @view_bg_color;
   background-image: none;
   border: 0;
 }
@@ -350,7 +357,7 @@ window.thunar,
 
 .thunar statusbar {
   min-height: 30px;
-  margin: 0;
+  margin: 0 -10px;
   padding: 0;
   color: @theme_unfocused_fg_color;
   background-color: alpha(@view_bg_color, 0.88);

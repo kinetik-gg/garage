@@ -531,6 +531,26 @@ record "linked the tracked configuration with stow --no-folding"
 # stow -- are found at first login.
 run fc-cache
 
+# Thunar's shortcuts headers and rows share one GTK3 CSS node, and its CSD
+# toolbar has no structural relationship with the resizable side pane. Compile
+# the narrowly scoped module that supplies those two missing semantics, plus
+# Finder-like ruled rows, against the GTK version installed above. It is loaded
+# by the UWSM environment and returns immediately in every process but Thunar.
+thunar_module_dir="${XDG_DATA_HOME:-$HOME/.local/share}/garage/gtk-modules"
+run mkdir -p -- "$thunar_module_dir"
+if ((dry_run)); then
+    info "[dry-run] compile Garage's Thunar GTK module"
+else
+    read -r -a thunar_module_cflags <<<"$(pkg-config --cflags gtk+-3.0)"
+    read -r -a thunar_module_libs <<<"$(pkg-config --libs gtk+-3.0)"
+    run cc -O2 -shared -fPIC -Wall -Wextra -Werror \
+        "${thunar_module_cflags[@]}" \
+        -o "$thunar_module_dir/garage-thunar.so" \
+        "$repo_dir/system/gtk-modules/garage-thunar.c" \
+        "${thunar_module_libs[@]}"
+fi
+record "built Garage's Thunar-only GTK integration"
+
 # ---------------------------------------------------------------------------
 # Per-user generated files
 #

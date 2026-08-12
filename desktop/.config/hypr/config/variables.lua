@@ -1,7 +1,7 @@
 -- Hyprland default apps
 
 TERMINAL     = os.getenv("HYPR_TERMINAL") or "kitty"
-FILE_MANAGER = os.getenv("HYPR_FILE_MANAGER") or "nautilus --new-window"
+FILE_MANAGER = os.getenv("HYPR_FILE_MANAGER") or ((os.getenv("HOME") or "") .. "/.local/bin/garage-open-files")
 BROWSER      = os.getenv("BROWSER") or "google-chrome-stable"
 EDITOR       = os.getenv("HYPR_EDITOR") or "gnome-text-editor --new-window"
 CALCULATOR   = os.getenv("HYPR_CALCULATOR") or "gnome-calculator"

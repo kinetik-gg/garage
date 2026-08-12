@@ -8,6 +8,16 @@ export HYPRCURSOR_SIZE=24
 export XCURSOR_THEME="macOS"
 export XCURSOR_SIZE=24
 
+# GTK3 cannot express two Thunar-only interactions in CSS: its shortcuts pane
+# exposes every row through one treeview node, and its CSD toolbar spans the
+# whole window instead of the content pane. This tiny module is a no-op outside
+# Thunar; bootstrap compiles it for the installed GTK version.
+garage_thunar_module="${XDG_DATA_HOME:-$HOME/.local/share}/garage/gtk-modules/garage-thunar.so"
+if [ -r "$garage_thunar_module" ]; then
+	export GTK_MODULES="${GTK_MODULES:+$GTK_MODULES:}$garage_thunar_module"
+fi
+unset garage_thunar_module
+
 # LANG chosen in System Preferences > Language & Region. Sourced rather than
 # written here: this file is a stow symlink into the dotfiles repo, and the
 # setting has to be writable at runtime. Absent until the first render, which

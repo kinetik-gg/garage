@@ -14,6 +14,10 @@ THUNAR_CSS = REPO_ROOT / "desktop" / ".config" / "gtk-3.0" / "thunar.css"
 MIMEAPPS = REPO_ROOT / "desktop" / ".config" / "mimeapps.list"
 THUNAR_DEFAULTS = REPO_ROOT / "templates" / "thunar.xml"
 BOOTSTRAP = REPO_ROOT / "bootstrap.sh"
+THUNAR_MODULE = REPO_ROOT / "system" / "gtk-modules" / "garage-thunar.c"
+UWSM_ENV = REPO_ROOT / "desktop" / ".config" / "uwsm" / "env"
+HYPR_VARIABLES = REPO_ROOT / "desktop" / ".config" / "hypr" / "config" / "variables.lua"
+FILES_OPENER = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-open-files"
 
 
 class ThunarTheme(unittest.TestCase):
@@ -46,11 +50,19 @@ class ThunarTheme(unittest.TestCase):
         self.assertIn("-GtkTreeView-vertical-separator: 10px", self.css)
         self.assertIn("-GtkTreeView-horizontal-separator: 14px", self.css)
         self.assertIn(".shortcuts-pane scrolledwindow", self.css)
-        self.assertIn("margin: 12px 10px", self.css)
+        shortcuts = self.css.split(".thunar .shortcuts-pane {", 1)[1].split("}", 1)[0]
+        self.assertIn("padding: 12px 10px", shortcuts)
+
+    def test_sidebar_headers_do_not_receive_the_item_hover_surface(self) -> None:
+        neutral = self.css.split(
+            ".thunar .shortcuts-pane treeview.view:hover:not(:selected)", 1
+        )[1].split("}", 1)[0]
+        self.assertIn("background-color: transparent", neutral)
+        self.assertIn("garage-shortcut-item-hover", self.css)
 
     def test_paned_drag_target_does_not_render_as_a_thick_border(self) -> None:
         separator = self.css.split(".thunar paned > separator", 1)[1].split("}", 1)[0]
-        self.assertIn("background: transparent", separator)
+        self.assertIn("background-color: @view_bg_color", separator)
         self.assertIn("background-image: none", separator)
         self.assertIn("border: 0", separator)
 
@@ -62,6 +74,7 @@ class ThunarTheme(unittest.TestCase):
     def test_statusbar_surface_is_full_width_but_text_remains_padded(self) -> None:
         statusbar = self.css.split(".thunar statusbar {", 1)[1].split("}", 1)[0]
         self.assertIn("padding: 0", statusbar)
+        self.assertIn("margin: 0 -10px", statusbar)
         self.assertIn(".thunar statusbar box", self.css)
         label = self.css.split(".thunar statusbar label {", 1)[1].split("}", 1)[0]
         self.assertIn("padding: 7px 14px", label)
@@ -75,6 +88,24 @@ class ThunarIntegration(unittest.TestCase):
         self.assertEqual("thunar.desktop", defaults["inode/directory"])
         self.assertEqual("thunar.desktop", defaults["x-scheme-handler/smb"])
         self.assertNotIn("org.gnome.Nautilus.desktop", defaults.values())
+
+    def test_file_manager_binding_resolves_the_xdg_default_at_launch(self) -> None:
+        variables = HYPR_VARIABLES.read_text(encoding="utf-8")
+        opener = FILES_OPENER.read_text(encoding="utf-8")
+        self.assertIn("garage-open-files", variables)
+        self.assertNotIn("nautilus", variables.lower())
+        self.assertIn('xdg-open "${1:-$HOME}"', opener)
+
+    def test_thunar_module_supplies_structure_gtk_css_cannot_express(self) -> None:
+        module = THUNAR_MODULE.read_text(encoding="utf-8")
+        environment = UWSM_ENV.read_text(encoding="utf-8")
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        self.assertIn("garage-shortcut-item-hover", module)
+        self.assertIn("gtk_tree_model_get_column_type", module)
+        self.assertIn("garage_details_draw_stripes", module)
+        self.assertIn("gtk_widget_set_margin_start", module)
+        self.assertIn("garage-thunar.so", environment)
+        self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
 
     def test_bootstrap_installs_the_complete_thunar_stack(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Resolve the file manager at launch time. System Preferences owns the XDG
+# inode/directory default, so this bind follows changes without another shell
+# or compositor-specific copy of the selected application.
+exec xdg-open "${1:-$HOME}"
