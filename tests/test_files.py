@@ -42,6 +42,16 @@ class ThunarTheme(unittest.TestCase):
             with self.subTest(selector=selector):
                 self.assertIn(selector, self.css)
 
+    def test_sidebar_and_file_rows_have_real_treeview_spacing(self) -> None:
+        self.assertIn("-GtkTreeView-vertical-separator: 10px", self.css)
+        self.assertIn("-GtkTreeView-horizontal-separator: 14px", self.css)
+        self.assertIn(".shortcuts-pane scrolledwindow", self.css)
+
+    def test_paned_drag_target_does_not_render_as_a_thick_border(self) -> None:
+        separator = self.css.split(".thunar paned > separator", 1)[1].split("}", 1)[0]
+        self.assertIn("background: transparent", separator)
+        self.assertIn("border: 0", separator)
+
 
 class ThunarIntegration(unittest.TestCase):
     def test_thunar_owns_folder_and_network_locations(self) -> None:
@@ -78,10 +88,17 @@ class ThunarIntegration(unittest.TestCase):
         self.assertEqual("true", properties["misc-symbolic-icons-in-sidepane"])
         self.assertEqual("true", properties["last-statusbar-visible"])
         toolbar = properties["last-toolbar-items"]
-        for item in ("back:1", "forward:1", "open-parent:1", "location-bar:1",
-                     "toggle-split-view:1", "view-switcher:1", "search:1"):
+        self.assertEqual("THUNAR_ZOOM_LEVEL_50_PERCENT",
+                         properties["last-details-view-zoom-level"])
+        visible = ("back:1", "forward:1", "location-bar:1",
+                   "view-switcher:1", "search:1", "menu:1")
+        hidden = ("open-parent:0", "open-home:0", "toggle-split-view:0")
+        for item in visible + hidden:
             with self.subTest(item=item):
                 self.assertIn(item, toolbar)
+        configured = toolbar.split(",")
+        self.assertEqual(list(visible),
+                         [item for item in configured if item.endswith(":1")])
 
 
 if __name__ == "__main__":
