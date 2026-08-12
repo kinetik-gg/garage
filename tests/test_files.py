@@ -77,14 +77,11 @@ class ThunarTheme(unittest.TestCase):
         self.assertNotIn(".standard-view scrolledwindow {", self.css)
 
     def test_toolbar_divider_belongs_only_to_the_content_column(self) -> None:
-        header = self.css.split(".thunar headerbar {", 1)[1].split("}", 1)[0]
-        toolbar = self.css.split(".thunar headerbar toolbar {", 1)[1].split("}", 1)[0]
-        sidebar_header = self.css.split(
-            ".thunar headerbar .garage-sidebar-header {", 1
+        toolbar = self.css.split(
+            ".thunar .garage-content-shell > toolbar {", 1
         )[1].split("}", 1)[0]
-        self.assertNotIn("border-bottom", header)
         self.assertIn("border-bottom: 1px solid @sidebar_border_color", toolbar)
-        self.assertIn("border: 0", sidebar_header)
+        self.assertNotIn("garage-sidebar-header", self.css)
 
     def test_statusbar_surface_is_full_width_but_text_remains_padded(self) -> None:
         statusbar = self.css.split(".thunar statusbar {", 1)[1].split("}", 1)[0]
@@ -118,8 +115,9 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("garage-shortcut-item-hover", module)
         self.assertIn("gtk_tree_model_get_column_type", module)
         self.assertIn("garage_details_draw_stripes", module)
-        self.assertIn("gtk_header_bar_set_custom_title", module)
-        self.assertIn("garage-sidebar-header", module)
+        self.assertIn("gtk_paned_pack2", module)
+        self.assertIn("garage-content-shell", module)
+        self.assertIn("gtk_container_remove", module)
         self.assertIn("gtk_menu_button_get_popup", module)
         self.assertIn("garage-thunar.so", environment)
         self.assertIn("system/gtk-modules/garage-thunar.c", bootstrap)
@@ -155,7 +153,7 @@ class ThunarIntegration(unittest.TestCase):
                       for item in root.findall("property")}
         self.assertEqual("ThunarDetailsView", properties["default-view"])
         self.assertEqual("ThunarDetailsView", properties["last-view"])
-        self.assertEqual("true", properties["misc-use-csd"])
+        self.assertEqual("false", properties["misc-use-csd"])
         self.assertEqual("true", properties["misc-symbolic-icons-in-toolbar"])
         self.assertEqual("true", properties["misc-symbolic-icons-in-sidepane"])
         self.assertEqual("true", properties["last-statusbar-visible"])

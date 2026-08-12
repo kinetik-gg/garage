@@ -6,7 +6,7 @@ typedef struct
 {
   GtkWidget *toolbar;
   GtkWidget *sidepane;
-  GtkWidget *sidebar_header;
+  GtkWidget *content_shell;
 } GarageWindowChrome;
 
 static gboolean
@@ -55,7 +55,7 @@ garage_window_chrome_free (gpointer data)
 
   garage_set_widget (&chrome->toolbar, NULL);
   garage_set_widget (&chrome->sidepane, NULL);
-  garage_set_widget (&chrome->sidebar_header, NULL);
+  garage_set_widget (&chrome->content_shell, NULL);
   g_free (chrome);
 }
 
@@ -177,72 +177,117 @@ garage_details_draw_stripes (GtkWidget *widget, cairo_t *cr, gpointer data)
   return GDK_EVENT_PROPAGATE;
 }
 
-static void
-garage_align_toolbar (GtkWidget    *sidepane,
-                      GdkRectangle *allocation,
-                      gpointer      data)
+static gboolean
+garage_is_location_toolbar (GtkWidget *widget)
 {
-  GarageWindowChrome *chrome = data;
+  GList *children;
+  GList *item;
+  gboolean found = FALSE;
 
-  (void) sidepane;
-  if (chrome->sidebar_header != NULL)
-    gtk_widget_set_size_request (chrome->sidebar_header,
-                                 allocation->width, -1);
+  if (!GTK_IS_TOOLBAR (widget))
+    return FALSE;
+
+  children = gtk_container_get_children (GTK_CONTAINER (widget));
+  for (item = children; item != NULL; item = item->next)
+    if (g_strcmp0 (g_object_get_data (G_OBJECT (item->data), "id"),
+                   "location-bar") == 0)
+      {
+        found = TRUE;
+        break;
+      }
+  g_list_free (children);
+  return found;
+}
+
+static GtkWidget *
+garage_find_main_paned (GtkWidget *sidepane)
+{
+  GtkWidget *ancestor;
+
+  for (ancestor = gtk_widget_get_parent (sidepane); ancestor != NULL;
+       ancestor = gtk_widget_get_parent (ancestor))
+    if (GTK_IS_PANED (ancestor))
+      {
+        GtkWidget *first = gtk_paned_get_child1 (GTK_PANED (ancestor));
+
+        if (first == sidepane || gtk_widget_is_ancestor (sidepane, first))
+          return ancestor;
+      }
+  return NULL;
 }
 
 static void
-garage_split_header (GarageWindowChrome *chrome)
+garage_own_toolbar (GarageWindowChrome *chrome)
 {
-  GtkWidget *headerbar;
-  GtkWidget *split;
-  GtkWidget *sidebar_header;
-  GdkRectangle allocation;
+  GtkWidget *main_paned;
+  GtkWidget *content;
+  GtkWidget *toolbar_parent;
+  GtkWidget *content_shell;
 
   if (chrome->toolbar == NULL || chrome->sidepane == NULL
       || g_object_get_data (G_OBJECT (chrome->toolbar),
-                            "garage-header-split-installed") != NULL)
+                            "garage-content-toolbar-installed") != NULL)
     return;
 
-  headerbar = gtk_widget_get_ancestor (chrome->toolbar, GTK_TYPE_HEADER_BAR);
-  if (headerbar == NULL
-      || gtk_header_bar_get_custom_title (GTK_HEADER_BAR (headerbar))
-         != chrome->toolbar)
+  /* With CSD disabled Thunar places the toolbar and the main horizontal pane
+   * in separate rows of its root grid. Move the toolbar into pane two instead:
+   * pane one (the sidebar) then genuinely spans the full window height, while
+   * toolbar, file view and status area become one content-owned column. */
+  if (gtk_widget_get_ancestor (chrome->toolbar, GTK_TYPE_HEADER_BAR) != NULL)
+    return;
+  main_paned = garage_find_main_paned (chrome->sidepane);
+  toolbar_parent = gtk_widget_get_parent (chrome->toolbar);
+  if (main_paned == NULL || toolbar_parent == NULL)
     return;
 
-  /* Thunar puts one toolbar across its whole CSD header, independently of the
-   * paned content below. Give the header the same two-column structure as the
-   * body: a calm sidebar-colored spacer and the real toolbar over the file
-   * content. Keeping the original toolbar intact preserves every action and
-   * the location entry's behaviour. */
   g_object_ref (chrome->toolbar);
-  gtk_header_bar_set_custom_title (GTK_HEADER_BAR (headerbar), NULL);
+  gtk_container_remove (GTK_CONTAINER (toolbar_parent), chrome->toolbar);
 
-  split = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_widget_set_hexpand (split, TRUE);
-  gtk_widget_set_vexpand (split, TRUE);
-  gtk_style_context_add_class (gtk_widget_get_style_context (split),
-                               "garage-header-split");
+  if (chrome->content_shell != NULL
+      && gtk_paned_get_child2 (GTK_PANED (main_paned))
+         == chrome->content_shell)
+    {
+      /* Thunar can rebuild its toolbar after a preference or plugin change.
+       * Reinsert the replacement into the existing content column. */
+      gtk_box_pack_start (GTK_BOX (chrome->content_shell),
+                          chrome->toolbar, FALSE, FALSE, 0);
+      gtk_box_reorder_child (GTK_BOX (chrome->content_shell),
+                             chrome->toolbar, 0);
+      gtk_widget_show (chrome->toolbar);
+      g_object_unref (chrome->toolbar);
+      g_object_set_data (G_OBJECT (chrome->toolbar),
+                         "garage-content-toolbar-installed",
+                         GINT_TO_POINTER (1));
+      return;
+    }
 
-  sidebar_header = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_widget_set_vexpand (sidebar_header, TRUE);
-  gtk_style_context_add_class (gtk_widget_get_style_context (sidebar_header),
-                               "garage-sidebar-header");
-  gtk_box_pack_start (GTK_BOX (split), sidebar_header, FALSE, FALSE, 0);
-  gtk_box_pack_start (GTK_BOX (split), chrome->toolbar, TRUE, TRUE, 0);
-  gtk_header_bar_set_custom_title (GTK_HEADER_BAR (headerbar), split);
-  /* Do not use show_all(): Thunar intentionally keeps most toolbar actions
-   * hidden according to last-toolbar-items, and recursively showing the split
-   * would resurrect all of that clutter. */
-  gtk_widget_show (sidebar_header);
+  content = gtk_paned_get_child2 (GTK_PANED (main_paned));
+  if (content == NULL)
+    {
+      g_object_unref (chrome->toolbar);
+      return;
+    }
+  g_object_ref (content);
+  gtk_container_remove (GTK_CONTAINER (main_paned), content);
+
+  content_shell = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand (content_shell, TRUE);
+  gtk_widget_set_vexpand (content_shell, TRUE);
+  gtk_style_context_add_class (gtk_widget_get_style_context (content_shell),
+                               "garage-content-shell");
+  gtk_box_pack_start (GTK_BOX (content_shell), chrome->toolbar,
+                      FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (content_shell), content, TRUE, TRUE, 0);
+  gtk_paned_pack2 (GTK_PANED (main_paned), content_shell, TRUE, FALSE);
   gtk_widget_show (chrome->toolbar);
-  gtk_widget_show (split);
+  gtk_widget_show (content);
+  gtk_widget_show (content_shell);
+  g_object_unref (content);
   g_object_unref (chrome->toolbar);
 
-  garage_set_widget (&chrome->sidebar_header, sidebar_header);
-  gtk_widget_get_allocation (chrome->sidepane, &allocation);
-  garage_align_toolbar (chrome->sidepane, &allocation, chrome);
+  garage_set_widget (&chrome->content_shell, content_shell);
   g_object_set_data (G_OBJECT (chrome->toolbar),
-                     "garage-header-split-installed", GINT_TO_POINTER (1));
+                     "garage-content-toolbar-installed", GINT_TO_POINTER (1));
 }
 
 static void
@@ -319,8 +364,7 @@ garage_find_widgets (GtkWidget *widget, gpointer data)
                              GINT_TO_POINTER (1));
         }
     }
-  else if (GTK_IS_TOOLBAR (widget)
-           && gtk_widget_get_ancestor (widget, GTK_TYPE_HEADER_BAR) != NULL)
+  else if (garage_is_location_toolbar (widget))
     garage_set_widget (&chrome->toolbar, widget);
 
   if (GTK_IS_CONTAINER (widget))
@@ -338,7 +382,6 @@ garage_install (gpointer data)
     {
       GtkWidget *window = item->data;
       GarageWindowChrome *chrome;
-      GdkRectangle allocation;
 
       if (g_strcmp0 (G_OBJECT_TYPE_NAME (window), "ThunarWindow") != 0)
         continue;
@@ -352,21 +395,7 @@ garage_install (gpointer data)
         }
 
       garage_find_widgets (window, chrome);
-      if (chrome->toolbar != NULL && chrome->sidepane != NULL
-          && g_object_get_data (G_OBJECT (chrome->sidepane),
-                                "garage-toolbar-alignment-installed") == NULL)
-        {
-          garage_split_header (chrome);
-          gtk_widget_get_allocation (chrome->sidepane, &allocation);
-          garage_align_toolbar (chrome->sidepane, &allocation, chrome);
-          g_signal_connect (chrome->sidepane, "size-allocate",
-                            G_CALLBACK (garage_align_toolbar), chrome);
-          g_object_set_data (G_OBJECT (chrome->sidepane),
-                             "garage-toolbar-alignment-installed",
-                             GINT_TO_POINTER (1));
-        }
-      else
-        garage_split_header (chrome);
+      garage_own_toolbar (chrome);
     }
   g_list_free (windows);
   return G_SOURCE_CONTINUE;

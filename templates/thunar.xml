@@ -32,6 +32,6 @@
   <property name="misc-switch-to-new-tab" type="bool" value="true"/>
   <property name="misc-tab-close-middle-click" type="bool" value="true"/>
   <property name="misc-thumbnail-draw-frames" type="bool" value="false"/>
-  <property name="misc-use-csd" type="bool" value="true"/>
+  <property name="misc-use-csd" type="bool" value="false"/>
   <property name="misc-window-title-style" type="string" value="THUNAR_WINDOW_TITLE_STYLE_FOLDER_NAME_WITHOUT_THUNAR_SUFFIX"/>
 </channel>

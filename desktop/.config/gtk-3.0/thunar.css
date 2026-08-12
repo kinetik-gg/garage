@@ -40,19 +40,15 @@ window.thunar,
   box-shadow: none;
 }
 
-.thunar headerbar toolbar {
-  padding: 4px 8px 4px 10px;
-  border: 0;
-  border-bottom: 1px solid @sidebar_border_color;
-}
-
-.thunar headerbar .garage-header-split {
+.thunar .garage-content-shell {
   background-color: alpha(@headerbar_bg_color, 0.88);
 }
 
-.thunar headerbar .garage-sidebar-header {
-  background-color: @sidebar_bg_color;
+.thunar .garage-content-shell > toolbar {
+  padding: 4px 8px 4px 10px;
+  background-color: alpha(@headerbar_bg_color, 0.88);
   border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
 }
 
 .thunar toolbar separator {
