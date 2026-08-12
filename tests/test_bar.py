@@ -233,12 +233,12 @@ class MonitorPanelToggle(unittest.TestCase):
             root = Path(root_text)
             self.desktop_state(root, "not json\n", "")
             call = self.run_toggle(root, "monitor", "cpu")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1620\n", call)
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1616\n", call)
 
     def test_the_widgetless_command_is_still_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as root_text:
             call = self.run_toggle(Path(root_text), "monitor")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1620\n", call)
+        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1616\n", call)
 
     def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
         result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
@@ -696,6 +696,14 @@ class BarPaddingScale(BackendTestCase):
         self.assertNotRegex(button, r"margin: 0 \d+px",
                             "a horizontal margin here is dead bar again")
 
+    def test_both_outer_edges_share_the_scaled_gutter(self) -> None:
+        css = self.spacing(1.2)
+        edge = round(self.garage.PADDING_TABLE["edge"] * 1.2)
+        menu = re.search(r"#custom-menu \{([^}]*)\}", css).group(1)
+        clock = re.search(r"#clock \{\s*padding-right: (\d+)px;\s*\}", css)
+        self.assertIn(f"margin-left: {edge}px", menu)
+        self.assertEqual(edge, int(clock.group(1)))
+
     def test_the_overrides_come_after_the_import(self) -> None:
         """GTK CSS resolves equal specificity by order, so this is the whole
         mechanism: the base sheet supplies the fonts, this supplies the room."""
@@ -883,8 +891,9 @@ class BarRenderers(BackendTestCase):
         config["bar"]["padding_scale"] = 2.0
         self.garage.render_bar_style(config)
         self.assertEqual(before, self.garage.WAYBAR_STYLE.stat().st_ino)
-        self.assertIn("margin-left: 12px", self.garage.WAYBAR_STYLE.read_text(
-            encoding="utf-8"))
+        self.assertIn(
+            f'margin-left: {self.garage.PADDING_TABLE["edge"] * 2}px',
+            self.garage.WAYBAR_STYLE.read_text(encoding="utf-8"))
 
     def test_a_stow_link_at_the_stylesheet_is_replaced_not_written_through(self) -> None:
         # Same migration case as the palette files: ~/.config/waybar/style.css was

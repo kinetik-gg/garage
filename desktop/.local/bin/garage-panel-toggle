@@ -69,7 +69,7 @@ if [ "$1" = monitor ]; then
     # only costs the anchor its accuracy, and the panel clamps itself into the
     # output regardless of what it is handed.
     image_padding=8
-    tail_width=300
+    tail_width=304
     if [ -r "$stylesheet" ]; then
         configured_padding=$(sed -n \
             '/^#image {/,/^}/s/.*padding: 0 \([0-9][0-9]*\)px;.*/\1/p' \
@@ -78,7 +78,7 @@ if [ "$1" = monitor ]; then
         configured_tail=$(sed -n \
             '/^#status-tail {/,/^}/s/.*min-width: \([0-9][0-9]*\)px;.*/\1/p' \
             "$stylesheet")
-        tail_width=${configured_tail:-300}
+        tail_width=${configured_tail:-304}
     fi
     module_padding=$((image_padding * 2))
     metric_width=0

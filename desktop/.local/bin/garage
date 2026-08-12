@@ -163,12 +163,12 @@ WAYBAR_STATUS_GROUP = "group/status-tail"
 #
 # The tail's own width is its text plus the padding around it, so both halves of
 # that can move: a longer clock format or a wider locale on one side,
-# bar.padding_scale on the other. Measured at 298px with the shipped clock format
-# at padding_scale 1.25, which is the widest of the scales in common use; 300 is
-# that rounded up. Past this the anchor drifts right of the group's true centre
+# bar.padding_scale on the other. The previous 298px measurement at padding_scale
+# 1.25 gains 4px from the larger right edge; 304 is that 302px result rounded up.
+# Past this the anchor drifts right of the group's true centre
 # by the excess, and no further -- the panel clamps itself into the output, so
 # the worst case is an off-centre dashboard, never one over an edge.
-WAYBAR_STATUS_TAIL_WIDTH = 300
+WAYBAR_STATUS_TAIL_WIDTH = 304
 
 # The metric strips the bar can carry, in the order they sit on the right side.
 # The names are garage-metrics' own --bar-svg widgets, and each one is switched
@@ -195,12 +195,15 @@ BAR_BACKGROUNDS = ("blurred", "transparent")
 # *vertical* margin is excluded for a harder reason -- see waybar_spacing_css(),
 # where it is derived from the bar height instead.
 PADDING_TABLE = {
-    # The menu button's two margins, not its padding: it is a square, and
-    # padding would stretch it back into a rectangle. See MENU_BUTTON_NUDGE.
-    # They add up with the square to exactly the width the two paddings they
-    # replaced came to, so nothing to the right of the logo moves.
-    "menu_left": 6,       # #custom-menu margin-left
-    "menu_right": 13,     # #custom-menu margin-right, wider so the logo clears
+    # One gutter for both physical screen edges. It is deliberately part of the
+    # scale: increasing bar density should loosen the frame around the complete
+    # bar at the same rate as the room between its modules. The menu carries it
+    # as a margin because that button must remain square; the clock carries it
+    # as padding because it is the final text module.
+    "edge": 18,
+    # Inner gap after the menu. A margin rather than padding so the logo's hover
+    # tint remains square; see MENU_BUTTON_NUDGE.
+    "menu_right": 13,
     # Half the space between two workspace dots -- and padding on the button
     # rather than margin around it, so the space between the dots belongs to a
     # dot and can be clicked. As a margin it was dead bar.
@@ -209,7 +212,6 @@ PADDING_TABLE = {
     "image": 8,           # #image, which is every metric strip
     "icon": 10,           # the notification / launcher / control-centre trio
     "tray": 8,
-    "clock_right": 15,    # the bar's right edge, so the clock is not flush
     "tooltip": 8,
 }
 
@@ -241,9 +243,8 @@ MODULE_HOVER_PILL = 27
 #
 # Its two spacings are margins rather than padding for the same reason. Padding
 # is inside the box and would stretch it back into a rectangle; a margin is
-# outside it, so the gap to the screen edge and the gap to the workspace dots
-# both survive with the square intact. See menu_left and menu_right in
-# PADDING_TABLE, which are those margins.
+# outside it, so the shared outer edge and the gap to the workspace dots both
+# survive with the square intact. See edge and menu_right in PADDING_TABLE.
 #
 # The logo is a Nerd Font glyph whose ink is wider than the advance it is
 # centred on and hangs off to the right of it, so a label centred in the square
@@ -3898,7 +3899,7 @@ def waybar_spacing_css(config: dict) -> str:
   min-width: {MODULE_HOVER_PILL - MENU_BUTTON_NUDGE}px;
   padding-left: 0;
   padding-right: {MENU_BUTTON_NUDGE}px;
-  margin-left: {step["menu_left"]}px;
+  margin-left: {step["edge"]}px;
   margin-right: {step["menu_right"]}px;
 }}
 
@@ -3963,7 +3964,7 @@ def waybar_spacing_css(config: dict) -> str:
 }}
 
 #clock {{
-  padding-right: {step["clock_right"]}px;
+  padding-right: {step["edge"]}px;
 }}
 
 tooltip {{
