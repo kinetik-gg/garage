@@ -279,6 +279,18 @@ PanelWindow {
                 radius: Theme.insetRadius(panel.radius, 1)
                 power: Theme.cornerPower
                 color: "white"
+            }
+
+            // MultiEffect requires its mask to be a texture provider. The
+            // superellipse is a Shape-backed component, so capture it rather
+            // than passing that Item directly (which yields an empty mask).
+            ShaderEffectSource {
+                id: backdropMaskTexture
+                anchors.fill: backdropMask
+                sourceItem: backdropMask
+                hideSource: true
+                live: true
+                recursive: true
                 visible: false
             }
 
@@ -292,7 +304,7 @@ PanelWindow {
                 blur: 1.0
                 blurMax: 48
                 maskEnabled: true
-                maskSource: backdropMask
+                maskSource: backdropMaskTexture
             }
         }
 

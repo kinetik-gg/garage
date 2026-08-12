@@ -307,7 +307,9 @@ class MediaPaletteArtwork(unittest.TestCase):
         self.assertIn("retainWhileLoading: true", palette)
         self.assertIn("source: backdropArt", palette)
         self.assertIn("blurEnabled: true", palette)
-        self.assertIn("maskSource: backdropMask", palette)
+        self.assertIn("sourceItem: backdropMask", palette)
+        self.assertIn("hideSource: true", palette)
+        self.assertIn("maskSource: backdropMaskTexture", palette)
         self.assertIn("opacity: 0.3", palette)
 
 
