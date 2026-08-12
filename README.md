@@ -80,6 +80,8 @@ their activation behavior.
 - Hyprland compositor
 - Kitty terminal
 - Fish shell with the Pure prompt
+- Thunar file explorer, with Garage chrome, split view, archive/media actions,
+  recursive search, and background thumbnailing
 - Rofi launcher
 - Waybar status bar
 - Quickshell shell (settings UI, launcher, control panels)

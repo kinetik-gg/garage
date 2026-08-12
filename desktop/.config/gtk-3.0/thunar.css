@@ -1,69 +1,347 @@
-/* Compact Vanta treatment for Thunar. Keep every selector scoped to Thunar. */
+/* Garage's Thunar surface.
+ *
+ * Thunar is GTK3, but it does not have to look like an application assembled
+ * from a toolbar, a tree and a status bar. This sheet gives those pieces one
+ * hierarchy while leaving the file manager's density and capability intact.
+ * Every colour comes from Garage's generated GTK palette, and every selector
+ * is scoped to Thunar so other GTK3 applications retain the base theme.
+ */
+
+/* Window and integrated chrome ------------------------------------------- */
+
+window.thunar,
 .thunar {
-  background-color: @window_bg_color;
+  background-color: alpha(@window_bg_color, 0.96);
   color: @window_fg_color;
 }
 
+.thunar headerbar {
+  min-height: 46px;
+  padding: 5px 8px;
+  background-color: alpha(@headerbar_bg_color, 0.92);
+  color: @headerbar_fg_color;
+  border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
+  box-shadow: none;
+}
+
+.thunar headerbar:backdrop {
+  background-color: alpha(@headerbar_backdrop_color, 0.94);
+}
+
+.thunar headerbar toolbar,
 .thunar toolbar {
-  min-height: 38px;
-  padding: 4px 7px;
-  background-color: @headerbar_bg_color;
+  min-height: 36px;
+  padding: 5px 9px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
+  box-shadow: none;
+}
+
+.thunar headerbar toolbar {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.thunar toolbar separator {
+  margin: 7px 5px;
+  background-color: @sidebar_border_color;
+}
+
+.thunar toolbar button,
+.thunar headerbar button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 5px;
+  margin: 0 1px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  transition: 120ms ease-out;
+}
+
+.thunar toolbar button:hover,
+.thunar headerbar button:hover {
+  background-color: alpha(@window_fg_color, 0.09);
+}
+
+.thunar toolbar button:active,
+.thunar headerbar button:active,
+.thunar toolbar button:checked,
+.thunar headerbar button:checked {
+  background-color: alpha(@window_fg_color, 0.15);
+}
+
+.thunar toolbar button:disabled,
+.thunar headerbar button:disabled {
+  color: @theme_unfocused_fg_color;
+  background: transparent;
+}
+
+/* Location entry and breadcrumb bar ------------------------------------- */
+
+.thunar .location-bar {
+  padding: 5px 8px;
+  background-color: alpha(@headerbar_bg_color, 0.80);
   border-bottom: 1px solid @sidebar_border_color;
 }
 
-.thunar toolbar button {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 2px;
-  border-radius: 7px;
+.thunar .location-button,
+.thunar .path-bar button {
+  min-height: 30px;
+  padding: 1px 9px;
+  margin: 0 1px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
 }
 
-.thunar toolbar entry {
-  min-height: 28px;
-  padding: 0 9px;
-  border-radius: 7px;
-  background-color: @view_bg_color;
+.thunar .location-button:hover,
+.thunar .path-bar button:hover {
+  background-color: alpha(@window_fg_color, 0.08);
 }
+
+.thunar .location-button:checked,
+.thunar .location-button:active,
+.thunar .path-bar button:checked,
+.thunar .path-bar button:active {
+  color: @headerbar_fg_color;
+  background-color: alpha(@window_fg_color, 0.13);
+}
+
+.thunar toolbar entry,
+.thunar .location-bar entry,
+.thunar entry.thunar-path-entry {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid @sidebar_border_color;
+  border-radius: 9px;
+  background-color: alpha(@view_bg_color, 0.88);
+  color: @view_fg_color;
+  box-shadow: none;
+}
+
+.thunar toolbar entry:focus,
+.thunar .location-bar entry:focus,
+.thunar entry.thunar-path-entry:focus {
+  border-color: @accent_color;
+  box-shadow: 0 0 0 1px alpha(@accent_color, 0.24);
+}
+
+/* Sidebar --------------------------------------------------------------- */
 
 .thunar .sidebar,
 .thunar .shortcuts-pane,
-.thunar treeview.sidebar {
-  background-color: @sidebar_bg_color;
+.thunar treeview.sidebar,
+.thunar .shortcuts-pane treeview.view {
+  min-width: 210px;
+  background-color: alpha(@sidebar_bg_color, 0.94);
   color: @sidebar_fg_color;
+  border: 0;
 }
 
-.thunar treeview {
-  padding: 2px;
+.thunar .shortcuts-pane treeview.view {
+  padding: 8px 6px;
 }
 
-.thunar treeview:selected,
-.thunar iconview:selected {
+.thunar .shortcuts-pane treeview.view:hover:not(:selected),
+.thunar treeview.sidebar:hover:not(:selected) {
+  background-color: alpha(@sidebar_fg_color, 0.07);
+}
+
+.thunar .shortcuts-pane treeview.view:selected,
+.thunar treeview.sidebar:selected {
   background-color: @accent_bg_color;
   color: @accent_fg_color;
 }
 
-.thunar statusbar {
-  padding: 3px 8px;
-  border-top: 1px solid @sidebar_border_color;
-  color: @theme_unfocused_fg_color;
+.thunar .shortcuts-pane treeview.view:selected:backdrop,
+.thunar treeview.sidebar:selected:backdrop {
+  background-color: @theme_unfocused_selected_bg_color;
+  color: @theme_unfocused_selected_fg_color;
 }
 
 .thunar paned > separator {
   min-width: 1px;
   min-height: 1px;
-  background-color: @sidebar_border_color;
+  background: @sidebar_border_color;
 }
+
+/* File canvas, details and icon views ----------------------------------- */
+
+.thunar .standard-view,
+.thunar .standard-view scrolledwindow,
+.thunar .standard-view viewport,
+.thunar .standard-view .view {
+  background-color: @view_bg_color;
+  color: @view_fg_color;
+  border: 0;
+}
+
+.thunar .standard-view treeview.view {
+  padding: 4px 6px;
+}
+
+.thunar .standard-view treeview.view:hover:not(:selected) {
+  background-color: alpha(@view_fg_color, 0.055);
+}
+
+.thunar .standard-view treeview.view:selected,
+.thunar .standard-view iconview.view:selected,
+.thunar .standard-view iconview:selected,
+.thunar .standard-view .view:selected {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+  outline-color: alpha(@accent_fg_color, 0.45);
+}
+
+.thunar .standard-view treeview.view:selected:backdrop,
+.thunar .standard-view iconview.view:selected:backdrop,
+.thunar .standard-view iconview:selected:backdrop {
+  background-color: @theme_unfocused_selected_bg_color;
+  color: @theme_unfocused_selected_fg_color;
+}
+
+.thunar .standard-view iconview {
+  padding: 14px;
+}
+
+.thunar .standard-view iconview text {
+  padding: 3px 6px;
+  border-radius: 7px;
+}
+
+.thunar .standard-view iconview text:selected {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
+
+.thunar treeview.view header button {
+  min-height: 28px;
+  padding: 2px 8px;
+  color: @theme_unfocused_fg_color;
+  background-color: alpha(@view_bg_color, 0.98);
+  border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.thunar treeview.view header button:hover {
+  color: @view_fg_color;
+  background-color: alpha(@view_fg_color, 0.06);
+}
+
+.thunar .standard-view rubberband,
+.thunar treeview.view rubberband,
+.thunar iconview rubberband {
+  border: 1px solid @accent_color;
+  background-color: alpha(@accent_color, 0.16);
+}
+
+.thunar .split-view-inactive-pane .view {
+  background-color: @theme_unfocused_bg_color;
+  color: @theme_unfocused_fg_color;
+}
+
+/* Tabs and secondary surfaces ------------------------------------------ */
 
 .thunar notebook > header {
-  background-color: @headerbar_bg_color;
-  border-color: @sidebar_border_color;
+  padding: 5px 7px 0;
+  background-color: alpha(@headerbar_bg_color, 0.88);
+  border: 0;
+  border-bottom: 1px solid @sidebar_border_color;
 }
 
-.thunar notebook tab {
-  min-height: 28px;
+.thunar notebook > header tab {
+  min-height: 29px;
+  padding: 2px 10px;
+  margin: 0 2px 5px;
+  color: @theme_unfocused_fg_color;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.thunar notebook > header tab:hover {
+  color: @window_fg_color;
+  background-color: alpha(@window_fg_color, 0.07);
+}
+
+.thunar notebook > header tab:checked {
+  color: @window_fg_color;
+  background-color: @card_bg_color;
+  box-shadow: inset 0 0 0 1px @sidebar_border_color;
+}
+
+.thunar notebook > header tab button {
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin-left: 6px;
+  border-radius: 6px;
+}
+
+.thunar .preview-pane {
+  padding: 12px;
+  background-color: @sidebar_bg_color;
+  border: 0;
+}
+
+.thunar .preview-pane image {
+  border-radius: 9px;
+}
+
+.thunar statusbar {
+  min-height: 26px;
   padding: 2px 9px;
+  color: @theme_unfocused_fg_color;
+  background-color: alpha(@headerbar_bg_color, 0.84);
+  border-top: 1px solid @sidebar_border_color;
 }
 
-.thunar .disk-space-usage-bar {
+.thunar statusbar frame,
+.thunar statusbar label {
+  border: 0;
+}
+
+.thunar progressbar trough,
+.thunar .disk-space-usage-bar trough {
   min-height: 5px;
+  border: 0;
+  border-radius: 999px;
+  background-color: alpha(@window_fg_color, 0.12);
+}
+
+.thunar progressbar progress,
+.thunar .disk-space-usage-bar progress {
+  min-height: 5px;
+  border: 0;
+  border-radius: 999px;
+  background-color: @accent_bg_color;
+}
+
+/* Quiet scrollbars leave the files, not the chrome, as the focal point. */
+.thunar scrollbar {
+  background: transparent;
+}
+
+.thunar scrollbar trough {
+  background: transparent;
+}
+
+.thunar scrollbar slider {
+  min-width: 5px;
+  min-height: 5px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: alpha(@window_fg_color, 0.28);
+}
+
+.thunar scrollbar slider:hover {
+  background-color: alpha(@window_fg_color, 0.43);
 }

@@ -56,6 +56,8 @@ QML_COLOR = re.compile(r'"#((?:[0-9a-fA-F]{2})?)([0-9a-fA-F]{6})"')
 # unreadable on a light desktop, because its base sheet named a dark-only
 # literal directly.
 STRUCTURAL_SHEETS = (
+    CONFIG / "gtk-3.0" / "thunar.css",
+    CONFIG / "gtk-4.0" / "nautilus.css",
     CONFIG / "waybar" / "waybar-base.css",
     CONFIG / "swayosd" / "swayosd-base.css",
     CONFIG / "rofi" / "apple-base.rasi",

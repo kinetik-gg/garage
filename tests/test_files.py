@@ -1,0 +1,88 @@
+"""Thunar is Garage's cohesive, capable file explorer rather than a GTK extra."""
+
+from __future__ import annotations
+
+import configparser
+from pathlib import Path
+import re
+import unittest
+import xml.etree.ElementTree as ET
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+THUNAR_CSS = REPO_ROOT / "desktop" / ".config" / "gtk-3.0" / "thunar.css"
+MIMEAPPS = REPO_ROOT / "desktop" / ".config" / "mimeapps.list"
+THUNAR_DEFAULTS = REPO_ROOT / "templates" / "thunar.xml"
+BOOTSTRAP = REPO_ROOT / "bootstrap.sh"
+
+
+class ThunarTheme(unittest.TestCase):
+    def setUp(self) -> None:
+        self.css = THUNAR_CSS.read_text(encoding="utf-8")
+
+    def test_every_rule_is_scoped_to_thunar(self) -> None:
+        structural = re.sub(r"/\*.*?\*/", "", self.css, flags=re.DOTALL)
+        for group in re.findall(r"([^{}]+)\{", structural):
+            for selector in group.split(","):
+                with self.subTest(selector=selector.strip()):
+                    self.assertIn("thunar", selector.lower())
+
+    def test_structure_uses_the_generated_palette_only(self) -> None:
+        self.assertIsNone(re.search(r"#[0-9a-fA-F]{3,8}\b", self.css))
+        self.assertIsNone(re.search(r"\brgba?\(\s*\d", self.css))
+        for role in ("@window_bg_color", "@sidebar_bg_color", "@view_bg_color",
+                     "@accent_bg_color", "@sidebar_border_color"):
+            with self.subTest(role=role):
+                self.assertIn(role, self.css)
+
+    def test_all_primary_surfaces_have_an_explicit_hierarchy(self) -> None:
+        for selector in ("headerbar", ".location-bar", ".shortcuts-pane",
+                         ".standard-view", "notebook > header", ".preview-pane",
+                         "statusbar", "scrollbar slider"):
+            with self.subTest(selector=selector):
+                self.assertIn(selector, self.css)
+
+
+class ThunarIntegration(unittest.TestCase):
+    def test_thunar_owns_folder_and_network_locations(self) -> None:
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(MIMEAPPS, encoding="utf-8")
+        defaults = parser["Default Applications"]
+        self.assertEqual("thunar.desktop", defaults["inode/directory"])
+        self.assertEqual("thunar.desktop", defaults["x-scheme-handler/smb"])
+        self.assertNotIn("org.gnome.Nautilus.desktop", defaults.values())
+
+    def test_bootstrap_installs_the_complete_thunar_stack(self) -> None:
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        package_block = bootstrap.split("packages=(", 1)[1].split("\n)", 1)[0]
+        for package in ("thunar", "thunar-archive-plugin",
+                        "thunar-media-tags-plugin", "tumbler", "catfish",
+                        "file-roller", "ffmpegthumbnailer", "gvfs-smb"):
+            with self.subTest(package=package):
+                self.assertRegex(package_block, rf"\b{re.escape(package)}\b")
+        self.assertNotRegex(package_block, r"\bnautilus\b")
+
+    def test_first_run_defaults_are_copied_but_never_linked(self) -> None:
+        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+        self.assertIn('cp -- "$repo_dir/templates/thunar.xml" "$thunar_config"',
+                      bootstrap)
+        self.assertIn("keeping the existing Thunar layout", bootstrap)
+        self.assertFalse(str(THUNAR_DEFAULTS.relative_to(REPO_ROOT)).startswith("desktop/"))
+
+    def test_first_run_layout_is_modern_without_hiding_capability(self) -> None:
+        root = ET.parse(THUNAR_DEFAULTS).getroot()
+        properties = {item.attrib["name"]: item.attrib["value"]
+                      for item in root.findall("property")}
+        self.assertEqual("true", properties["misc-use-csd"])
+        self.assertEqual("true", properties["misc-symbolic-icons-in-toolbar"])
+        self.assertEqual("true", properties["misc-symbolic-icons-in-sidepane"])
+        self.assertEqual("true", properties["last-statusbar-visible"])
+        toolbar = properties["last-toolbar-items"]
+        for item in ("back:1", "forward:1", "open-parent:1", "location-bar:1",
+                     "toggle-split-view:1", "view-switcher:1", "search:1"):
+            with self.subTest(item=item):
+                self.assertIn(item, toolbar)
+
+
+if __name__ == "__main__":
+    unittest.main()

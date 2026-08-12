@@ -259,7 +259,9 @@ packages=(
     grim slurp satty hyprpicker
     networkmanager bluez bluez-utils
     pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol cava
-    nautilus gvfs gvfs-smb gnome-text-editor gnome-calculator loupe
+    thunar thunar-archive-plugin thunar-media-tags-plugin tumbler
+    catfish file-roller ffmpegthumbnailer gvfs gvfs-smb
+    gnome-text-editor gnome-calculator loupe
     btop fastfetch micro qt6ct qt6-wayland xsettingsd
     python python-pip python-pipx uv lua jq zenity file libnotify 7zip
     papirus-icon-theme adw-gtk-theme
@@ -570,6 +572,19 @@ BOOKMARKS
     record "wrote ~/.config/gtk-3.0/bookmarks"
 else
     info "keeping the existing ~/.config/gtk-3.0/bookmarks"
+fi
+
+# Xfconf files are mutable application state. Linking this into the checkout
+# would make changing a column width or closing the sidebar dirty the Garage
+# repository, so seed a polished first-run layout and let Thunar own the copy.
+# Existing installs win: bootstrap never replaces their chosen view or geometry.
+thunar_config="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml"
+if [[ ! -e $thunar_config && ! -L $thunar_config ]]; then
+    run mkdir -p -- "$(dirname -- "$thunar_config")"
+    run cp -- "$repo_dir/templates/thunar.xml" "$thunar_config"
+    record "seeded Garage's first-run Thunar layout"
+else
+    info "keeping the existing Thunar layout"
 fi
 
 if [[ ! -e "${HOME}/.local/share/wallpaper/current" ]]; then
