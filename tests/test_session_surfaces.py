@@ -150,19 +150,17 @@ class HyprlockSurface(unittest.TestCase):
     def test_background_is_all_monitor_but_form_is_monitor_scoped(self) -> None:
         background = self.conf.split("background {", 1)[1].split("}", 1)[0]
         self.assertRegex(background, r"(?m)^\s*monitor\s*=\s*$")
-        for widget in ("shape", "input-field", "label"):
-            with self.subTest(widget=widget):
-                block = self.conf.split(f"{widget} {{", 1)[1].split("}", 1)[0]
-                self.assertIn("monitor = $auth_monitor", block)
+        field = self.conf.split("input-field {", 1)[1].split("}", 1)[0]
+        self.assertIn("monitor = $auth_monitor", field)
         self.assertNotIn("$TIME", self.conf)
+        self.assertNotIn("shape {", self.conf)
+        self.assertNotIn("label {", self.conf)
 
-    def test_compact_card_and_authentication_text_have_fixed_geometry(self) -> None:
-        self.assertIn("size = 384, 210", self.conf)
+    def test_password_field_is_the_only_control_and_keeps_fixed_geometry(self) -> None:
         self.assertIn("size = 320, 44", self.conf)
-        self.assertIn("text = Unlock", self.conf)
         self.assertIn("check_text = Authenticating…", self.conf)
         self.assertIn("fail_text = $FAIL", self.conf)
-        self.assertIn("$lock_card_color", self.conf)
+        self.assertIn("position = 0, 0", self.conf)
 
     def run_script(self, monitors: object) -> tuple[str, list[list[str]]]:
         with tempfile.TemporaryDirectory(prefix="garage-lock-test-") as scratch:

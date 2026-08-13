@@ -82,8 +82,7 @@ PALETTE_FILES = (
 # undefined variable -- it leaves the `$name` in place, the colour parse fails,
 # and the lock screen draws with whatever it defaulted to.
 HYPRLOCK_VARS = ("outer_color", "inner_color", "font_color", "placeholder_hex",
-                 "check_color", "fail_color", "lock_card_color",
-                 "lock_card_border")
+                 "check_color", "fail_color")
 
 
 def qml_block(text: str, name: str) -> str:
