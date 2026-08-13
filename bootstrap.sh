@@ -570,7 +570,7 @@ else
 fi
 record "built Garage's Thunar-only GTK integration"
 
-if ! command -v rustup >/dev/null; then
+if ((!dry_run)) && ! command -v rustup >/dev/null; then
     fail "rustup is required to build Garage's Rust backend."
 fi
 run rustup default stable
