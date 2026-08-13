@@ -1,0 +1,25 @@
+[schema]
+preferences_version = 5
+
+[appearance]
+wallpaper_dark = "/home/rizki/Pictures/it's \"dark\".png"
+accent_color = "blue"
+night_shift_enabled = true
+night_shift_temperature = 4500
+reduce_motion = false
+animation_speed = 1.0
+glass_transparency = 0.04
+glass_refraction = 0.7
+border_size = 0
+
+[bar]
+height = 43
+spacing_scale = 1.2
+clock_format = "%a %d %b  %H:%M"
+
+[pointer]
+pointer_sensitivity = 0.30000000000000004
+natural_scroll = true
+
+[skipped]
+kept = "yes"
