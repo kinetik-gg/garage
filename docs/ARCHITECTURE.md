@@ -28,8 +28,9 @@ split and snapshot pattern for the read side). Three writers sit off that path, 
 each emitting a departures-only or stamp-only document: `compact_preferences_file()` (the v5
 migration rewrite), `repair_reset()` (`garage repair --reset`), and `bootstrap.sh`'s first-boot GPU
 glass gate, which writes only when the file does not exist — its comment block is headed
-"ONE-WRITER VIOLATION, deliberate, narrow, and measured". `save_workspace_blocks()` and `keybind_action()` are likewise the
-single writers of `workspace-blocks.toml` and `keybindings.toml`. `displays.toml` has two: the
+"ONE-WRITER VIOLATION, deliberate, narrow, and measured". `save_workspace_blocks()` and
+`keybind_action()` are likewise the single writers of `workspace-blocks.toml` and
+`keybindings.toml`. `displays.toml` has two: the
 Displays pane's `display_finish()`, and `initialize_display_config()`, which seeds the file from
 `display_snapshot()` on the first apply so a machine whose owner never opened the pane isn't left
 on the catch-all monitor rule — it never overwrites an existing file. Both serialize on
@@ -48,14 +49,14 @@ the running session. Every consumer class gets there by one of these mechanisms:
 
 | Consumer class | Mechanism | Example route step | Call site |
 | --- | --- | --- | --- |
-| Reads live, per frame (Hyprland core options) | `hyprctl eval` (no reload) + fragment written for durability | `apply_border`, `apply_motion` | `eval_config()`; `apply_border()` |
+| Reads live, per frame (Hyprland core options) | `hyprctl eval` (no reload *needed* — options are dereferenced per frame) + fragment written for durability, and a silent `hyprctl reload` if the eval fails | `apply_border`, `apply_motion` | `eval_config()`; `apply_border()`. `apply_motion()` calls `hyprctl eval` directly rather than through `eval_config()`, per its docstring |
 | Parse-time config (workspace/window rules, binds) | Fragment write + `hyprctl reload` | `apply_workspace_plan` | `apply_workspace_plan()` calls `render_workspaces()` then `run_or_raise(..., ["hyprctl", "reload"], ...)` |
 | Signal-rereaders (other daemons) | Write file in place + `pkill -USR1`/`-USR2` | theme push | `push_theme()`: `pkill -USR2 waybar`, `pkill -USR1 kitty` |
 | Startup-readers (hypridle) | Write config + `systemctl restart` | `idle` route | `PREFERENCE_ROUTES["idle"]` restarts `hypridle.service`; `render_idle()` is its `ExecStartPre` |
 | inotify watchers (Quickshell) | `write_marker()`, inode preserved | accent/corner-radius/material markers | `render_accent()`, `render_corner_radius()` |
 | portal-backed toolkits (GTK/libadwaita) | `gsettings set` | theme push | `push_theme()`: `gsettings set org.gnome.desktop.interface ...` |
 | xsettingsd/XWayland (GTK3) | Write file + `systemctl reload-or-restart` | theme push | `push_theme()`: `reload-or-restart xsettingsd.service` |
-| plugin-owned live state (glass/corner radius) | `eval_config()` first, fall back to `hyprctl reload` on error | `apply_glass`, `apply_corner_radius` | `apply_glass()`; `push_corner_radius()` |
+| plugin-owned live state (glass/corner radius) | `eval_config()` first, fall back to `hyprctl reload` on error — a plugin that never loaded takes the whole eval down with it, so only the guarded fragment can apply these; `apply_glass()` raises `SettingsError` when the reload fails too | `apply_glass`, `apply_corner_radius` | `apply_glass()`; `push_corner_radius()` |
 
 `eval_config()` exists because Hyprland 0.56+ parses config with Lua and `hyprctl keyword` refuses
 to run against a non-legacy parser — `eval` is the only way to reach a live option, and it works
