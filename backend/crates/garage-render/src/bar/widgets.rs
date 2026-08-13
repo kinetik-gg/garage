@@ -18,9 +18,10 @@
 //! reason.
 //!
 //! The module definitions this writes -- one `image#metric-*` module per enabled metric, the
-//! AI usage strip, the media control -- are the one place a metric strip's declared `size`
-//! has to agree with `garage-metrics`' own layout table; `tests/test_bar.py` parses this
-//! script and fails on drift between the two.
+//! AI usage strip, the media control -- now exec the Rust binaries in `$HOME/.local/bin`; the
+//! old waybar Python paths died with the Python backend. This is also the one place a metric
+//! strip's declared `size` has to agree with `garage-metrics`' own layout table;
+//! `tests/test_bar.py` parses this script and fails on drift between the two.
 
 use garage_core::fs::atomic::atomic_write;
 use garage_core::schema::Preferences;
@@ -140,7 +141,7 @@ fn media_definition() -> (String, Value) {
         Value::Table(vec![
             (
                 "exec".to_owned(),
-                Value::Str("$HOME/.config/waybar/media-status.py".to_owned()),
+                Value::Str("$HOME/.local/bin/garage-waybar-module media".to_owned()),
             ),
             ("return-type".to_owned(), Value::Str("json".to_owned())),
             ("interval".to_owned(), Value::Int(2)),

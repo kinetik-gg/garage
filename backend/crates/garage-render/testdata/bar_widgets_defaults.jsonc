@@ -53,7 +53,7 @@
     ]
   },
   "custom/media": {
-    "exec": "$HOME/.config/waybar/media-status.py",
+    "exec": "$HOME/.local/bin/garage-waybar-module media",
     "return-type": "json",
     "interval": 2,
     "hide-empty-text": true,
