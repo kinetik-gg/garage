@@ -17,9 +17,11 @@ use crate::{general, idle, motion, preferences, search};
 ///
 /// # Errors
 ///
-/// Whatever the dispatched renderer returns. Every renderer is a stub today -- see
-/// [`RenderError::PortPending`] -- so every arm currently fails; Phase 3 replaces the bodies
-/// this calls into, not this match.
+/// Whatever the dispatched renderer returns. [`RenderStep::Preferences`],
+/// [`RenderStep::Motion`] and [`RenderStep::Idle`] reach a real implementation as of task
+/// 3.3; [`RenderStep::SearchEngine`] and [`RenderStep::General`] are still stubs -- see
+/// [`RenderError::PortPending`] -- and Phase 3 replaces those two bodies next, not this
+/// match.
 pub fn run_render(step: RenderStep, cx: &RenderCx<'_>) -> Result<(), RenderError> {
     match step {
         RenderStep::SearchEngine => search::render_search_engine(cx),

@@ -34,6 +34,8 @@ mod motion;
 mod palette;
 mod preferences;
 mod region;
+#[cfg(test)]
+mod render_parity_tests;
 mod search;
 mod theme;
 mod wallpaper;

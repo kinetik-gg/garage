@@ -170,6 +170,7 @@ dependencies = [
  "garage-core",
  "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

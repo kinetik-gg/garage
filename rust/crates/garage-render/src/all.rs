@@ -42,8 +42,10 @@ use crate::{
 ///
 /// # Errors
 ///
-/// The first renderer's error, in call order below. Every renderer is a stub today, so this
-/// always fails on [`preferences::render_preferences`] until Phase 3 gives it a body.
+/// The first renderer's error, in call order below. [`preferences::render_preferences`],
+/// [`motion::render_motion`] and [`accent::render_accent`] are real as of task 3.3; every
+/// other renderer in this chain is still a stub, so a call today fails on
+/// [`keybinds::render_keybinds`], the next one in line.
 pub fn render_all(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     preferences::render_preferences(cx)?;
     keybinds::render_keybinds(cx)?;

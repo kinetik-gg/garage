@@ -456,6 +456,52 @@ RENDER: tuple[Scenario, ...] = ()
 # tests/test_schema_table.py: render, render-bar, render-wallpaper and the Lua
 # fragments -- the family the luac shim exists for.
 
+
+def stamped_lock_prefs(body: str) -> dict[str, object]:
+    """A v5-stamped preferences.toml carrying only a `[lock]` departure, so the load
+    path takes no migration branch and the scenario is purely about what render_idle
+    does with the timeouts."""
+    return prefs(f"[schema]\npreferences_version = 5\n\n{body}")
+
+
+RENDER_IDLE: tuple[Scenario, ...] = (
+    Scenario(
+        name="render-idle-defaults",
+        argv=("render-idle",),
+        # No preferences.toml at all: the shipped defaults' lock_timeout=600 and
+        # display_off_timeout=900 each produce a listener; suspend_timeout=0 does not.
+    ),
+    Scenario(
+        name="render-idle-lock-all-zero",
+        argv=("render-idle",),
+        # Every timeout at zero: hypridle.conf carries the general{} block and no
+        # listener at all -- the case task 3.3's own unit tests could not cover without
+        # a toml dev-dependency this crate does not otherwise need.
+        pre_state=stamped_lock_prefs(
+            "[lock]\nlock_timeout = 0\ndisplay_off_timeout = 0\nsuspend_timeout = 0\n"
+        ),
+    ),
+    Scenario(
+        name="render-idle-lock-all-nonzero",
+        argv=("render-idle",),
+        # All three configured: three listener blocks, in lock/display-off/suspend
+        # order, each with a distinct timeout so a transposition would be visible.
+        pre_state=stamped_lock_prefs(
+            "[lock]\nlock_timeout = 300\ndisplay_off_timeout = 120\n"
+            "suspend_timeout = 1800\n"
+        ),
+    ),
+    Scenario(
+        name="render-idle-suspend-only",
+        argv=("render-idle",),
+        # Only suspend configured -- the one listener the shipped defaults never
+        # exercise, since suspend_timeout defaults to 0.
+        pre_state=stamped_lock_prefs(
+            "[lock]\nlock_timeout = 0\ndisplay_off_timeout = 0\nsuspend_timeout = 600\n"
+        ),
+    ),
+)
+
 PALETTE: tuple[Scenario, ...] = ()
 # Grown from tests/test_palette.py and tests/test_wallpapers.py: theme-sync,
 # night-shift-sync, wallpaper selection, and the marker files whose *inodes*
@@ -502,6 +548,11 @@ FAMILIES = (
     Family(name="render", active=False,
            note="fragment generation; from test_bar.py, test_keybinds.py",
            scenarios=RENDER),
+    Family(name="render_idle", active=True,
+           note="hypridle.conf from [lock] alone; task 3.3, garage-render. Active because "
+                "`garage render-idle` now runs the real load -> render_idle chain end to "
+                "end (task 3.15's CLI wiring).",
+           scenarios=RENDER_IDLE),
     Family(name="palette", active=False,
            note="theme and wallpaper markers; from test_palette.py",
            scenarios=PALETTE),
