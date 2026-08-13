@@ -1,0 +1,20 @@
+{
+  "group/monitoring": {
+    "orientation": "horizontal",
+    "modules": [
+      "image#metric-cpu",
+      "custom/not-a-metric",
+      "image#metric-memory",
+      "image#metric-network",
+      "image#metric-temp",
+      "image#metric-disk",
+      "image#metric-gpu"
+    ]
+  },
+  "image#metric-cpu": {"size": 82, "interval": 2},
+  "image#metric-memory": {"size": 82, "interval": 2},
+  "image#metric-network": {"size": 130, "interval": 2},
+  "image#metric-temp": {"size": 76, "interval": 2},
+  "image#metric-disk": {"size": 91, "interval": 2},
+  "image#metric-gpu": {"size": 124, "interval": 2}
+}

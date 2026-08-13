@@ -1,0 +1,24 @@
+#custom-menu {
+  min-width: 23px;
+  padding-left: 0;
+  padding-right: 7px;
+  margin-left: 24px;
+  margin-right: 17px;
+}
+
+#workspaces button {
+  margin: 3px 0;
+  padding: 0 8px;
+}
+
+#custom-media {
+  margin-left: 19px;
+}
+
+#image {
+  padding: 0 9px;
+}
+
+#status-tail {
+  min-width: 333px;
+}

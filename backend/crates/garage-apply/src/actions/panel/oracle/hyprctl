@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+case "$*" in
+    "cursorpos -j")  exec /usr/bin/cat "$PANEL_FIXTURES/cursor-edge.json" ;;
+    "monitors -j")   exec /usr/bin/cat "$PANEL_FIXTURES/monitors.json" ;;
+    "workspaces -j") exec /usr/bin/cat "$PANEL_FIXTURES/workspaces.json" ;;
+    *)                exit 2 ;;
+esac

@@ -1,6 +1,6 @@
 //! `action()`: run one one-shot action -- volume, mute, default sink/source, night shift
-//! toggle, glass reset, a keybind edit, a default-application change, an immediate lock, or a
-//! date/time change.
+//! toggle, glass reset, a keybind edit, a default-application change, an immediate lock, a
+//! date/time change, or a Waybar panel click.
 //!
 //! A second dispatch table, deliberately separate from [`crate::route`]'s route walking: an
 //! action is not a preference, has no key in `preferences.toml` and no
@@ -27,6 +27,7 @@
 //! through the `action` command's own dispatch, never through `Route::steps()`.
 
 mod audio;
+mod panel;
 mod preference;
 mod pyvalue;
 
@@ -81,6 +82,7 @@ pub fn action(
             spawn(cx, &["timedatectl", "set-ntp", ntp_word(value)])
         }),
         "datetime.timezone" => light(paths, proc, |cx| set_timezone(cx, value)),
+        "panel.toggle" => light(paths, proc, |cx| panel::panel_toggle(cx, value)),
         // `name.split(".", 1)[1]`: everything after the first dot, which is the operation for
         // a keybind action and the role for a defaults one.
         other => match (
@@ -102,11 +104,11 @@ pub fn action(
 ///
 /// The preference slot is filled from the compiled-in defaults, which is a pure parse of a
 /// string in the binary and touches no file. Nothing reached through this closure reads a
-/// preference -- `wpctl`, `pactl`, `loginctl` and `timedatectl` take their argument from the
-/// payload, `keybind_action()` reads `keybindings.toml`, and `set_default_app()` reads
-/// `mimeapps.list` and the desktop files. Reading layer 2 to fill the slot honestly would be
-/// the dishonest choice: it would compact the user's file as a side effect of turning the
-/// volume down.
+/// preference -- `wpctl`, `pactl`, `loginctl`, `timedatectl`, `hyprctl` and `qs` take their
+/// argument from the payload or live session, `keybind_action()` reads `keybindings.toml`, and
+/// `set_default_app()` reads `mimeapps.list` and the desktop files. Reading layer 2 to fill the
+/// slot honestly would be the dishonest choice: it would compact the user's file as a side
+/// effect of turning the volume down.
 fn light<R>(
     paths: &Paths,
     proc: &dyn Runner,

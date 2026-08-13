@@ -1,0 +1,6 @@
+#!/bin/sh
+printf 'qs'
+for argument do
+    printf ' %s' "$argument"
+done
+printf '\n'
