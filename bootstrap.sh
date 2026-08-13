@@ -948,7 +948,7 @@ step "Setting up the shell prompt"
 # Pinned: an unpinned prompt plugin is a third party with write access to every
 # future shell start. `fisher install owner/repo@ref` checks out that ref.
 pure_pin="pure-fish/pure@v4.18.0"
-if fish -c 'type -q fisher'; then
+if ((dry_run)) || fish -c 'type -q fisher'; then
     # fish_plugins is fisher's own manifest and is what it reconciles against.
     # `fisher list` is not used here: it reads a fish universal variable, which
     # is per-machine state that does not exist on a first run and can go missing
