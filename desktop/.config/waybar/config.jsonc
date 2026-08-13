@@ -73,21 +73,21 @@
   // decides whether it is listed at all, and the module list and the definition
   // have to be written by the same writer to stay in step.
   "custom/containers": {
-    "exec": "$HOME/.config/waybar/context-status.py containers",
+    "exec": "$HOME/.local/bin/garage-waybar-module context containers",
     "return-type": "json",
     "interval": 5,
     "hide-empty-text": true,
     "tooltip": true
   },
   "custom/microphone": {
-    "exec": "$HOME/.config/waybar/context-status.py microphone",
+    "exec": "$HOME/.local/bin/garage-waybar-module context microphone",
     "return-type": "json",
     "interval": 2,
     "hide-empty-text": true,
     "tooltip": true
   },
   "custom/smb": {
-    "exec": "$HOME/.config/waybar/context-status.py smb",
+    "exec": "$HOME/.local/bin/garage-waybar-module context smb",
     "return-type": "json",
     "interval": 15,
     "hide-empty-text": true,
