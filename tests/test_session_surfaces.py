@@ -95,6 +95,8 @@ class SddmTheme(unittest.TestCase):
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("hyprlock-monitor.conf", bootstrap)
         self.assertIn("$auth_monitor =", bootstrap)
+        self.assertIn("$auth_width = 320", bootstrap)
+        self.assertIn("$auth_height = 44", bootstrap)
         self.assertIn('chmod 0600 "$hyprlock_monitor_state"', bootstrap)
 
     def test_theme_qml_loads_in_qt6_sddm_test_mode(self) -> None:
@@ -156,20 +158,31 @@ class HyprlockSurface(unittest.TestCase):
         self.assertNotIn("shape {", self.conf)
         self.assertNotIn("label {", self.conf)
 
-    def test_password_field_is_the_only_control_and_keeps_fixed_geometry(self) -> None:
-        self.assertIn("size = 320, 44", self.conf)
-        self.assertIn("check_text = Authenticating…", self.conf)
-        self.assertIn("fail_text = $FAIL", self.conf)
+    def test_password_field_is_the_only_control_and_scales_as_one_surface(self) -> None:
+        self.assertIn("fractional_scaling = 1", self.conf)
+        self.assertIn("size = $auth_width, $auth_height", self.conf)
+        self.assertIn("Authenticating…", self.conf)
+        self.assertIn("$FAIL", self.conf)
         self.assertIn("position = 0, 0", self.conf)
+        self.assertIn("outline_thickness = 0", self.conf)
         self.assertIn("inner_color = rgba(00000000)", self.conf)
-        self.assertIn("Enter your password...", self.conf)
+        self.assertIn("check_color = rgba(00000000)", self.conf)
+        self.assertIn("fail_color = rgba(00000000)", self.conf)
+        self.assertIn("Type your password...", self.conf)
 
-    def run_script(self, monitors: object) -> tuple[str, list[list[str]]]:
+    def run_script(
+        self, monitors: object, primary: str = ""
+    ) -> tuple[str, list[list[str]]]:
         with tempfile.TemporaryDirectory(prefix="garage-lock-test-") as scratch:
             root = Path(scratch)
             binary = root / "bin"
             binary.mkdir()
             calls = root / "calls"
+            config = root / "config" / "garage"
+            config.mkdir(parents=True)
+            (config / "displays.toml").write_text(
+                f'primary = {json.dumps(primary)}\n', encoding="utf-8"
+            )
             (binary / "hyprctl").write_text(
                 "#!/bin/sh\nprintf '%s' \"$GARAGE_MONITORS\"\n", encoding="utf-8"
             )
@@ -185,6 +198,7 @@ class HyprlockSurface(unittest.TestCase):
                 {
                     "PATH": f"{binary}:{env['PATH']}",
                     "HOME": str(root),
+                    "XDG_CONFIG_HOME": str(root / "config"),
                     "XDG_STATE_HOME": str(root / "state"),
                     "GARAGE_MONITORS": json.dumps(monitors),
                     "GARAGE_CALLS": str(calls),
@@ -199,21 +213,30 @@ class HyprlockSurface(unittest.TestCase):
             invoked = [line.split() for line in calls.read_text(encoding="utf-8").splitlines()]
             return state, invoked
 
-    def test_focused_monitor_is_written_atomically_before_hyprlock(self) -> None:
+    def test_configured_primary_is_written_atomically_before_hyprlock(self) -> None:
         state, invoked = self.run_script(
-            [{"name": "DP-1", "focused": False},
-             {"name": "HDMI-A-1", "focused": True}]
+            [{"name": "DP-1", "focused": False, "scale": 1.5},
+             {"name": "HDMI-A-1", "focused": True, "scale": 1}],
+            primary="DP-1",
         )
-        self.assertIn("$auth_monitor = HDMI-A-1", state)
+        self.assertIn("$auth_monitor = DP-1", state)
+        self.assertIn("$auth_width = 480", state)
+        self.assertIn("$auth_height = 66", state)
         self.assertEqual(invoked, [["--immediate-render"]])
 
-    def test_first_monitor_and_all_monitor_fallbacks_are_safe(self) -> None:
+    def test_missing_primary_and_all_monitor_fallbacks_are_safe(self) -> None:
         first, _ = self.run_script(
-            [{"name": "DP-2", "focused": False}, {"name": "DP-3", "focused": False}]
+            [{"name": "DP-2", "focused": False, "scale": 1.6666666},
+             {"name": "DP-3", "focused": True, "scale": 1}],
+            primary="DP-9",
         )
         empty, _ = self.run_script([])
         self.assertIn("$auth_monitor = DP-2", first)
+        self.assertIn("$auth_width = 533", first)
+        self.assertIn("$auth_height = 73", first)
         self.assertRegex(empty, r"(?m)^\$auth_monitor =\s*$")
+        self.assertIn("$auth_width = 320", empty)
+        self.assertIn("$auth_height = 44", empty)
 
     def test_monitor_name_cannot_inject_hyprlang(self) -> None:
         state, _ = self.run_script([{"name": "DP-1\n$evil = yes", "focused": True}])

@@ -8,9 +8,10 @@ responsibilities separate:
   switch-user field, session selection, sleep, reboot and shutdown. Reboot and
   shutdown require inline confirmation; sleep is immediate.
 - **Hyprlock** unlocks the already-running session. It follows Garage's current
-  wallpaper and generated light/dark palette. Its only control is a transparent
-  password field, placed by `garage-lock-session` on Hyprland's focused monitor
-  while the wallpaper remains on every connected output.
+  wallpaper and generated light/dark palette. Its only control is a borderless,
+  transparent password field, placed by `garage-lock-session` on Hyprland's
+  configured primary monitor while the wallpaper remains on every connected
+  output.
 
 Both surfaces keep authentication/error feedback inside fixed geometry. A
 failed password therefore changes text and colour without moving the controls.
@@ -34,11 +35,17 @@ the greeter does not probe user homes for face files.
 
 ## Hyprlock routing
 
-Before invoking Hyprlock, `garage-lock-session` reads `hyprctl monitors -j`:
+Before invoking Hyprlock, `garage-lock-session` reads Garage's
+`~/.config/garage/displays.toml` and `hyprctl monitors -j`:
 
-1. use the focused output;
+1. use the configured primary output when it is connected;
 2. otherwise use the first connected output;
 3. otherwise leave the monitor empty, which is Hyprlock's all-monitor fallback.
+
+The wrapper also reads that output's live scale and multiplies the field's base
+`320 × 44` geometry by it. Hyprlock's fractional-scaling protocol remains
+enabled, so the buffer is rendered at the output's native pixel density while
+the field keeps the same logical size at integer or fractional display scales.
 
 Only conservative output names are accepted before writing Hyprlang. The
 include is written to a temporary file with mode `0600` and atomically renamed

@@ -81,8 +81,7 @@ PALETTE_FILES = (
 # The palette variables hyprlock.conf dereferences. hyprlang does not error on an
 # undefined variable -- it leaves the `$name` in place, the colour parse fails,
 # and the lock screen draws with whatever it defaulted to.
-HYPRLOCK_VARS = ("outer_color", "font_color", "placeholder_hex",
-                 "check_color", "fail_color")
+HYPRLOCK_VARS = ("font_color", "placeholder_hex", "check_hex", "fail_hex")
 
 
 def qml_block(text: str, name: str) -> str:
