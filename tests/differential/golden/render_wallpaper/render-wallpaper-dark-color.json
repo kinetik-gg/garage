@@ -1,0 +1,90 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".config/garage/preferences.toml",
+      "sha256": "6d5090ffbb04159ef4599df49bd7d8bcbe1ec639eabacad8df94f3bdd4925216",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage/generated",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/hyprpaper.conf",
+      "sha256": "9a46b6bd2478760b2fa951767dcf6556a0d38fb3a81fd26ffeea6e0f1a9f22de",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "SURVIVED .config/garage/preferences.toml"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":true,\"error\":\"\"}\n",
+  "trace": []
+}

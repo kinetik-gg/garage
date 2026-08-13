@@ -1,0 +1,97 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".config/garage/preferences.toml",
+      "sha256": "30828c06796a23f73207f95f954c068a995ec36190300a97879aaf61b67c043e",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage/generated",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/hypridle.conf",
+      "sha256": "45025e6f76eef25fbacfc6ef6136b88b32c68441aca594ef780aaecc6bde81ae",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/state/garage/preferences.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "CHANGED .config/garage/preferences.toml"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":true,\"error\":\"\"}\n",
+  "trace": []
+}

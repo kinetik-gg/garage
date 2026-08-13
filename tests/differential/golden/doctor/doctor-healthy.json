@@ -1,0 +1,101 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    1
+  ],
+  "inodes": [],
+  "stderr": "",
+  "stdout": "Garage doctor\n  checkout  $REPO\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  FAIL  stow links   1/219 paths link here; 218 problem(s): missing ~/.config/btop/btop.conf, missing ~/.config/fish/config.fish, missing ~/.config/gtk-3.0/thunar.css, missing ~/.config/gtk-4.0/thumbnail.png, missing ~/.config/hypr/config/animations.lua, missing ~/.config/hypr/config/autostart.lua, missing ~/.config/hypr/config/binds.lua, missing ~/.config/hypr/config/decorations.lua, missing ~/.config/hypr/config/environment.lua, missing ~/.config/hypr/config/inputs.lua, and 208 more\n                     -> garage update  (or ./bootstrap.sh, which backs up anything in the way)\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 14 units enabled and running\n  FAIL  plugins      kinetik-glass, hyprexpo not built for the running build v0.56.2\n                     -> ~/.config/hypr/scripts/garage-rebuild-plugins\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n2 problem(s) found.\n",
+  "trace": [
+    "Hyprland --version",
+    "pacman -Q stow hypridle hyprpaper waybar quickshell kitty fish adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprsunset.service",
+    "systemctl --user is-active hyprsunset.service",
+    "systemctl --user is-enabled hyprpolkitagent.service",
+    "systemctl --user is-active hyprpolkitagent.service",
+    "systemctl --user is-enabled swayosd.service",
+    "systemctl --user is-active swayosd.service",
+    "systemctl --user is-enabled cliphist.service",
+    "systemctl --user is-active cliphist.service",
+    "systemctl --user is-enabled cliphist-image.service",
+    "systemctl --user is-active cliphist-image.service",
+    "systemctl --user is-enabled xsettingsd.service",
+    "systemctl --user is-active xsettingsd.service",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "systemctl --user is-enabled garage-file-index.service",
+    "systemctl --user is-active garage-file-index.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "Hyprland --version",
+    "hyprctl version"
+  ]
+}

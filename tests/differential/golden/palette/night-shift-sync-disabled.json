@@ -1,0 +1,78 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".config/garage/preferences.toml",
+      "sha256": "9b76d6a629d5e45bf4ff7d596ae19e5ffc4398bc37d42a0801b1a6696504f354",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "SURVIVED .config/garage/preferences.toml"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":{\"active\":false,\"applied\":true},\"error\":\"\"}\n",
+  "trace": [
+    "hyprctl hyprsunset identity"
+  ]
+}

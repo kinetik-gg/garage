@@ -1,0 +1,140 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".config/garage/preferences.toml",
+      "sha256": "f96135d461e5ee9585a602f6660ab89513dc661fb7fa4401668c2a147787c60f",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/waybar",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".config/waybar/style.css",
+      "sha256": "d8ebde2d8cb6c7085fb373dfc649533051f7ba407a3a520ff6d8393430a76826",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage/generated",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/hypridle.conf",
+      "sha256": "45025e6f76eef25fbacfc6ef6136b88b32c68441aca594ef780aaecc6bde81ae",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/state/garage/generated/material",
+      "sha256": "ee93a250d2d9cce674fa16d437d640c36f150a4471c787c776303fdfd44dfc9a",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/preferences.lua",
+      "sha256": "83d55d73380ee24bc0a3bf6f0586c46c1f098441f1d502295cb0b4dbcb7630ee",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/state/garage/generated/reduce-motion",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/state/garage/preferences.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "CHANGED .config/garage/preferences.toml"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":{\"schema\":{\"preferences_version\":5},\"appearance\":{\"wallpaper_light\":\"\",\"wallpaper_dark\":\"\",\"wallpaper_light_source\":\"image\",\"wallpaper_dark_source\":\"image\",\"wallpaper_light_color\":\"#f5f5f7\",\"wallpaper_dark_color\":\"#1c1c1e\",\"wallpaper_fit\":\"cover\",\"accent_color\":\"blue\",\"night_shift_enabled\":true,\"night_shift_start\":\"18:00\",\"night_shift_end\":\"06:00\",\"night_shift_temperature\":4500,\"theme_mode\":\"dark\",\"corner_radius\":\"normal\",\"border_size\":0,\"reduce_motion\":true,\"animation_speed\":1.0,\"theme_light_at\":\"07:00\",\"theme_dark_at\":\"19:00\",\"search_engine\":\"google\",\"search_custom_url\":\"\",\"glass_mode\":\"liquid\",\"glass_blur\":\"normal\",\"glass_transparency\":0.04,\"glass_edge_width\":24,\"glass_refraction\":0.7,\"glass_clarity\":0.75,\"glass_highlight\":0.12},\"bar\":{\"height\":43,\"padding_scale\":1.2,\"background\":\"transparent\",\"monitor_cpu\":true,\"monitor_memory\":true,\"monitor_network\":true,\"monitor_temp\":false,\"monitor_disk\":false,\"monitor_gpu\":false,\"ai_usage\":true,\"media_player\":true},\"general\":{\"terminal\":\"\",\"builtin_launcher\":true},\"indexing\":{\"enabled\":true,\"frequency_minutes\":5,\"max_depth\":8,\"directories\":\"~/Desktop\\n~/Documents\\n~/Downloads\\n~/Music\\n~/Pictures\\n~/Projects\\n~/repositories\\n~/Videos\"},\"input\":{\"pointer_sensitivity\":0.0,\"accel_profile\":\"flat\",\"natural_scroll\":false,\"keyboard_layout\":\"us\",\"repeat_rate\":25,\"repeat_delay\":600,\"touchpad_tap_to_click\":true,\"touchpad_natural_scroll\":true,\"touchpad_disable_while_typing\":true},\"lock\":{\"lock_timeout\":600,\"display_off_timeout\":900,\"suspend_timeout\":0},\"workspaces\":{\"mode\":\"per-display\",\"default_count\":4,\"counts\":\"\",\"shared_count\":8,\"indicator\":true},\"region\":{\"locale\":\"\",\"time_format\":\"24\",\"date_format\":\"dmy\",\"first_day_of_week\":\"sunday\"}},\"error\":\"\"}\n",
+  "trace": [
+    "luac -p $HOME/.local/state/garage/generated/.preferences.lua.XXXXXXXX",
+    "hyprctl eval 'hl.config({animations = {enabled = false}})",
+    "hl.animation({ leaf = \"global\", enabled = true, speed = 3, bezier = \"workspaceEase\" })",
+    "hl.animation({ leaf = \"layers\", enabled = true, speed = 2.4, bezier = \"workspaceEase\" })",
+    "hl.animation({ leaf = \"workspaces\", enabled = true, speed = 3, bezier = \"workspaceEase\", style = \"slide\" })",
+    "'",
+    "pkill -USR2 -x waybar"
+  ]
+}

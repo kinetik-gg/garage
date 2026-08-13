@@ -1,0 +1,67 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [],
+  "stderr": "",
+  "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does not exist (which is what a fresh install looks like)\n\nWhat `garage repair --reset` would do:\n  1. nothing to back up, because there is no file yet\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 5) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
+  "trace": []
+}

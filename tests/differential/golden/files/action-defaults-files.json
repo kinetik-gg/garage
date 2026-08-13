@@ -1,0 +1,146 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".config/hyprland-mimeapps.list",
+      "sha256": "75524604efe6374a82b311d83fdfd21a74f1c06d3ef238bf1b7625a439fa0e51",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share/applications",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/firefox.desktop",
+      "sha256": "191717be26735cf891c540bc41851145b2c0f0ba88806030224d9ee80f127689",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/kitty.desktop",
+      "sha256": "024c4bf1685dbc4a45ad27f1d583e16e5dd2123fa04caeab45862f0016c9e580",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/mpv.desktop",
+      "sha256": "d215f2c9c6bc62c395f43f2d665e10182d9e757c90cba51dccf6933155645744",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/org.gnome.Evince.desktop",
+      "sha256": "bead18abc5ec20f1f362d162d8845f04c5edde51b016007147c85bf2a43e1f3c",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/org.gnome.Loupe.desktop",
+      "sha256": "01a9809233367409a85e7b463e74e5aafe142009401334703869c9338a26f6bc",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/org.gnome.TextEditor.desktop",
+      "sha256": "01e43fa6ffb5504dd7a10d240fd28bb85539e73daa0023f36f5643ae55a86ac8",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/thunar.desktop",
+      "sha256": "82f2e2ea3038d2336e8e669e00d611207e4bc4f826b0a866512b46241f5af5fc",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".local/share/applications/thunderbird.desktop",
+      "sha256": "61623549ca3a8d50f77c26888ecfd493b309bef3c9e6809c4a0fc561430a6018",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "SURVIVED .local/share/applications/firefox.desktop",
+    "SURVIVED .local/share/applications/kitty.desktop",
+    "SURVIVED .local/share/applications/mpv.desktop",
+    "SURVIVED .local/share/applications/org.gnome.Evince.desktop",
+    "SURVIVED .local/share/applications/org.gnome.Loupe.desktop",
+    "SURVIVED .local/share/applications/org.gnome.TextEditor.desktop",
+    "SURVIVED .local/share/applications/thunar.desktop",
+    "SURVIVED .local/share/applications/thunderbird.desktop"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":true,\"error\":\"\"}\n",
+  "trace": []
+}

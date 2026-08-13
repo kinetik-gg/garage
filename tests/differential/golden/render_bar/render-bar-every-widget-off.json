@@ -1,0 +1,111 @@
+{
+  "digest": [
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".cache",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".config/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "symlink",
+      "mode": "0777",
+      "path": ".config/garage/preferences.defaults.toml",
+      "sha256": "",
+      "target": "$REPO/desktop/.config/garage/preferences.defaults.toml"
+    },
+    {
+      "kind": "file",
+      "mode": "0644",
+      "path": ".config/garage/preferences.toml",
+      "sha256": "a0a9203402d4294b39770cc7465d0a310f770e33a64156ec43b3fa6da4d3f970",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/share",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "dir",
+      "mode": "0755",
+      "path": ".local/state/garage/generated",
+      "sha256": "",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/locale.env",
+      "sha256": "810b93dd82c91e3882d30bcb66263f0ee25c8cb97936bddef6677081358c1074",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/waybar-clock.jsonc",
+      "sha256": "5fc7d31c9f81f203d7ed1471cda4d505d1054d10fe726c2c5a31cb3e1d671353",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/waybar-widgets.jsonc",
+      "sha256": "e40a0ca1c91a3c01f1d313fce9fc8b3d760c79e55cf47f2234adfce573ee1830",
+      "target": ""
+    },
+    {
+      "kind": "file",
+      "mode": "0600",
+      "path": ".local/state/garage/generated/waybar-workspaces.jsonc",
+      "sha256": "87faf107e7fe003640398c10a203501dd9395f496c05b62fb5e865083be05e45",
+      "target": ""
+    }
+  ],
+  "exit_code": [
+    0
+  ],
+  "inodes": [
+    "SURVIVED .config/garage/preferences.toml"
+  ],
+  "stderr": "",
+  "stdout": "{\"ok\":true,\"data\":true,\"error\":\"\"}\n",
+  "trace": []
+}
