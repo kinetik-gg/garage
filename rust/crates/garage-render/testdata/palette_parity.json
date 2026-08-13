@@ -1,0 +1,563 @@
+{
+  "PALETTE": {
+    "dark": {
+      "accent": "#0a84ff",
+      "accent_fg": "#ffffff",
+      "accent_soft": "#64aaff",
+      "bar_bg": "rgba(28, 28, 30, 0.42)",
+      "bar_dot": "#ffffff",
+      "bar_edge": "rgba(0, 0, 0, 0.30)",
+      "bar_sheen": "rgba(255, 255, 255, 0.07)",
+      "bevel_dark": "#000000",
+      "bevel_faint": "#202022",
+      "bevel_light": "#3a3a3c",
+      "bevel_mid": "#111113",
+      "bevel_midlight": "#2c2c2e",
+      "bg": "#1c1c1e",
+      "bg_alt2": "#202022",
+      "bg_float": "#2c2c2e",
+      "bg_lifted": "#3a3a3c",
+      "bg_raised": "#242426",
+      "bg_sidebar": "#202022",
+      "bg_sunken": "#161617",
+      "bg_well": "#111113",
+      "body_base": "#1c1c1e",
+      "body_opaque": "#1c1c1e",
+      "border_active": "#666666",
+      "border_inactive": "#181818",
+      "border_locked": "#888888",
+      "caution": "#ff9f0a",
+      "danger": "#ff453a",
+      "edge": "rgba(255, 255, 255, 0.16)",
+      "error_bg": "#3a0000",
+      "error_fg": "#ffffff",
+      "fg": "#d1d1d6",
+      "fg_backdrop": "#bcbcbc",
+      "fg_bright": "#f5f5f7",
+      "fg_disabled": "#6e6e73",
+      "fg_faint": "#6e6e73",
+      "fg_muted": "#8e8e93",
+      "fg_placeholder": "#8e8e93",
+      "fg_placeholder_dim": "#6e6e73",
+      "fg_secondary": "#a8a8ad",
+      "fg_strong": "#f5f5f7",
+      "hairline": "rgba(255, 255, 255, 0.12)",
+      "info": "#5ac8fa",
+      "knob": "#e5e5e7",
+      "line": "#3a3a3c",
+      "line_box": "#3a3a3c",
+      "line_faint": "#48484a",
+      "link": "#64aaff",
+      "link_visited": "#5e5ce6",
+      "meter_track": "#2c2c2e",
+      "ok": "#32d74b",
+      "on_bg": "#ffffff",
+      "osd_bg": "rgba(28, 28, 30, 0.94)",
+      "osd_fg": "rgba(245, 245, 247, 0.92)",
+      "osd_fg_muted": "rgba(245, 245, 247, 0.82)",
+      "osd_fill": "rgba(245, 245, 247, 0.90)",
+      "osd_track": "rgba(245, 245, 247, 0.24)",
+      "row_selected": "#2c2c2e",
+      "shade": "rgba(0, 0, 0, 0.45)",
+      "shadow_base": "#000000",
+      "success_bg": "#13231a",
+      "success_fg": "#bfd0c5",
+      "tooltip_bg": "rgba(44, 44, 46, 0.90)",
+      "urgent": "rgba(255, 69, 58, 0.95)",
+      "violet": "#af52de",
+      "warn": "#ffd60a",
+      "warning_bg": "#2a220f",
+      "warning_fg": "#d8d0b8"
+    },
+    "light": {
+      "accent": "#007aff",
+      "accent_fg": "#ffffff",
+      "accent_soft": "#007aff",
+      "bar_bg": "rgba(245, 245, 247, 0.42)",
+      "bar_dot": "#1c1c1e",
+      "bar_edge": "rgba(0, 0, 0, 0.12)",
+      "bar_sheen": "rgba(255, 255, 255, 0.60)",
+      "bevel_dark": "#b0b0b5",
+      "bevel_faint": "#d8d8dd",
+      "bevel_light": "#ffffff",
+      "bevel_mid": "#d1d1d6",
+      "bevel_midlight": "#f7f7fa",
+      "bg": "#f2f2f7",
+      "bg_alt2": "#f7f7fa",
+      "bg_float": "#ffffff",
+      "bg_lifted": "#d1d1d6",
+      "bg_raised": "#f5f5f7",
+      "bg_sidebar": "#ebebf0",
+      "bg_sunken": "#ffffff",
+      "bg_well": "#ffffff",
+      "body_base": "#f5f5f7",
+      "body_opaque": "#ffffff",
+      "border_active": "#b0b0b5",
+      "border_inactive": "#e5e5ea",
+      "border_locked": "#8e8e93",
+      "caution": "#ff9f0a",
+      "danger": "#ff453a",
+      "edge": "rgba(0, 0, 0, 0.12)",
+      "error_bg": "#ffdad6",
+      "error_fg": "#93000a",
+      "fg": "#1c1c1e",
+      "fg_backdrop": "#3a3a3c",
+      "fg_bright": "#0b0b0d",
+      "fg_disabled": "#8a8a90",
+      "fg_faint": "#b0b0b5",
+      "fg_muted": "#6c6c70",
+      "fg_placeholder": "#8e8e93",
+      "fg_placeholder_dim": "#aeaeb2",
+      "fg_secondary": "#45454a",
+      "fg_strong": "#1c1c1e",
+      "hairline": "rgba(0, 0, 0, 0.12)",
+      "info": "#5ac8fa",
+      "knob": "#ffffff",
+      "line": "#c7c7cc",
+      "line_box": "#b0b0b5",
+      "line_faint": "#c7c7cc",
+      "link": "#0060df",
+      "link_visited": "#5856d6",
+      "meter_track": "#e5e5ea",
+      "ok": "#32d74b",
+      "on_bg": "#000000",
+      "osd_bg": "rgba(245, 245, 247, 0.94)",
+      "osd_fg": "rgba(28, 28, 30, 0.92)",
+      "osd_fg_muted": "rgba(28, 28, 30, 0.82)",
+      "osd_fill": "rgba(28, 28, 30, 0.85)",
+      "osd_track": "rgba(28, 28, 30, 0.20)",
+      "row_selected": "#d1d1d6",
+      "shade": "rgba(0, 0, 0, 0.12)",
+      "shadow_base": "#000000",
+      "success_bg": "#d9f2e3",
+      "success_fg": "#0b3d24",
+      "tooltip_bg": "rgba(255, 255, 255, 0.95)",
+      "urgent": "rgba(255, 69, 58, 0.95)",
+      "violet": "#af52de",
+      "warn": "#ffd60a",
+      "warning_bg": "#fff4d6",
+      "warning_fg": "#614700"
+    }
+  },
+  "ACCENTS": {
+    "blue": "#3584e4",
+    "green": "#3a944a",
+    "orange": "#ff7800",
+    "pink": "#d56199",
+    "purple": "#9141ac",
+    "red": "#e01b24",
+    "slate": "#6f8396",
+    "teal": "#2190a4",
+    "yellow": "#f6d32d"
+  },
+  "BORDER_COLORS": {
+    "dark": [
+      "rgba(666666ff)",
+      "rgba(181818ff)"
+    ],
+    "light": [
+      "rgba(b0b0b5ff)",
+      "rgba(e5e5eaff)"
+    ]
+  },
+  "GTK3_TOKENS": [
+    [
+      "accent_color",
+      "accent_soft"
+    ],
+    [
+      "accent_bg_color",
+      "accent"
+    ],
+    [
+      "accent_fg_color",
+      "accent_fg"
+    ],
+    [
+      "window_bg_color",
+      "bg"
+    ],
+    [
+      "window_fg_color",
+      "fg"
+    ],
+    [
+      "view_bg_color",
+      "bg_sunken"
+    ],
+    [
+      "view_fg_color",
+      "fg"
+    ],
+    [
+      "headerbar_bg_color",
+      "bg_raised"
+    ],
+    [
+      "headerbar_fg_color",
+      "fg_strong"
+    ],
+    [
+      "headerbar_backdrop_color",
+      "bg"
+    ],
+    [
+      "sidebar_bg_color",
+      "bg_sidebar"
+    ],
+    [
+      "sidebar_fg_color",
+      "fg"
+    ],
+    [
+      "sidebar_backdrop_color",
+      "bg"
+    ],
+    [
+      "sidebar_border_color",
+      "hairline"
+    ],
+    [
+      "popover_bg_color",
+      "bg_float"
+    ],
+    [
+      "popover_fg_color",
+      "fg_strong"
+    ],
+    [
+      "card_bg_color",
+      "bg_float"
+    ],
+    [
+      "card_fg_color",
+      "fg"
+    ],
+    [
+      "dialog_bg_color",
+      "bg_raised"
+    ],
+    [
+      "dialog_fg_color",
+      "fg_strong"
+    ],
+    [
+      "theme_bg_color",
+      "bg"
+    ],
+    [
+      "theme_fg_color",
+      "fg"
+    ],
+    [
+      "theme_base_color",
+      "bg_sunken"
+    ],
+    [
+      "theme_text_color",
+      "fg"
+    ],
+    [
+      "theme_selected_bg_color",
+      "accent"
+    ],
+    [
+      "theme_selected_fg_color",
+      "accent_fg"
+    ],
+    [
+      "theme_unfocused_bg_color",
+      "bg"
+    ],
+    [
+      "theme_unfocused_fg_color",
+      "fg_muted"
+    ],
+    [
+      "theme_unfocused_selected_bg_color",
+      "bg_lifted"
+    ],
+    [
+      "theme_unfocused_selected_fg_color",
+      "fg_backdrop"
+    ],
+    [
+      "destructive_bg_color",
+      "error_bg"
+    ],
+    [
+      "destructive_fg_color",
+      "error_fg"
+    ],
+    [
+      "error_bg_color",
+      "error_bg"
+    ],
+    [
+      "error_fg_color",
+      "error_fg"
+    ]
+  ],
+  "GTK4_TOKENS": [
+    [
+      "accent-color",
+      "accent_soft"
+    ],
+    [
+      "accent-bg-color",
+      "accent"
+    ],
+    [
+      "accent-fg-color",
+      "accent_fg"
+    ],
+    [
+      "window-bg-color",
+      "bg"
+    ],
+    [
+      "window-fg-color",
+      "fg"
+    ],
+    [
+      "view-bg-color",
+      "bg_sunken"
+    ],
+    [
+      "view-fg-color",
+      "fg"
+    ],
+    [
+      "headerbar-bg-color",
+      "bg_raised"
+    ],
+    [
+      "headerbar-fg-color",
+      "fg_strong"
+    ],
+    [
+      "headerbar-backdrop-color",
+      "bg"
+    ],
+    [
+      "sidebar-bg-color",
+      "bg_sidebar"
+    ],
+    [
+      "sidebar-fg-color",
+      "fg"
+    ],
+    [
+      "sidebar-backdrop-color",
+      "bg"
+    ],
+    [
+      "sidebar-border-color",
+      "hairline"
+    ],
+    [
+      "card-bg-color",
+      "bg_float"
+    ],
+    [
+      "card-fg-color",
+      "fg"
+    ],
+    [
+      "popover-bg-color",
+      "bg_float"
+    ],
+    [
+      "popover-fg-color",
+      "fg_strong"
+    ],
+    [
+      "dialog-bg-color",
+      "bg_raised"
+    ],
+    [
+      "dialog-fg-color",
+      "fg_strong"
+    ],
+    [
+      "destructive-bg-color",
+      "error_bg"
+    ],
+    [
+      "destructive-fg-color",
+      "error_fg"
+    ],
+    [
+      "error-bg-color",
+      "error_bg"
+    ],
+    [
+      "error-fg-color",
+      "error_fg"
+    ],
+    [
+      "warning-bg-color",
+      "warning_bg"
+    ],
+    [
+      "warning-fg-color",
+      "warning_fg"
+    ],
+    [
+      "success-bg-color",
+      "success_bg"
+    ],
+    [
+      "success-fg-color",
+      "success_fg"
+    ],
+    [
+      "shade-color",
+      "shade"
+    ]
+  ],
+  "QT_ROLES": [
+    [
+      "WindowText",
+      "fg",
+      "fg_backdrop",
+      "fg_faint"
+    ],
+    [
+      "Button",
+      "bg",
+      "bg",
+      "bg"
+    ],
+    [
+      "Light",
+      "bevel_light",
+      "bevel_light",
+      "bevel_light"
+    ],
+    [
+      "Midlight",
+      "bevel_midlight",
+      "bevel_midlight",
+      "bevel_midlight"
+    ],
+    [
+      "Dark",
+      "bevel_dark",
+      "bevel_dark",
+      "line"
+    ],
+    [
+      "Mid",
+      "bevel_mid",
+      "bevel_mid",
+      "bevel_faint"
+    ],
+    [
+      "Text",
+      "fg",
+      "fg_backdrop",
+      "fg_faint"
+    ],
+    [
+      "BrightText",
+      "accent_fg",
+      "accent_fg",
+      "accent_fg"
+    ],
+    [
+      "ButtonText",
+      "fg",
+      "fg_backdrop",
+      "fg_faint"
+    ],
+    [
+      "Base",
+      "bg_sunken",
+      "bg_sunken",
+      "bg_alt2"
+    ],
+    [
+      "Window",
+      "bg",
+      "bg",
+      "bg"
+    ],
+    [
+      "Shadow",
+      "line",
+      "line",
+      "bevel_faint"
+    ],
+    [
+      "Highlight",
+      "accent",
+      "bg_lifted",
+      "bg_lifted"
+    ],
+    [
+      "HighlightedText",
+      "accent_fg",
+      "fg",
+      "bg_alt2"
+    ],
+    [
+      "Link",
+      "accent",
+      "accent",
+      "fg_faint"
+    ],
+    [
+      "LinkVisited",
+      "link_visited",
+      "link_visited",
+      "fg_faint"
+    ],
+    [
+      "AlternateBase",
+      "bg_alt2",
+      "bg_alt2",
+      "bg"
+    ],
+    [
+      "NoRole",
+      "bg_sunken",
+      "bg_sunken",
+      "bg_sunken"
+    ],
+    [
+      "ToolTipBase",
+      "bg_float",
+      "bg_float",
+      "bg_alt2"
+    ],
+    [
+      "ToolTipText",
+      "fg",
+      "fg",
+      "fg_faint"
+    ],
+    [
+      "PlaceholderText",
+      "fg_placeholder",
+      "fg_placeholder_dim",
+      "line"
+    ],
+    [
+      "Accent",
+      "accent",
+      "accent",
+      "fg_faint"
+    ]
+  ],
+  "PADDING_TABLE": {
+    "edge": 18,
+    "icon": 10,
+    "image": 8,
+    "menu_right": 13,
+    "module": 12,
+    "tooltip": 8,
+    "tray": 8,
+    "workspace_gap": 5
+  }
+}

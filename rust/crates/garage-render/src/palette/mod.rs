@@ -6,6 +6,8 @@
 
 pub(crate) mod accents;
 pub(crate) mod gtk;
+#[cfg(test)]
+mod parity;
 pub(crate) mod qt;
 pub(crate) mod rofi;
 pub(crate) mod swayosd;
