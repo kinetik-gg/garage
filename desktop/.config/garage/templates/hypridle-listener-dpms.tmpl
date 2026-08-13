@@ -1,0 +1,5 @@
+listener {
+    timeout = {{timeout}}
+    on-timeout = hyprctl dispatch 'hl.dsp.dpms({ mode = "off" })'
+    on-resume = hyprctl dispatch 'hl.dsp.dpms({ mode = "on" })'
+}

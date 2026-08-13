@@ -45,6 +45,10 @@ mod region;
 #[cfg(test)]
 mod render_parity_tests;
 mod search;
+/// The `{{name}}` engine and the templates every mechanical emitter's text now lives in.
+/// Private: a template is an implementation detail of the renderer that owns it, and
+/// nothing outside this crate expands one.
+mod template;
 pub mod theme;
 mod wallpaper;
 #[cfg(test)]

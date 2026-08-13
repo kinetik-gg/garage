@@ -60,6 +60,10 @@ pub enum RenderError {
         source: std::io::Error,
     },
 
+    /// A generated file's template could not be expanded -- see [`TemplateError`].
+    #[error(transparent)]
+    Template(#[from] TemplateError),
+
     /// `int()` or `float()` refused a value a hand-edited `displays.toml` -- or a Displays
     /// pane payload -- put where a coordinate, a scale, a transform or a VRR mode belongs.
     ///
@@ -87,5 +91,44 @@ pub enum RenderError {
         role: String,
         /// What it resolved to, as `repr()` spells it.
         value: String,
+    },
+}
+
+/// Why a generated file's template could not be expanded.
+///
+/// Lives here rather than beside the engine because it is part of [`RenderError`], which
+/// is this crate's public failure type, and a public enum cannot carry a variant whose
+/// type nobody outside the crate can name.
+///
+/// Both variants are a *present* template that does not work, which is deliberately not a
+/// case anything falls back from: an absent template is a machine missing its dotfiles and
+/// the compiled copy answers for it, but a template that is there and names a variable
+/// nothing supplies is an edit someone made, and the render they made it for is where they
+/// should hear about it. Each names the file and the variable, because "a template is
+/// broken" is not something anyone can act on.
+#[derive(Debug, Error)]
+pub enum TemplateError {
+    /// The template names a variable its renderer does not supply -- a typo, or a
+    /// placeholder outliving the value it was written for.
+    ///
+    /// Carries the whole list of variables the renderer does supply, because the fix for
+    /// a typo is the correct spelling and the reader of this message is someone who has
+    /// just edited a file by hand.
+    #[error("{file}: {{{{{variable}}}}} is not a variable this template is given ({given})")]
+    Unknown {
+        /// The template's file name, as it is looked for under `templates/`.
+        file: &'static str,
+        /// The name between the braces.
+        variable: String,
+        /// Every name the renderer answers to, comma-separated.
+        given: String,
+    },
+
+    /// A `{{` with no `}}` after it. The rest of the file would be swallowed into a
+    /// variable name, so it is refused rather than guessed at.
+    #[error("{file}: a {{{{ placeholder is never closed")]
+    Unterminated {
+        /// The template's file name.
+        file: &'static str,
     },
 }
