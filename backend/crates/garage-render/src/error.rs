@@ -37,6 +37,34 @@ pub enum RenderError {
     #[error(transparent)]
     Atomic(#[from] AtomicWriteError),
 
+    /// A layer-2 TOML file the workspace plan reads could not be read or parsed:
+    /// `displays.toml` or `workspace-blocks.toml`.
+    ///
+    /// The Python's `load_toml()` raises `SettingsError(f"{path.name}: {error}")` for both
+    /// halves -- an `OSError` opening it and a `TOMLDecodeError` parsing it -- and this
+    /// keeps that shape: the file's own name, then whatever the reader complained about.
+    /// Only the shape is parity, not the text; `tomllib` and the `toml` crate word a syntax
+    /// error differently and neither wording is depended on.
+    #[error("{name}: {detail}")]
+    Toml {
+        /// The file's name alone, which is the half the reader recognises.
+        name: String,
+        /// What the read or the parse complained about.
+        detail: String,
+    },
+
+    /// A generated fragment could not be removed -- `workspaces.lua`, when the plan comes
+    /// back empty. `Path.unlink(missing_ok=True)`'s remaining failure modes: an unwritable
+    /// directory, a path that is not a file. An already-absent fragment is success, exactly
+    /// as `missing_ok=True` makes it.
+    #[error("{}: could not be removed: {source}", path.display())]
+    Remove {
+        /// The fragment that is meant to stop existing.
+        path: std::path::PathBuf,
+        /// The underlying failure.
+        source: std::io::Error,
+    },
+
     /// A palette role that must be an opaque `#rrggbb` is composited -- [`crate::theme`]'s
     /// `opaque()` refusing to hand `rgba(...)` to `qt6ct` or to `hyprlock`, neither of whose
     /// parsers can spell one, and Qt's would fall back to Fusion's own grey without saying

@@ -28,8 +28,8 @@ mod displays;
 pub mod error;
 mod general;
 mod idle;
-mod keybinds;
-mod lua;
+pub mod keybinds;
+pub mod lua;
 mod motion;
 mod palette;
 mod preferences;
@@ -39,7 +39,14 @@ mod render_parity_tests;
 mod search;
 pub mod theme;
 mod wallpaper;
-mod workspaces;
+#[cfg(test)]
+mod workspace_parity_tests;
+/// Public because `garage-apply`'s `apply_workspace_plan()` needs the plan itself: it asks
+/// for one, compares it against the groups the installed fragment still hands out, and
+/// salvages every window across the difference before the reload. Publishing the plan is not
+/// publishing the ability to act on it -- everything here still only reads files and writes
+/// layer 3 plus the allocator's one sanctioned layer-2 file.
+pub mod workspaces;
 
 pub use cx::RenderCx;
 pub use error::RenderError;

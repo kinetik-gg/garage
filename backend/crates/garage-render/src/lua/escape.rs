@@ -38,7 +38,7 @@ const fn short_escape(ch: char) -> Option<&'static str> {
 /// See the module docs for why this is not `serde_json`, and why non-ASCII passes through
 /// as UTF-8 rather than being escaped.
 #[must_use]
-pub(crate) fn lua_string(value: &str) -> String {
+pub fn lua_string(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');
     for ch in value.chars() {

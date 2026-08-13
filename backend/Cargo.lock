@@ -86,7 +86,9 @@ dependencies = [
  "garage-prefs",
  "garage-proc",
  "garage-render",
+ "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

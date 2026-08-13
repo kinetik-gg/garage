@@ -19,9 +19,9 @@ use crate::{
 ///
 /// # Errors
 ///
-/// Whatever the dispatched applier returns. Every applier is a stub today -- see
-/// [`ApplyError::PortPending`] -- so every arm currently fails; Phase 3 replaces the bodies
-/// this calls into, not this match.
+/// Whatever the dispatched applier returns. [`ApplyStep::WorkspacePlan`] reaches a real
+/// implementation as of task 3.5; the rest are still stubs -- see [`ApplyError::PortPending`]
+/// -- and Phase 3 replaces the bodies this calls into, not this match.
 pub fn run_apply(step: ApplyStep, cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     match step {
         ApplyStep::Wallpaper => wallpaper::apply_wallpaper(cx),

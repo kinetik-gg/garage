@@ -30,7 +30,7 @@ pub mod error;
 mod eval;
 mod file_index;
 mod glass;
-mod keybind;
+pub mod keybind;
 mod locale;
 mod motion;
 mod night_shift;
@@ -42,6 +42,8 @@ mod terminal;
 mod theme;
 mod update;
 mod wallpaper;
+#[cfg(test)]
+mod workspace_trace_tests;
 mod workspaces;
 
 pub use cx::SessionCx;
