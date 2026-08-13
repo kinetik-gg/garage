@@ -65,8 +65,13 @@ pub(crate) const ACCENTS: [(&str, &str); 9] = [
 /// for both schemes by construction (`palette::parity::every_role_is_defined_for_both_schemes`
 /// pins this against the Python source); their absence here would be a broken build the
 /// palette-parity test already catches, not a condition a running renderer could hit.
+///
+/// # Panics
+///
+/// Never, for the reason the paragraph above gives: both roles are defined for both schemes
+/// by construction, and the palette-parity test is what holds that true.
 #[must_use]
-pub(crate) fn border_colors(scheme: Scheme) -> (String, String) {
+pub fn border_colors(scheme: Scheme) -> (String, String) {
     #[allow(clippy::expect_used)]
     let active = table::role(scheme, "border_active").expect("border_active is a PALETTE role");
     #[allow(clippy::expect_used)]

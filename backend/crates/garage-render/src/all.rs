@@ -59,10 +59,14 @@ use crate::{
 /// whether the service has to be restarted -- is dropped here exactly as the Python drops
 /// it: `render_all()` is not the caller that restarts anything, and
 /// `garage-apply`'s `apply_preferences()` is the one that asks for the flag.
-pub fn render_all(cx: &RenderCx<'_>, document: &Document) -> Result<(), RenderError> {
+pub fn render_all(
+    cx: &RenderCx<'_>,
+    document: &Document,
+    browser: general::BrowserCommand<'_>,
+) -> Result<(), RenderError> {
     preferences::render_preferences(cx)?;
     keybinds::render_keybinds(cx, document)?;
-    general::render_general(cx)?;
+    general::render_general(cx, browser)?;
     region::render_region(cx)?;
     plan::render_workspaces(cx)?;
     bar_workspaces::render_bar_workspaces(cx)?;
@@ -185,7 +189,8 @@ mod tests {
 
     /// The scenario this task's report calls out by name: a fresh scratch tree with no
     /// `displays.toml` at all completes `render_all()` end to end, `render_displays()`'s own
-    /// `PortPending` stub never reached because `layout["displays"]` is empty.
+    /// the display fragment's own branch, which takes the fragment away rather than
+    /// writing one because `layout["displays"]` is empty.
     #[test]
     fn render_all_completes_with_no_displays_toml_in_scratch() {
         let defaults = Defaults::compiled().expect("shipped defaults parse");
@@ -195,7 +200,8 @@ mod tests {
         let cx = RenderCx::new(defaults.values(), &paths, &monitors, &lua);
         assert!(!paths.host.displays.exists());
 
-        render_all(&cx, &Document::default()).expect("render_all completes with no displays.toml");
+        render_all(&cx, &Document::default(), None)
+            .expect("render_all completes with no displays.toml");
         assert!(!paths.fragments.displays.exists());
         drop(std::fs::remove_dir_all(&paths.home));
     }
@@ -216,14 +222,14 @@ mod tests {
         let monitors = NoMonitors;
         let lua = LuaAccepts;
         let cx = RenderCx::new(defaults.values(), &paths, &monitors, &lua);
-        render_all(&cx, &Document::default())
+        render_all(&cx, &Document::default(), None)
             .expect("render_all completes with an empty saved layout");
         assert!(!paths.fragments.displays.exists());
         drop(std::fs::remove_dir_all(&paths.home));
     }
 
     /// A `displays.toml` naming one enabled display now writes the per-monitor fragment
-    /// rather than stopping at a stub -- `render_all()` has no `PortPending` path left.
+    /// rather than stopping anywhere -- every step of `render_all()` reaches a real body.
     #[test]
     fn render_all_writes_the_display_fragment_once_a_display_is_saved() {
         let defaults = Defaults::compiled().expect("shipped defaults parse");
@@ -238,7 +244,8 @@ mod tests {
         let monitors = NoMonitors;
         let lua = LuaAccepts;
         let cx = RenderCx::new(defaults.values(), &paths, &monitors, &lua);
-        render_all(&cx, &Document::default()).expect("render_all completes with a saved layout");
+        render_all(&cx, &Document::default(), None)
+            .expect("render_all completes with a saved layout");
         assert_eq!(
             std::fs::read_to_string(&paths.fragments.displays).ok(),
             Some(
@@ -264,7 +271,7 @@ mod tests {
         let monitors = NoMonitors;
         let lua = LuaAccepts;
         let cx = RenderCx::new(defaults.values(), &paths, &monitors, &lua);
-        let error = render_all(&cx, &Document::default()).expect_err("the shape is refused");
+        let error = render_all(&cx, &Document::default(), None).expect_err("the shape is refused");
         assert!(matches!(error, RenderError::Toml { .. }));
         assert_eq!(
             error.to_string(),

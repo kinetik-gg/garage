@@ -56,7 +56,7 @@ fn colour(scheme: Scheme, name: &str) -> &'static str {
 /// The bar's whole generated stylesheet: colours, the import, the overrides
 /// (`waybar_style_css()`, garage:3984-4021).
 #[must_use]
-pub(crate) fn waybar_style_css(scheme: Scheme, prefs: &Preferences) -> String {
+pub fn waybar_style_css(scheme: Scheme, prefs: &Preferences) -> String {
     let bar_fg = colour(scheme, "on_bg");
     let dot = rgb_parts(colour(scheme, "bar_dot"));
     format!(

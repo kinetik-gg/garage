@@ -1,23 +1,21 @@
 //! `ApplyError`: what an applier can fail with.
 
+use garage_core::schema::Section;
 use thiserror::Error;
 
 /// Why an apply step could not complete.
 ///
-/// The same scaffold state as [`garage_render::error::RenderError`], for the same reason:
-/// every function named in [`crate::dispatch`] exists today as a stub that names the Python
-/// function it stands in for and returns this variant unconditionally. Phase 3 gives each
-/// stub a real body and this enum the variants a real `hyprctl`, `gsettings` or `systemctl`
-/// call can actually produce -- see [`garage_core::traits::RunError`], which most of them
-/// will wrap.
+/// The scaffold variant this enum carried through the port is gone: every function named in
+/// [`crate::dispatch`] has a real body, and every variant below is a failure a real
+/// `hyprctl`, `gsettings`, `systemctl` or filesystem call can actually produce.
+///
+/// Two shapes, and the difference is who owns the words. `#[error(transparent)]` variants
+/// defer to the layer that raised them, because that layer is where the Python spells the
+/// message; the rest carry a `String` this crate built, because the Python builds it at the
+/// site too. Either way the text *is* the contract -- `main()` prints `str(error)` into the
+/// envelope's `error` field and nothing matches on a type.
 #[derive(Debug, Error)]
 pub enum ApplyError {
-    /// This applier has not been ported yet. The `&'static str` names the Python function
-    /// this stub stands in for, so a caller sees which one is still owed rather than a bare
-    /// "not implemented".
-    #[error("{0} has not been ported yet")]
-    PortPending(&'static str),
-
     /// A renderer an applier ran first failed. Most appliers are a render followed by a push,
     /// and the render half's failures are already modelled -- re-describing them here would
     /// be a second copy that could disagree with the first.
@@ -50,6 +48,15 @@ pub enum ApplyError {
     /// The TOML emitter refused a value on the way into `displays.toml`.
     #[error(transparent)]
     Emit(#[from] garage_core::toml_emit::EmitError),
+
+    /// A marker file under `~/.local/state/garage/generated` could not be written.
+    ///
+    /// Its own variant rather than folded into [`ApplyError::Io`] because a marker write is
+    /// never a plain `write()`: `write_marker()` truncates in place so the inode Quickshell
+    /// is watching survives, and refuses to follow a symlink out of the state tree. Both
+    /// refusals are the writer's, and its text is the one that says which.
+    #[error(transparent)]
+    Marker(#[from] garage_core::fs::marker::MarkerWriteError),
 
     /// A file this crate rewrites whole -- `displays.toml`, the pending-transaction file --
     /// could not be replaced.
@@ -94,6 +101,37 @@ pub enum ApplyError {
     /// `PREFERENCES_LOCK` could not be taken -- `repair --reset`'s one blocking acquire.
     #[error(transparent)]
     Lock(#[from] garage_prefs::LockError),
+
+    /// `apply_changed_preference()`'s `f"Unsupported {section} preference: {key}"`, for the
+    /// three sections that name the key because each of their keys routes somewhere of its
+    /// own.
+    #[error("Unsupported {section} preference: {key}")]
+    UnsupportedPreference {
+        /// The section the key claimed to be in.
+        section: Section,
+        /// The key on its own, without the section -- the Python's `dotted.split(".", 1)[1]`.
+        key: String,
+    },
+
+    /// `apply_changed_preference()`'s `f"Unsupported preference section: {section}"`, for a
+    /// section with no route of its own to fall back on.
+    #[error("Unsupported preference section: {0}")]
+    UnsupportedSection(Section),
+
+    /// `set` refused the key outright, or a value the schema would not take. Text pinned by
+    /// [`garage_core::schema::SetError`].
+    #[error(transparent)]
+    Set(#[from] garage_core::schema::SetError),
+
+    /// A shortcut change was refused. Text owned by [`crate::keybind::KeybindError`], whose
+    /// every variant is named after the Python expression that raised it.
+    #[error(transparent)]
+    Keybind(#[from] crate::keybind::KeybindError),
+
+    /// A default-application change was refused: `"Unknown default application: {role}"` or
+    /// `"{desktop_id} is not installed"`.
+    #[error(transparent)]
+    DesktopFile(#[from] crate::desktopfiles::mime::DesktopFileError),
 
     /// A command that was supposed to move the session refused to.
     ///

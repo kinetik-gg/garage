@@ -20,17 +20,104 @@
 # family in scenarios.py is for -- inactive families report their mismatch counts
 # and skip, so progress stays visible without anything being forgiven.
 #
-# Empty on purpose: no deviation has been earned yet.
+# As of tasks 3.10+3.11 every family in scenarios.py is active, so this file is the
+# whole of what the port is forgiven. It reads as three groups: the typed schema
+# (five entries, one cause), the two argv positions the Python indexes without
+# checking, and the runtime manifest the Rust doctor reads where the Python names
+# constants. Nothing else differs anywhere in the corpus.
+#
+# ---------------------------------------------------------------------------
+# The typed schema: five differences, one cause
+# ---------------------------------------------------------------------------
+# `PREFERENCE_SCHEMA` is a dict of dicts there and a generated struct here, and
+# every entry below falls out of that one decision. None of them is reachable from
+# the pane, which sends values it got from a schema it was handed.
 
 [[deviation]]
-surface  = "trace"
-scenario = "render-all-empty"
-reason   = "render_general() in the Rust port writes the launcher and terminal markers only, never the browser one: resolving a browser association requires role_applications() -> mime_handlers(), which runs `env LC_ALL=C gio mime <type>` as a subprocess, and a RenderCx structurally carries no Runner -- see garage-render's RenderCx docs for why a renderer may never gain one. This is an architectural boundary, not a temporary gap: full three-marker parity is restored on the apply side, which does hold a Runner, once garage-apply grows the equivalent of the Python's apply_terminal() (which already calls render_general() and reaches further). Until then, garage render's trace is missing exactly the three `gio mime` calls role_applications() makes for the browser role's three mimetypes (x-scheme-handler/http, x-scheme-handler/https, text/html)."
+surface  = "stderr"
+scenario = "prefs-load-exotic-scalars"
+reason   = "Coercion notes come out in a different order, and only when a single load produces more than one. The Python's validate_preferences() walks PREFERENCE_SCHEMA, whose key order is the source table's (theme_light_at, theme_dark_at, ..., reduce_motion, animation_speed); the port walks PreferenceKey::ALL, whose order is preferences.defaults.toml's (reduce_motion, animation_speed, theme_light_at, theme_dark_at). The two orders genuinely differ, and the port has only one of them because one ordering serves both the notes and every envelope that prints the configuration -- and the envelope is the ordering that is a contract with the QML client. Same set of notes, same wording, same count; only the order of two lines on stderr. Retiring this means giving PreferenceKey a second ordering for the coercion walk, which belongs with the schema table (task 3.2), not with the apply layer."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "prefs-load-corrupt"
+reason   = "The envelope's shape is the Python's -- ok false, exit 1, `preferences.toml: {message}` -- and the message inside it is the TOML parser's. tomllib writes `Expected '=' after a key in a key/value pair (at line 1, column 6)`; the `toml` crate writes a multi-line quotation of the offending line with a caret under it. Both name the same file, the same line and the same column, and nothing matches on either: it is a sentence for a person whose preferences.toml a text editor broke. Pinning it would mean reimplementing tomllib's diagnostics, which is a worse file than this entry."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "prefs-set-unchecked-value"
+reason   = "`night_shift_enabled` is one of the five keys the Python's schema calls \"unchecked\": every renderer reads them through bool(), so the file's value is stored verbatim and the truth value is computed at each read. The port's PyTruthy resolves bool() once, at coercion time, and stores the bool -- so `set appearance.night_shift_enabled '\"maybe\"'` is accepted by both (which is the half of the kind table that matters) and read back as `\"maybe\"` there and `true` here. Every consumer agrees, because bool(\"maybe\") is true; what differs is only what the envelope echoes back. Storing the original would mean a Preferences field that can hold any TOML scalar, which is the thing the typed schema exists to remove."
 
 [[deviation]]
 surface  = "digest"
-scenario = "render-all-empty"
-reason   = "Same root cause as this scenario's trace deviation: render_general() does not write generated/browser, because computing its contents needs the subprocess-backed browser_command() a renderer cannot run. Every other generated file matches."
+scenario = "prefs-set-unchecked-value"
+reason   = "The same value, seen in preferences.toml rather than in the envelope: the Python's departure line is `night_shift_enabled = \"maybe\"` and the port's is `night_shift_enabled = true`. Same key, same file shape, same everything else. See this scenario's stdout entry."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "prefs-set-invalid-locale"
+reason   = "The `locale` kind is the one constraint in the table that asks the machine a question: `not value or value in installed_locales()`, and installed_locales() runs `locale -a`. The port's schema crate may not spawn a process -- the same rule that put luac behind a trait -- so the non-empty half of that check is not made, and an uninstalled locale survives the coercion pass instead of being replaced by ''. garage_core::schema::coerce::Locale says so in as many words and carries `is_usable(installed)` for the caller that can ask. Wiring it in belongs with a crate that owns a runner, which is a schema-layer change (task 3.2), not an apply-layer one."
+
+[[deviation]]
+surface  = "stderr"
+scenario = "prefs-set-invalid-locale"
+reason   = "The coercion note the check above would have produced -- `region.locale 'xx_YY.UTF-8' is not valid, using ''` -- is absent for the same reason. See this scenario's stdout entry."
+
+[[deviation]]
+surface  = "trace"
+scenario = "prefs-set-invalid-locale"
+reason   = "The `locale -a` the check would have run, seen at the process boundary. The port's trace is missing exactly that one line and is identical either side of it. See this scenario's stdout entry, and `apply-locale`, which is the same line on a value both backends accept."
+
+[[deviation]]
+surface  = "trace"
+scenario = "apply-locale"
+reason   = "The same missing `locale -a`, on a locale both backends accept: the Python's `locale` kind consults installed_locales() for any non-empty value, so setting one puts that read at the head of the trace. Everything after it -- `systemctl --user set-environment LANG=...`, the D-Bus activation environment beside it, and the bar reload Route::Locale's second step issues -- is identical. See prefs-set-invalid-locale's stdout entry for the whole of why the check is not made here."
+
+[[deviation]]
+surface  = "digest"
+scenario = "prefs-set-invalid-locale"
+reason   = "The uninstalled locale reaches preferences.toml as a departure here and is coerced away to the shipped default -- and therefore dropped from the file -- there. Downstream, locale.env and waybar-clock.jsonc carry it too. One cause, four surfaces: see this scenario's stdout entry."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "prefs-set-bookkeeping-key"
+reason   = "Both refuse `set schema.preferences_version 4`, at different points and with different words. The Python's set_nested() accepts it -- FALLBACK_DEFAULTS carries the [schema] section, so the key is 'known' -- writes the file, and only then does apply_changed_preference() refuse with `Unsupported preference section: schema`. The port's PreferenceKey does not have the stamp at all (it is bookkeeping, not a preference), so the parse refuses first with `Unknown preference: schema.preferences_version` and nothing is written. The refusal is the contract and both keep it; the port keeps it one step earlier, which is the direction that cannot lose data."
+
+[[deviation]]
+surface  = "digest"
+scenario = "prefs-set-bookkeeping-key"
+reason   = "The consequence of refusing earlier: the Python leaves a freshly written preferences.toml behind before it refuses, and the port leaves the tree untouched. See this scenario's stdout entry."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "snapshot-degraded"
+reason   = "The degrade path -- an unparseable preferences.toml answered with a deep copy of the shipped defaults and the refusal in `error` -- differs in two ways, both already written down for other scenarios. (1) The `error` string is the TOML parser's, exactly as in `prefs-load-corrupt`. (2) The `preferences` payload is FALLBACK_DEFAULTS here rather than the merged document, and FALLBACK_DEFAULTS is derived from PREFERENCE_SCHEMA, so its key order is the source table's rather than preferences.defaults.toml's -- the same two orderings `prefs-load-exotic-scalars` describes -- and it carries the [schema] stamp section that the merged document also carries. Every other field of this snapshot, and the whole of the non-degraded `snapshot-empty`, compares byte for byte."
+
+# ---------------------------------------------------------------------------
+# argv positions the Python indexes without checking
+# ---------------------------------------------------------------------------
+
+[[deviation]]
+surface  = "stdout"
+scenario = "action-no-name"
+reason   = "`garage action` with no name is `argv[2]` on a two-element list: an IndexError, which main()'s except tuple does not catch, so the Python prints nothing on stdout and leaves a traceback on stderr. The port answers through the envelope with a usage message, which is the shape `set`'s own argument-count guard already establishes and the one the QML client can read. Exit 1 either way. The same deviation the four display-* commands would show if the corpus asked them the same question; garage_cli::error::CliError::DisplayUsage says so at the type."
+
+[[deviation]]
+surface  = "stderr"
+scenario = "action-no-name"
+reason   = "The other half of the same: a CPython traceback there, nothing here. See this scenario's stdout entry."
+
+# ---------------------------------------------------------------------------
+# The runtime manifest, which task 3.12's steering required
+# ---------------------------------------------------------------------------
+# Two entries that used to sit here alongside these -- `render-all-empty`'s trace
+# and digest, for the browser marker `render_general()` could not write -- retired
+# with tasks 3.10+3.11. The marker's *value* is now an argument to
+# render_general() rather than something the renderer has to go and find, so
+# `garage render` publishes all three markers and makes the same three `gio mime`
+# calls the Python does, without garage-render gaining a runner. See
+# garage_render::general for the shape and why it is not a capability.
+
 
 [[deviation]]
 surface  = "stdout"

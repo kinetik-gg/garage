@@ -25,7 +25,7 @@ use crate::error::RenderError;
 /// # Errors
 ///
 /// [`RenderError::Marker`] if the marker could not be written.
-pub(crate) fn render_accent(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_accent(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let text = format!("{}\n", cx.prefs().appearance.accent_color.as_str());
     write_marker(&cx.paths().markers.accent, &text)?;
     Ok(())

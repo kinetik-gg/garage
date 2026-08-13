@@ -13,19 +13,20 @@
 //!   json.loads(argv[3]))` evaluates its arguments before it runs -- a malformed value is
 //!   reported ahead of an unknown key, not the other way round;
 //! * the file is written before the route is walked, so a route that fails still leaves the
-//!   user's choice on disk. That is what makes today's half-ported state legible rather than
-//!   lossy: `set appearance.theme_mode '"dark"'` records the departure and then says which
-//!   applier is still owed.
+//!   user's choice on disk. A compositor that is not up, a `systemctl` that refuses, a
+//!   wallpaper that has been deleted -- all of them are reported *after* the choice is
+//!   recorded, which is the only order in which a refusal cannot cost the user their setting.
 
 use garage_apply::cx::SessionCx;
-use garage_apply::dispatch::run_apply;
+use garage_apply::route::apply_changed_preference;
+use garage_apply::snapshot::preferences_json;
 use garage_core::paths::Paths;
-use garage_core::schema::{Notes, PreferenceKey, Preferences, Route, Section, Step};
-use garage_prefs::{load_preferences, report_preference_notes, save_preferences, PrefLock};
-use garage_proc::{Hyprctl, Luac, System};
+use garage_core::schema::{Notes, PreferenceKey, Preferences};
+use garage_core::traits::Runner;
+use garage_prefs::{load_effective, report_preference_notes, save_preferences, PrefLock};
+use garage_proc::{Hyprctl, Luac};
 use garage_render::cx::RenderCx;
-use garage_render::dispatch::run_render;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::error::CliError;
 
@@ -36,7 +37,7 @@ use crate::error::CliError;
 /// [`CliError::SetUsage`] for the wrong number of arguments, then whatever the load, the
 /// schema, the save or the route walk refuses. Every one of them reaches the envelope as its
 /// own `Display`.
-pub(crate) fn set(paths: &Paths, argv: &[String]) -> Result<Value, CliError> {
+pub(crate) fn set(paths: &Paths, proc: &dyn Runner, argv: &[String]) -> Result<Value, CliError> {
     if argv.len() != 4 {
         return Err(CliError::SetUsage);
     }
@@ -44,7 +45,8 @@ pub(crate) fn set(paths: &Paths, argv: &[String]) -> Result<Value, CliError> {
         return Err(CliError::SetUsage);
     };
     let lock = PrefLock::acquire(paths)?;
-    let mut config = load_preferences(paths, None)?;
+    let effective = load_effective(paths, None)?;
+    let mut config = effective.preferences;
     let raw: Value = serde_json::from_str(value_text)?;
     let key: PreferenceKey = key_text.parse()?;
     let mut notes = Notes::new();
@@ -54,92 +56,31 @@ pub(crate) fn set(paths: &Paths, argv: &[String]) -> Result<Value, CliError> {
     config.set(key, &json_value(&raw), &mut notes)?;
     report_preference_notes(notes.as_slice(), None);
     save_preferences(paths, &config, &lock, None)?;
-    walk(route_for(key)?, paths, &config)?;
+    walk(key, paths, proc, &config)?;
     // Explicit, and at the end rather than at the save: the lock covers the apply too.
     drop(lock);
-    Ok(preferences_json(&config))
+    Ok(preferences_json(&config, &effective.schema))
 }
 
-/// `apply_changed_preference()`'s dispatch, minus the walk: which route one changed key takes.
+/// `for step in PREFERENCE_ROUTES[route]: globals()[name](config, *arguments)`, through
+/// [`apply_changed_preference`] -- which lives in `garage-apply` because `action
+/// appearance.night_shift.toggle` walks the very same route from there, with no `main()`
+/// branch between it and the step table.
 ///
-/// The two refusals below cannot be reached from a parsed [`PreferenceKey`] today, and they
-/// are written down anyway because the Python's own fallback cannot be reached either -- a
-/// key that is in `PREFERENCE_SCHEMA` always has a `route`, and a key that is not never
-/// survives `set_nested()`. What `SECTION_ROUTES` and these two messages describe is the
-/// behaviour a key *outside* the schema has always had, and the Python's comment is explicit
-/// that appearance, general and bar name the key while the rest name the section. Dropping
-/// either half here would be a refactor inventing an error the product never had.
-///
-/// # Errors
-///
-/// [`CliError::UnsupportedPreference`] or [`CliError::UnsupportedSection`] for a key that
-/// routes nowhere, chosen by the same three-section split the Python makes.
-pub(crate) fn route_for(key: PreferenceKey) -> Result<Route, CliError> {
-    if let Some(route) = key.route() {
-        return Ok(route);
-    }
-    let section = key.section();
-    if let Some(route) = section.route() {
-        return Ok(route);
-    }
-    match section {
-        Section::Appearance | Section::General | Section::Bar => {
-            Err(CliError::UnsupportedPreference {
-                section,
-                key: key.name().to_owned(),
-            })
-        }
-        Section::Indexing
-        | Section::Input
-        | Section::Lock
-        | Section::Region
-        | Section::Workspaces => Err(CliError::UnsupportedSection(section)),
-    }
-}
-
-/// `for step in PREFERENCE_ROUTES[route]: globals()[name](config, *arguments)`.
-///
-/// The contexts are built here and nowhere else on this path, which is what keeps the
-/// render half unable to reach the lock: [`RenderCx`] carries no runner and no lock, and
-/// the [`SessionCx`] that does carry a runner is only ever handed to an
-/// [`Step::Apply`] step.
-fn walk(route: Route, paths: &Paths, config: &Preferences) -> Result<(), CliError> {
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
+/// The contexts are built here and nowhere else on this path, which is what keeps the render
+/// half unable to reach the lock: [`RenderCx`] carries no runner and no lock, and the
+/// [`SessionCx`] that does carry a runner is what the walk is handed.
+fn walk(
+    key: PreferenceKey,
+    paths: &Paths,
+    proc: &dyn Runner,
+    config: &Preferences,
+) -> Result<(), CliError> {
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
     let render = RenderCx::new(config, paths, &monitors, &lua);
-    let mut session = SessionCx::new(render, &system);
-    for step in route.steps() {
-        match *step {
-            Step::Render(step) => run_render(step, &render)?,
-            Step::Apply(step) => run_apply(step, &mut session)?,
-        }
-    }
-    Ok(())
-}
-
-/// The whole effective configuration as `response(config)` prints it.
-///
-/// Sections and keys come out in declaration order, which is `preferences.defaults.toml`'s
-/// own order, which is the order the Python's `deep_merge` leaves in the dict it answers
-/// with -- so a client reading the two backends' envelopes side by side sees the same
-/// document, not a re-sorted one.
-///
-/// **Parity gap, stated plainly:** the Python's `config` is a dict and can still be carrying
-/// keys the schema does not have (a stamped file's unknown key survives the load) plus the
-/// `[schema]` version stamp itself. A [`Preferences`] can hold neither, so both are absent
-/// here. Nothing reads them off this envelope -- the QML client asks for keys it knows.
-fn preferences_json(config: &Preferences) -> Value {
-    let mut document = Map::new();
-    config.each_key(|key, value| {
-        let section = document
-            .entry(key.section().as_str().to_owned())
-            .or_insert_with(|| Value::Object(Map::new()));
-        if let Some(table) = section.as_object_mut() {
-            table.insert(key.name().to_owned(), toml_value(&value));
-        }
-    });
-    Value::Object(document)
+    let mut session = SessionCx::new(render, proc);
+    Ok(apply_changed_preference(&mut session, key)?)
 }
 
 /// `json.loads()`'s result, as the schema's coercion pass wants to see it.
@@ -170,26 +111,6 @@ fn json_value(value: &Value) -> toml::Value {
     }
 }
 
-/// The other direction, for the envelope. A TOML datetime cannot reach a [`Preferences`]
-/// field -- no kind in the table stores one -- so it is spelled the way TOML spells it
-/// rather than given a shape of its own.
-fn toml_value(value: &toml::Value) -> Value {
-    match value {
-        toml::Value::String(text) => Value::String(text.clone()),
-        toml::Value::Integer(number) => Value::from(*number),
-        toml::Value::Float(number) => Value::from(*number),
-        toml::Value::Boolean(flag) => Value::Bool(*flag),
-        toml::Value::Datetime(stamp) => Value::String(stamp.to_string()),
-        toml::Value::Array(items) => Value::Array(items.iter().map(toml_value).collect()),
-        toml::Value::Table(entries) => Value::Object(
-            entries
-                .iter()
-                .map(|(key, item)| (key.clone(), toml_value(item)))
-                .collect(),
-        ),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -202,7 +123,10 @@ mod tests {
     use garage_core::schema::{PreferenceKey, Route};
     use serde_json::{json, Value};
 
-    use super::{json_value, preferences_json, route_for, set, toml_value};
+    use super::{json_value, set};
+    use crate::testing::Offline;
+    use garage_apply::route::route_for;
+    use garage_apply::snapshot::preferences_json;
 
     static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -241,26 +165,36 @@ mod tests {
             .collect()
     }
 
-    /// The happy flow as far as it goes today: the lock is taken, layer 2 is loaded, the
-    /// departure is written, and only then does the route say which applier is owed. The
-    /// file assertion is the load-bearing half -- a port that reported the missing applier
-    /// *before* writing would lose the user's choice, and the envelope alone cannot tell the
-    /// two apart.
+    /// The whole flow, end to end: the lock is taken, layer 2 is loaded, the departure is
+    /// written, and the route is walked against an offline machine. The file assertion is the
+    /// load-bearing half -- a port that walked the route *before* writing would lose the
+    /// user's choice if a step refused, and the envelope alone cannot tell the two apart.
     #[test]
-    fn a_set_writes_the_departure_and_then_names_the_applier_that_is_owed() {
+    fn a_set_writes_the_departure_and_then_walks_its_route() {
         let (home, paths) = scratch("set-theme-mode");
-        let error = set(
+        let proc = Offline::new();
+        let payload = set(
             &paths,
+            &proc,
             &argv(&["set", "appearance.theme_mode", "\"light\""]),
         )
-        .expect_err("apply_theme_if_scheme_moved is still a stub");
+        .expect("the whole route walks against an offline machine");
         assert_eq!(
-            error.to_string(),
-            "apply_theme_if_scheme_moved has not been ported yet"
+            payload.pointer("/appearance/theme_mode"),
+            Some(&Value::String("light".to_owned()))
         );
         assert_eq!(
             fs::read_to_string(&paths.host.preferences).expect("the file was written"),
             "[schema]\npreferences_version = 5\n\n[appearance]\ntheme_mode = \"light\"\n"
+        );
+        // Route::Theme is apply_theme_if_scheme_moved, and nothing has ever been pushed on
+        // this scratch machine, so the gate is open and the palette is pushed for real.
+        assert!(proc.calls().contains(
+            &"gsettings set org.gnome.desktop.interface color-scheme prefer-light".to_owned()
+        ));
+        assert_eq!(
+            proc.calls().last().map(String::as_str),
+            Some("hyprctl reload")
         );
         drop(fs::remove_dir_all(&home));
     }
@@ -271,15 +205,12 @@ mod tests {
     #[test]
     fn a_refused_value_is_corrected_and_leaves_no_departure_behind() {
         let (home, paths) = scratch("set-bad-enum");
-        let error = set(
+        set(
             &paths,
+            &Offline::new(),
             &argv(&["set", "appearance.theme_mode", "\"sideways\""]),
         )
-        .expect_err("apply_theme_if_scheme_moved is still a stub");
-        assert_eq!(
-            error.to_string(),
-            "apply_theme_if_scheme_moved has not been ported yet"
-        );
+        .expect("a refused value is corrected rather than refused");
         assert_eq!(
             fs::read_to_string(&paths.host.preferences).expect("the file was written"),
             "[schema]\npreferences_version = 5\n"
@@ -290,8 +221,12 @@ mod tests {
     #[test]
     fn a_key_the_schema_does_not_have_is_refused_before_anything_is_written() {
         let (home, paths) = scratch("set-unknown-key");
-        let error = set(&paths, &argv(&["set", "nonesuch.key", "\"x\""]))
-            .expect_err("the schema gates `set`");
+        let error = set(
+            &paths,
+            &Offline::new(),
+            &argv(&["set", "nonesuch.key", "\"x\""]),
+        )
+        .expect_err("the schema gates `set`");
         assert_eq!(error.to_string(), "Unknown preference: nonesuch.key");
         assert!(!paths.host.preferences.exists());
         drop(fs::remove_dir_all(&home));
@@ -302,8 +237,12 @@ mod tests {
         // Argument evaluation order, made a test: `json.loads(argv[3])` runs before
         // `set_nested` does, so this is a JSON complaint and not "Unknown preference".
         let (home, paths) = scratch("set-bad-json");
-        let error = set(&paths, &argv(&["set", "nonesuch.key", "{not json"]))
-            .expect_err("the value does not parse");
+        let error = set(
+            &paths,
+            &Offline::new(),
+            &argv(&["set", "nonesuch.key", "{not json"]),
+        )
+        .expect_err("the value does not parse");
         assert!(
             !error.to_string().starts_with("Unknown preference"),
             "{error}"
@@ -351,16 +290,9 @@ mod tests {
     }
 
     #[test]
-    fn the_two_directions_agree_on_everything_a_preference_can_hold() {
-        for value in [json!("x"), json!(3), json!(1.5), json!(false)] {
-            assert_eq!(toml_value(&json_value(&value)), value);
-        }
-    }
-
-    #[test]
     fn the_envelope_payload_is_grouped_by_section_in_declaration_order() {
         let defaults = Defaults::compiled().expect("the shipped defaults parse");
-        let document = preferences_json(defaults.values());
+        let document = preferences_json(defaults.values(), &toml::Table::new());
         let sections: Vec<&str> = document
             .as_object()
             .map(|map| map.keys().map(String::as_str).collect())

@@ -23,9 +23,9 @@ use garage_render::displays::{
     render_displays, strict_mirror_targets, DisplayEntry, DisplayLayout,
 };
 
+use crate::command::run;
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
-use crate::workspaces::run;
 
 /// The half-pixel slack every edge comparison is given. See the module doc.
 const TOLERANCE: f64 = 0.5;

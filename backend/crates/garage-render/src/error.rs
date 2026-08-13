@@ -7,22 +7,17 @@ use thiserror::Error;
 
 /// Why a renderer could not complete.
 ///
-/// [`PortPending`](RenderError::PortPending) is this crate's scaffold state, still carried
-/// by every renderer [`crate::preferences`], [`crate::idle`], [`crate::motion`] and
-/// [`crate::accent`] have not replaced -- see the module docs across this crate for what
-/// each one will become. The other three variants are the real filesystem failures those
-/// four renderers can now produce: an unwritable path, a malformed fragment `luac` rejected,
-/// a marker whose symlink could not be removed. Each wraps the writer's own error type
-/// rather than flattening it, so a caller sees exactly which path and which underlying
-/// `io::Error` failed.
+/// Every variant is a real failure a renderer can produce: an unwritable path, a malformed
+/// fragment `luac` rejected, a marker whose symlink could not be removed, a `displays.toml`
+/// that does not parse, a palette role that is not an opaque hex. Each wraps the writer's own
+/// error type rather than flattening it, so a caller sees exactly which path and which
+/// underlying `io::Error` failed.
+///
+/// There is no scaffold variant here any more. Phase 3 replaced the last renderer stub, and
+/// with it the `PortPending` this enum carried through the port: every `RenderStep` reaches a
+/// real implementation, and a renderer that fails now fails for a reason the machine gave.
 #[derive(Debug, Error)]
 pub enum RenderError {
-    /// This renderer has not been ported yet. The `&'static str` names the Python function
-    /// this stub stands in for, so a caller sees which one is still owed rather than a bare
-    /// "not implemented".
-    #[error("{0} has not been ported yet")]
-    PortPending(&'static str),
-
     /// A generated Lua fragment could not be staged, checked or installed --
     /// [`crate::preferences::render_preferences`]'s `hyprland.lua` fragment.
     #[error(transparent)]

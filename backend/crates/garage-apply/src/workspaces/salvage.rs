@@ -14,9 +14,9 @@ use garage_render::lua::escape::lua_string;
 use garage_render::workspaces::WorkspacePlan;
 use serde_json::Value;
 
+use crate::command::{json_list, run};
 use crate::cx::SessionCx;
 use crate::workspaces::installed::installed_workspace_groups;
-use crate::workspaces::{json_list, run};
 
 /// Which display's block an id falls in.
 ///

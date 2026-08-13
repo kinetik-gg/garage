@@ -12,7 +12,10 @@ mod displays;
 mod error;
 mod pyjson;
 mod response;
+mod session;
 mod set;
+#[cfg(test)]
+mod testing;
 
 use std::process::ExitCode;
 

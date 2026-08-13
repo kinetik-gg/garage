@@ -17,12 +17,13 @@
 //! allowed to run programs, because acting on the session is what it is for.
 #![forbid(unsafe_code)]
 
-mod actions;
+pub mod actions;
 mod bar;
 mod border;
+mod command;
 mod corner;
 pub mod cx;
-mod desktopfiles;
+pub mod desktopfiles;
 pub mod dispatch;
 #[cfg(test)]
 mod display_parity_tests;
@@ -37,23 +38,30 @@ mod glass;
 pub mod keybind;
 mod locale;
 mod motion;
-mod night_shift;
+pub mod night_shift;
 mod region;
 pub mod repair;
 #[cfg(test)]
 mod repair_transcripts;
 pub mod route;
-mod snapshot;
-mod terminal;
-mod theme;
+pub mod snapshot;
+pub mod terminal;
+#[cfg(test)]
+mod testing;
+pub mod theme;
 pub mod update;
 mod wallpaper;
 #[cfg(test)]
 mod workspace_trace_tests;
 mod workspaces;
 
+pub use actions::action;
 pub use cx::SessionCx;
 pub use doctor::doctor;
 pub use error::ApplyError;
+pub use night_shift::apply_night_shift;
 pub use repair::repair;
+pub use route::apply_preferences;
+pub use snapshot::make_snapshot;
+pub use theme::theme_sync;
 pub use update::update;

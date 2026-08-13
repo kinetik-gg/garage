@@ -114,7 +114,7 @@ fn read_desktop_entry_section(path: &Path) -> HashMap<String, String> {
 /// desktop file under it, plus the [`MonitorSource`]/[`LuaSyntaxCheck`]/[`SessionCx`] stubs
 /// every render context needs. Centralised here, the base every other submodule already
 /// depends on for its production code, rather than copied three times -- the same
-/// one-copy-not-three reasoning [`crate::workspaces::run`] applies on the apply side.
+/// one-copy-not-three reasoning [`crate::command::run`] applies on the apply side.
 #[cfg(test)]
 pub(in crate::desktopfiles) mod support {
     use std::collections::HashMap;

@@ -47,7 +47,7 @@ use crate::cx::SessionCx;
 /// two variants wrap this module's own [`AtomicWriteError`] and [`MarkerWriteError`], and a
 /// type is easiest to keep honest beside the calls that produce it.
 #[derive(Debug, Error)]
-pub(crate) enum DesktopFileError {
+pub enum DesktopFileError {
     /// `set_default_app()`: a role name `DEFAULT_APP_ROLES` does not carry.
     #[error("Unknown default application: {0}")]
     UnknownRole(String),
@@ -64,7 +64,7 @@ pub(crate) enum DesktopFileError {
 
 /// `run()` (garage:1462) with `check=False`: a command that could not be run at all comes
 /// back as the `CompletedProcess(command, 1, "", str(error))` the Python synthesises, the
-/// same conflation [`crate::workspaces::run`] makes for the same reason. `pub(super)` rather
+/// same conflation [`crate::command::run`] makes for the same reason. `pub(super)` rather
 /// than private: [`crate::desktopfiles::roles::set_default_app`]'s own `hyprctl reload` goes
 /// through this copy too, so there is one `Runner` boundary in this module rather than two.
 pub(super) fn run(cx: &SessionCx<'_>, command: &[&str]) -> Output {

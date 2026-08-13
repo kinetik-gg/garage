@@ -54,7 +54,7 @@ use crate::lua::escape::lua_string;
 /// that crate; flagged in this task's report as worth promoting once a second caller needs
 /// it (bar spacing, the displays fragment and the live `hyprctl eval` push all use `:g` too).
 #[must_use]
-pub(crate) fn python_g_format(value: f64) -> String {
+pub fn python_g_format(value: f64) -> String {
     if value.is_nan() {
         return "nan".to_string();
     }
@@ -136,7 +136,7 @@ fn strip_insignificant(text: &str) -> String {
 /// `lua_pairs()` (garage:2184-2185): join `role = value` entries into the inside of a Lua
 /// table constructor.
 #[must_use]
-pub(crate) fn lua_pairs(pairs: &[(&str, String)], separator: &str) -> String {
+pub fn lua_pairs(pairs: &[(&str, String)], separator: &str) -> String {
     pairs
         .iter()
         .map(|(key, value)| format!("{key} = {value}"))
@@ -147,7 +147,7 @@ pub(crate) fn lua_pairs(pairs: &[(&str, String)], separator: &str) -> String {
 /// `glass_options()` (garage:2088-2115): the Kinetik Glass options the `glass_*` preferences
 /// drive, as Lua literals, in the Python dict's own insertion order.
 #[must_use]
-pub(crate) fn glass_options(prefs: &Preferences) -> Vec<(&'static str, String)> {
+pub fn glass_options(prefs: &Preferences) -> Vec<(&'static str, String)> {
     let appearance = &prefs.appearance;
     // Frosted is not a separate code path: a bevel steepness of zero leaves the surface
     // flat, so the lateral shift is zero and the same shader produces plain blur. Edge
@@ -186,7 +186,7 @@ pub(crate) fn glass_options(prefs: &Preferences) -> Vec<(&'static str, String)> 
 /// instead. Fullscreen stays opaque either way: there is nothing behind it worth showing
 /// through.
 #[must_use]
-pub(crate) fn material_decoration(prefs: &Preferences) -> Vec<(&'static str, String)> {
+pub fn material_decoration(prefs: &Preferences) -> Vec<(&'static str, String)> {
     let appearance = &prefs.appearance;
     let level = appearance.glass_blur;
     let solid = appearance.glass_mode == GlassMode::Off;
@@ -217,7 +217,7 @@ pub(crate) fn material_decoration(prefs: &Preferences) -> Vec<(&'static str, Str
 /// See the module docs for why this takes the resolved colours as arguments rather than
 /// resolving them itself the way the Python does.
 #[must_use]
-pub(crate) fn border_general(border_size: i64, active_rgba: &str, inactive_rgba: &str) -> String {
+pub fn border_general(border_size: i64, active_rgba: &str, inactive_rgba: &str) -> String {
     format!(
         "border_size = {border_size}, col = {{active_border = \"{active_rgba}\", \
          inactive_border = \"{inactive_rgba}\"}}"
@@ -263,7 +263,7 @@ const ANIMATION_LEAVES: &[AnimationLeaf] = &[
 /// is what the speed control already does -- and per-leaf speeds are still emitted while it
 /// is on, so switching it back off restores the desktop without a second push.
 #[must_use]
-pub(crate) fn motion_lua(prefs: &Preferences) -> String {
+pub fn motion_lua(prefs: &Preferences) -> String {
     let appearance = &prefs.appearance;
     let enabled = !appearance.reduce_motion;
     // Hyprland's speed is a duration in deciseconds, so a faster desktop is a smaller
@@ -295,7 +295,7 @@ fn animation_statement(leaf: &AnimationLeaf, factor: f64) -> String {
 /// desktop is sized from. [`garage_core::schema::enums::CornerRadius::px`] carries the value
 /// table; this is the one name every renderer's Lua reads it through.
 #[must_use]
-pub(crate) fn corner_rounding(prefs: &Preferences) -> u16 {
+pub fn corner_rounding(prefs: &Preferences) -> u16 {
     prefs.appearance.corner_radius.px()
 }
 
@@ -304,7 +304,7 @@ pub(crate) fn corner_rounding(prefs: &Preferences) -> u16 {
 /// `Theme.cornerPower` in the shell, which draws the same silhouette in QML. Lives here,
 /// alongside [`corner_rounding`], rather than in `garage_core::schema::enums` because it is
 /// not itself a value table -- there is only one number, not one per enum member.
-pub(crate) const CORNER_POWER: f64 = 3.37;
+pub const CORNER_POWER: f64 = 3.37;
 
 #[cfg(test)]
 mod tests {

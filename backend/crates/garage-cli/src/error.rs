@@ -9,18 +9,16 @@
 //! Every variant below is therefore either a pass-through of an error whose text was already
 //! pinned against the Python by the layer that owns it (`#[error(transparent)]`), or a
 //! message this file spells out because the string lives in `main()` itself and nowhere
-//! else. The two "Unsupported ..." variants are the second kind and belong to
-//! `apply_changed_preference()`; see [`crate::set::route_for`] for why they are unreachable
-//! today and still written down.
+//! else. `apply_changed_preference()`'s two "Unsupported ..." refusals used to be the second
+//! kind here; they moved to [`ApplyError`] with the route walk itself, so `garage set` and
+//! `garage action appearance.night_shift.toggle` cannot disagree about what an unroutable key
+//! is called.
 //!
-//! [`CliError::PortPending`] is the scaffold state, matching
-//! [`RenderError::PortPending`](garage_render::RenderError::PortPending) and
-//! [`ApplyError::PortPending`](garage_apply::ApplyError::PortPending): the command's shape
-//! is final, the layer under it is not, and saying which command is owed is more useful than
-//! a bare "not implemented".
+//! There is no scaffold variant left. Every command in the table reaches a real layer, so a
+//! failure here is always something the machine or the argument said.
 
 use garage_apply::ApplyError;
-use garage_core::schema::{ParseKeyError, Section, SetError};
+use garage_core::schema::{ParseKeyError, SetError};
 use garage_prefs::{LockError, PrefsError};
 use garage_render::RenderError;
 use thiserror::Error;
@@ -46,27 +44,6 @@ pub(crate) enum CliError {
     /// shape here is the one `set`'s own argument-count guard already establishes.
     #[error("Usage: {0}")]
     DisplayUsage(&'static str),
-
-    /// This command's layer has not been ported yet. The `&'static str` is the command name
-    /// as a person would type it, which is the thing a reader of the envelope can act on.
-    #[error("{0} has not been ported yet")]
-    PortPending(&'static str),
-
-    /// `apply_changed_preference()`'s `f"Unsupported {section} preference: {key}"`, for the
-    /// three sections that name the key because each of their keys routes somewhere of its
-    /// own.
-    #[error("Unsupported {section} preference: {key}")]
-    UnsupportedPreference {
-        /// The section the key claimed to be in.
-        section: Section,
-        /// The key on its own, without the section -- the Python's `dotted.split(".", 1)[1]`.
-        key: String,
-    },
-
-    /// `apply_changed_preference()`'s `f"Unsupported preference section: {section}"`, for a
-    /// section with no route of its own to fall back on.
-    #[error("Unsupported preference section: {0}")]
-    UnsupportedSection(Section),
 
     /// Reading, migrating or writing layer 2 failed. Text pinned by `garage-prefs`.
     #[error(transparent)]

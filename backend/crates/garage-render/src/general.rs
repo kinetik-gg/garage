@@ -5,11 +5,11 @@
 //! costs an open and a read; resolving the launcher choice or the terminal's `Exec=` line at
 //! bind time would be felt on every press instead of once per render.
 //!
-//! # Two markers, not three -- a necessary deviation
+//! # Two markers this module resolves, and a third it is handed
 //!
 //! The Python's `render_general()` (garage:4446-4459) writes three markers: the launcher, the
-//! resolved terminal command, and the resolved browser command. This port writes the first
-//! two and, deliberately, not the third. The reason is structural, not an oversight:
+//! resolved terminal command, and the resolved browser command. This port resolves the first
+//! two and takes the third as an argument. The reason is structural, not an oversight:
 //!
 //! * The launcher marker is pure -- `general.builtin_launcher` read straight off the already
 //!   validated [`Preferences`] this renderer is handed.
@@ -28,13 +28,21 @@
 //!   `role_applications()` and from there through `mime_handlers()`, which runs
 //!   `env LC_ALL=C gio mime <type>` as a subprocess (garage:4294-4308). A renderer has no
 //!   [`Runner`](garage_core::traits::Runner) and structurally cannot grow one -- see
-//!   [`crate::cx::RenderCx`]'s own "No process runner" section -- so this is the one marker
-//!   `render_general()` cannot reach, full stop, wherever its logic lives. Publishing the
-//!   browser marker belongs to the apply side, which does hold a `Runner`: a future
-//!   `garage-apply` applier (mirroring the Python's `apply_terminal()`, which already calls
-//!   `render_general()` and then reaches further) is where full three-marker parity is
-//!   restored. Until that lands, the browser marker is simply not written by this crate --
-//!   flagged here rather than shipped silently, per this task's own rule.
+//!   [`crate::cx::RenderCx`]'s own "No process runner" section.
+//!
+//! So the *value* arrives as an argument: [`render_general`] takes an optional
+//! `&dyn Fn() -> String` and, when it is given one, calls it at exactly the point the Python
+//! calls `browser_command()` -- after the other two markers, inside this function, so the
+//! three `gio mime` calls land where they land there. What that hands this crate is a string
+//! producer, not a capability: nothing here can spawn a process, choose a different command,
+//! or ask a second question. `garage-apply` supplies it from `browser_command()`, and every
+//! caller that reaches this from a session context passes one.
+//!
+//! [`None`] is what `Route::Launcher`'s own render step passes, and it is not a gap: that
+//! route exists because `general.builtin_launcher` moved, the browser marker is unrelated to
+//! it, and the Python's own route walk rewrites all three only because it has one function
+//! for them. The apply-side walk in `garage-apply` routes that step through its own
+//! three-marker publisher instead, so nothing loses a marker in practice.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -189,15 +197,19 @@ fn terminal_command(paths: &Paths, configured: &str) -> String {
     strip_exec_field_codes(&exec)
 }
 
-/// Write the launcher and terminal markers `binds.lua` and the launcher wrapper read.
+/// How the third marker's contents are obtained, when they are.
 ///
-/// The browser marker is not written here -- see this module's docs for why that is a
-/// necessary deviation from the Python's `render_general()` rather than a gap in the port.
+/// A producer of one string, not a process runner: see this module's docs for the whole of
+/// why the shape is this one. `None` writes the two markers this crate can resolve itself.
+pub type BrowserCommand<'a> = Option<&'a dyn Fn() -> String>;
+
+/// Write the markers `binds.lua` and the launcher wrapper read: the launcher, the terminal,
+/// and -- when `browser` is given -- the browser (garage:4446-4459).
 ///
 /// # Errors
 ///
-/// [`RenderError::Marker`] if either marker could not be written.
-pub(crate) fn render_general(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+/// [`RenderError::Marker`] if any of the markers could not be written.
+pub fn render_general(cx: &RenderCx<'_>, browser: BrowserCommand<'_>) -> Result<(), RenderError> {
     let launcher = if cx.prefs().general.builtin_launcher {
         "builtin"
     } else {
@@ -206,6 +218,9 @@ pub(crate) fn render_general(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     write_marker(&cx.paths().markers.launcher, &format!("{launcher}\n"))?;
     let terminal = terminal_command(cx.paths(), &cx.prefs().general.terminal);
     write_marker(&cx.paths().markers.terminal, &format!("{terminal}\n"))?;
+    if let Some(resolve) = browser {
+        write_marker(&cx.paths().markers.browser, &format!("{}\n", resolve()))?;
+    }
     Ok(())
 }
 
@@ -412,7 +427,7 @@ mod tests {
         let monitors = NoMonitors;
         let lua = LuaAccepts;
         let cx = RenderCx::new(&prefs, &fixture.paths, &monitors, &lua);
-        render_general(&cx).expect("render_general succeeds on a clean scratch");
+        render_general(&cx, None).expect("render_general succeeds on a clean scratch");
 
         let launcher =
             fs::read_to_string(&fixture.paths.markers.launcher).expect("launcher marker");

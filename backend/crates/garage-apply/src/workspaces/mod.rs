@@ -59,86 +59,32 @@
 //! through the same remap its windows took, and falling back to the last slot it kept when
 //! that workspace is gone for good.
 //!
-//! # `json_command()` lives here, for now
+//! # Where `run()` and `json_command()` went
 //!
-//! The Python's `json_command()` (garage:4946-4952) folds four different failures -- a
-//! missing binary, a timeout, a non-zero exit, unparseable output -- into one fallback value,
-//! and every `hyprctl -j` reader in the file goes through it. `garage-proc`'s `Hyprctl`
-//! deliberately does *not*: it keeps those failures as an `Err` so a caller may choose, which
-//! is right for the one question a render asks and wrong for these three readers, which want
-//! the conflation exactly. [`json_list`] is the local equivalent, private to this module.
-//! `display_snapshot()` wants the same thing and is a different task's file; when it lands,
-//! the two should become one helper rather than two -- there is nothing in this one specific
-//! to workspaces.
+//! Both lived here while this was the only module that needed them. They are
+//! [`crate::command`]'s now: `display_snapshot()` and the audio, input and date/time
+//! snapshots all want the same conflation of "a missing binary, a timeout, a non-zero exit
+//! and unparseable output are one empty answer", and there was never anything in either
+//! helper specific to workspaces. See that module for what the conflation is for and why
+//! `garage-proc`'s `Hyprctl` deliberately does not make it.
 
 pub(crate) mod installed;
 pub(crate) mod salvage;
 
-use garage_core::traits::{Output, DEFAULT_RUN_TIMEOUT};
 use garage_render::workspaces::plan::{render_workspaces_for, workspace_plan_for};
-use serde_json::Value;
 
+use crate::command::run;
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
+use crate::route::run_or_raise;
 use crate::workspaces::salvage::{
     active_workspaces, reap_stranded_windows, remap_workspaces, restore_active_workspaces,
 };
-
-/// `run()` (garage:1462) with `check=False`: a command that could not be run at all comes
-/// back as the `CompletedProcess(command, 1, "", str(error))` the Python synthesises, so
-/// every caller below sees one shape rather than two.
-pub(super) fn run(cx: &SessionCx<'_>, command: &[&str]) -> Output {
-    cx.proc()
-        .run(command, DEFAULT_RUN_TIMEOUT)
-        .unwrap_or_else(|error| Output {
-            status: 1,
-            stdout: String::new(),
-            stderr: error.detail,
-        })
-}
-
-/// `json_command(command, [])`: the parsed list, and an empty one for every way of not
-/// getting one. See the module doc for why this conflation is wanted here.
-pub(super) fn json_list(cx: &SessionCx<'_>, command: &[&str]) -> Vec<Value> {
-    let result = run(cx, command);
-    if result.status != 0 {
-        return Vec::new();
-    }
-    serde_json::from_str::<Value>(&result.stdout)
-        .ok()
-        .and_then(|document| match document {
-            Value::Array(items) => Some(items),
-            // Anything else is either falsy (`or []`) or iterates into values no caller's
-            // `isinstance(..., dict)` guard accepts, which is the same empty answer.
-            Value::Null
-            | Value::Bool(_)
-            | Value::Number(_)
-            | Value::String(_)
-            | Value::Object(_) => None,
-        })
-        .unwrap_or_default()
-}
-
-/// `run_or_raise()` (garage:4861-4868): signal the session, and refuse to fail quietly.
-fn run_or_raise(cx: &SessionCx<'_>, command: &[&str], message: &str) -> Result<(), ApplyError> {
-    let result = run(cx, command);
-    if result.status == 0 {
-        return Ok(());
-    }
-    let detail = result.stderr.trim();
-    Err(ApplyError::Signal(if detail.is_empty() {
-        message.to_owned()
-    } else {
-        detail.to_owned()
-    }))
-}
 
 /// Have waybar re-read its config and every file it includes.
 ///
 /// SIGUSR2 is waybar's default full-reload action. The bar is already signalled this way on a
 /// theme change, so this is the route it already survives.
-#[allow(dead_code)] // the bar appliers this belongs to are a later task's stubs; the signal
-                    // itself is workspace-adjacent and ported here with the rest of them.
 pub(crate) fn reload_bar(cx: &SessionCx<'_>) {
     drop(run(cx, &["pkill", "-USR2", "-x", "waybar"]));
 }

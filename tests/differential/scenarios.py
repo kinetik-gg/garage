@@ -11,9 +11,9 @@ family still runs every one of its cases -- that is the point, it is how progres
 becomes visible before it becomes green -- but its mismatches produce a skip
 carrying the mismatch count rather than a failure. An active family fails on any
 difference that is not written down in deviations.toml. So the file reads, top to
-bottom, as a map of how much of the backend has actually been ported: today,
-nothing is active, and the smoke family exists to prove the harness itself
-compares things.
+bottom, as a map of how much of the backend has actually been ported: as of tasks
+3.10 and 3.11 every family is active, and what the port is forgiven is the whole
+of deviations.toml and nothing else.
 
 Each family names the existing Python test files its cases will be grown from.
 Those suites already encode what the behaviour is; the differential corpus is not
@@ -76,17 +76,15 @@ APPLICATIONS = {
 # ---------------------------------------------------------------------------
 # cli: main()'s own surface, which task 3.15 ported ahead of the layers
 # ---------------------------------------------------------------------------
-# The first active family, and deliberately the smallest one that can be active:
-# every case here is answered by main() itself -- the USAGE text, the argument
-# count, the unknown-command message and the envelope they travel in -- with no
-# layer underneath it that is still a stub. That is the whole test for whether a
-# case belongs here. `snapshot` is the obvious fourth (it is what a bare `garage`
-# dispatches to) and it is not here, because make_snapshot() is task 3.9 and the
-# case would be claiming parity for something that does not exist yet.
-#
-# These three moved out of `smoke`, which keeps the cases whose layers are still
-# owed. `help` and `unknown-command` were written there to prove the harness
-# compares things; they now prove something about the port instead.
+# The first family that was ever active, and deliberately the smallest one that
+# could be: every case here is answered by main() itself -- the USAGE text, the
+# argument count, the unknown-command message and the envelope they travel in --
+# with no layer underneath it at all. That is the whole test for whether a case
+# belongs here, and it is why `snapshot` is not one of them even now that
+# make_snapshot() is ported: a bare `garage` does dispatch to it, but the case
+# would then be a claim about eight live reads rather than about the dispatch.
+# It lives in `snapshot` instead, with `snapshot-default-command` beside it
+# pinning the bare-argv default.
 
 CLI = (
     Scenario(
@@ -134,30 +132,12 @@ SMOKE = (
         # the defaults symlink is the only input. Writes exactly one generated
         # file; spawns nothing. This is the digest surface's simplest exercise.
     ),
-    Scenario(
-        name="snapshot-empty",
-        argv=("snapshot",),
-        # The heaviest shim traffic in the corpus: monitors, devices, pipewire,
-        # pulse, timedatectl, locale, mime lookups. Almost all of the work is in
-        # the trace, which is exactly the surface a port is most likely to get
-        # quietly wrong.
-        pre_state=dict(APPLICATIONS),
-    ),
-    Scenario(
-        name="set-theme-mode",
-        argv=("set", "appearance.theme_mode", '"dark"'),
-        # Four argv items, matching main()'s `len(argv) != 4` guard. The full
-        # read-validate-write-apply path: takes PREFERENCES_LOCK, rewrites
-        # preferences.toml, rewrites the palette markers and signals the
-        # session. Both the inode surface (markers truncated in place) and the
-        # trace surface (gsettings, hyprctl) carry real information here.
-        pre_state={
-            # A marker that already exists, so the inode report has something to
-            # say about write_marker's in-place truncation.
-            ".local/state/garage/generated/accent": "#000000\n",
-        },
-    ),
 )
+# `snapshot-empty` and `set-theme-mode` used to be here, as the two cases whose
+# layers were still owed. Task 3.10+3.11 ported both, so each moved to the family
+# that claims it: `snapshot-empty` to `snapshot`, `set-theme-mode` to `palette`.
+# What is left is the one case that was never a layer claim -- a file-writing
+# command with no external calls, which is what proves the digest surface works.
 
 
 # ---------------------------------------------------------------------------
@@ -640,14 +620,374 @@ RENDER_IDLE: tuple[Scenario, ...] = (
     ),
 )
 
-PALETTE: tuple[Scenario, ...] = ()
+def stamped(body: str) -> dict[str, object]:
+    """A v5-stamped preferences.toml, so the load takes no migration branch and
+    the scenario is purely about what the apply layer does with the values."""
+    return prefs(f"[schema]\npreferences_version = 5\n\n{body}")
+
+
+# Every scenario below pins theme_mode explicitly rather than leaving it on
+# `auto`. Auto reads the wall clock, and a case that straddled 07:00 or 19:00
+# between the harness's two Python runs would fail the determinism check rather
+# than say anything about the port. Night shift is pinned the same way and for
+# the same reason: `night_shift_enabled = false` is always inactive, and a
+# start equal to its end falls into the wrapping branch, which is always active.
+
+PALETTE: tuple[Scenario, ...] = (
+    Scenario(
+        name="set-theme-mode",
+        argv=("set", "appearance.theme_mode", '"dark"'),
+        # Four argv items, matching main()'s `len(argv) != 4` guard. The full
+        # read-validate-write-apply path: takes PREFERENCES_LOCK, rewrites
+        # preferences.toml, rewrites the palette markers and signals the
+        # session. Both the inode surface (markers truncated in place) and the
+        # trace surface (gsettings, hyprctl) carry real information here.
+        pre_state={
+            # A marker that already exists, so the inode report has something to
+            # say about write_marker's in-place truncation.
+            ".local/state/garage/generated/accent": "#000000\n",
+        },
+    ),
+    Scenario(
+        name="set-accent-color",
+        argv=("set", "appearance.accent_color", '"teal"'),
+        fixtures="session",
+        # Route::Accent, which is the one route whose applier writes its own
+        # marker rather than going through a RenderStep -- render_accent() then
+        # push_accent(). The `gsettings range` gate is what the fixture is for:
+        # the name is in the range, so the push happens.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="set-accent-color-out-of-range",
+        argv=("set", "appearance.accent_color", '"slate"'),
+        # No fixture at all, so `gsettings range` answers empty and the name is
+        # not in it: the marker is still written and the push is skipped. The
+        # half of push_accent() a port is most likely to drop.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="theme-sync-first-run",
+        argv=("theme-sync",),
+        fixtures="session",
+        # Nothing has ever been pushed, so applied_scheme() is "" and the gate
+        # is open: the whole palette is written, the seven signals are issued,
+        # render_preferences() runs again and the compositor is reloaded. The
+        # response carries the resolved scheme.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="theme-sync-already-applied",
+        argv=("theme-sync",),
+        fixtures="session",
+        # The gate closed: the marker already says "dark". Nothing is written and
+        # nothing is signalled, which is the whole point of the five-minute timer
+        # not making the desktop flicker. The response is still the scheme.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n')
+        | {".local/state/garage/generated/color-scheme": "dark\n"},
+    ),
+    Scenario(
+        name="theme-sync-scheme-moved",
+        argv=("theme-sync",),
+        fixtures="session",
+        # The marker says dark and the schedule says light: the full switch, with
+        # the marker overwritten in place (the inode surface says so, because
+        # Quickshell is watching that inode).
+        pre_state=stamped('[appearance]\ntheme_mode = "light"\n')
+        | {".local/state/garage/generated/color-scheme": "dark\n"},
+    ),
+    Scenario(
+        name="night-shift-sync-active",
+        argv=("night-shift-sync",),
+        fixtures="session",
+        # start == end is not a window at all, and the Python's wrapping branch
+        # reads it as every minute of the day -- which is what makes this case
+        # answerable without a clock. The temperature reaches hyprsunset.
+        pre_state=stamped(
+            '[appearance]\nnight_shift_enabled = true\n'
+            'night_shift_start = "00:00"\nnight_shift_end = "00:00"\n'
+            'night_shift_temperature = 3800\n'
+        ),
+    ),
+    Scenario(
+        name="night-shift-sync-disabled",
+        argv=("night-shift-sync",),
+        fixtures="session",
+        # The other arm: identity, and `active` false in the response.
+        pre_state=stamped("[appearance]\nnight_shift_enabled = false\n"),
+    ),
+    Scenario(
+        name="set-wallpaper-solid-colour",
+        argv=("set", "appearance.wallpaper_dark_color", '"#ff0000"'),
+        fixtures="session",
+        # Route::WallpaperDark against a dark session, so the live half lands.
+        # hyprpaper has no colour mode, so the swatch is rendered to a PNG named
+        # after it -- the `magick` argv is pinned byte for byte here, geometry
+        # included (3840x2160, the independent maxima of the fixture's two
+        # displays, which is neither display's own resolution). The shim writes
+        # no file, so the "exited zero and wrote nothing" guard fires and the
+        # envelope carries `Unable to render #ff0000`.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nwallpaper_dark_source = "color"\n'
+        ),
+    ),
+    Scenario(
+        name="set-wallpaper-missing-picture",
+        argv=("set", "appearance.wallpaper_dark", '"/nope/absent.png"'),
+        fixtures="session",
+        # The other refusal wallpaper_target() can raise, in the Python's own
+        # words. The file is still written before the route walks, which is the
+        # property the digest surface is here for.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="set-wallpaper-fit",
+        argv=("set", "appearance.wallpaper_fit", '"contain"'),
+        fixtures="session",
+        # The shared fit, which always reaches the desktop: hyprpaper.conf moves,
+        # so this is the restart arm rather than the IPC one. A picture is planted
+        # so wallpaper_target() resolves to something.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nwallpaper_dark = "~/pic.png"\n'
+        )
+        | {"pic.png": "not really a png, but `file` is fixtured\n"},
+    ),
+    Scenario(
+        name="set-wallpaper-picture-unchanged-fit",
+        argv=("render-wallpaper",),
+        then=("set", "appearance.wallpaper_dark", '"~/pic.png"'),
+        fixtures="session",
+        # Two commands against one world, which is the only way to reach the IPC
+        # arm: `render-wallpaper` writes hyprpaper.conf first, so by the time the
+        # `set` runs the file already says what render_wallpaper() would write.
+        # The fit therefore did not move, and the change goes over IPC instead --
+        # one `hyprctl hyprpaper wallpaper <monitor>,<resolved>` per monitor, with
+        # the *resolved* target rather than the `current` symlink, which is what
+        # hyprpaper's path-keyed cache needs to notice a change at all. Planting
+        # the file directly is not an option: its one line is an absolute path
+        # into a scratch HOME the harness invents per run.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n')
+        | {"pic.png": "not really a png, but `file` is fixtured\n"},
+    ),
+)
 # Grown from tests/test_palette.py and tests/test_wallpapers.py: theme-sync,
 # night-shift-sync, wallpaper selection, and the marker files whose *inodes*
-# Quickshell watches.
+# Quickshell watches. Task 3.10+3.11 ported push_theme(), apply_wallpaper() and
+# the whole wallpaper resolver, which is what made every case here answerable.
 
-APPLY: tuple[Scenario, ...] = ()
+APPLY: tuple[Scenario, ...] = (
+    Scenario(
+        name="apply-empty",
+        argv=("apply",),
+        fixtures="session",
+        # The session-start path from autostart.lua, against a machine that has
+        # never been configured: seed displays.toml from the live compositor,
+        # render hyprpaper.conf *ahead* of render_all() so the restart decision
+        # is taken by the first writer, render everything, then push accent,
+        # corner radius and theme, reload, dress the wallpaper, put the night
+        # shift schedule in, and restart hypridle. Almost all of it is trace.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nnight_shift_enabled = false\n'
+        ),
+    ),
+    Scenario(
+        name="apply-night-shift-on",
+        argv=("apply",),
+        fixtures="session",
+        # The other arm of the one step in the sequence that reads a schedule.
+        # start == end is always active, so this needs no clock -- see PALETTE's
+        # own note.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "light"\nnight_shift_enabled = true\n'
+            'night_shift_start = "09:00"\nnight_shift_end = "09:00"\n'
+            'night_shift_temperature = 3200\n'
+        ),
+    ),
+    Scenario(
+        name="apply-with-a-wallpaper",
+        argv=("apply",),
+        fixtures="session",
+        # The wallpaper half reaches the end: the `current` symlink is re-pointed
+        # atomically, hyprpaper.conf is new so the service is restarted rather
+        # than talked to, and the digest carries the symlink the two backends both
+        # wrote. `paper_moved` is threaded from ahead of render_all(), which is
+        # the ordering this case exists to pin.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nnight_shift_enabled = false\n'
+            'wallpaper_dark = "~/pic.png"\n'
+        )
+        | {"pic.png": "not really a png, but `file` is fixtured\n"},
+    ),
+    Scenario(
+        name="apply-shared-workspaces",
+        argv=("apply",),
+        fixtures="session",
+        # Shared mode, which changes what the workspace half of a full render
+        # emits and leaves the block allocator with one group rather than one per
+        # display. Here because `apply` is the only command that runs the whole
+        # chain, and a mode difference this deep in it should be visible on the
+        # digest without a second command.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nnight_shift_enabled = false\n\n'
+            '[workspaces]\nmode = "shared"\nshared_count = 6\n'
+        ),
+    ),
+    Scenario(
+        name="apply-file-index-off",
+        argv=("set", "indexing.enabled", "false"),
+        fixtures="session",
+        # Not `apply`: Route::FileIndex is the one route whose every step is a
+        # run_or_raise, so this is where the three `systemctl --user` calls and
+        # their named refusals live. Disabling stops and disables in one call and
+        # returns; enabling is enable-then-restart.
+        pre_state=stamped("[indexing]\nenabled = true\n"),
+    ),
+    Scenario(
+        name="apply-file-index-on",
+        argv=("set", "indexing.frequency_minutes", "10"),
+        fixtures="session",
+        pre_state=stamped("[indexing]\nenabled = true\n"),
+    ),
+    Scenario(
+        name="apply-locale",
+        argv=("set", "region.locale", '"id_ID.UTF-8"'),
+        fixtures="session",
+        # Route::Locale is two apply steps: seed the systemd user manager's
+        # environment (and the D-Bus activation environment beside it), then
+        # render the region fragments and reload the bar. The `locale -a` fixture
+        # is what makes id_ID.UTF-8 an installed locale rather than a refused one.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-locale-cleared",
+        argv=("set", "region.locale", '""'),
+        fixtures="session",
+        # The empty override resolves to the *system* locale rather than clearing
+        # LANG to nothing, which is the arm a port is most likely to write as
+        # `set-environment LANG=`. `/etc/locale.conf` is the one absolute path
+        # neither backend clamps into the scratch, so the value here is the
+        # developer's own -- which is fine, because what is compared is that the
+        # two backends read the same file and agree, not what it happens to say.
+        #
+        # No stored locale, deliberately: the Python's `locale` kind consults
+        # `locale -a` for a *non-empty* value, so a departure would put that read
+        # on the load's trace too. `apply-locale` above is where that difference
+        # is exercised and written down; this case is about the unset arm alone.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-region-date-format",
+        argv=("set", "region.date_format", '"mdy"'),
+        fixtures="session",
+        # Route::Region: the same renderer, one step fewer. Every region key
+        # reaches the bar clock, and only the locale takes the extra step above.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-glass-mode",
+        argv=("set", "appearance.glass_mode", '"frosted"'),
+        fixtures="session",
+        # The material, pushed live: the marker Quickshell watches, then one
+        # `hyprctl eval` carrying both the core decoration options and the plugin
+        # ones, with the blur write-back appended. The eval body is the thing this
+        # pins -- it has to be the same Lua the fragment carries.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="apply-glass-eval-refused",
+        argv=("set", "appearance.glass_mode", '"off"'),
+        fixtures="glass-eval-refused",
+        # The plugin never loaded, so the eval fails as a whole and the fallback
+        # is a full reload rather than refusing the setting. The reload succeeds
+        # here, so the envelope is still ok.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="apply-corner-radius",
+        argv=("set", "appearance.corner_radius", '"large"'),
+        fixtures="session",
+        # Render the marker, then push it: one eval across the core decoration
+        # options, the Kinetik Glass plugin's and hyprexpo's together, with
+        # CORNER_POWER spelled the way `f"{3.37:g}"` spells it.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="apply-border-size",
+        argv=("set", "appearance.border_size", "3"),
+        fixtures="session",
+        # The size and the theme-resolved colour together, because decorations.lua
+        # paints both borders fully transparent and a size with no colour would
+        # silently shrink the window and draw nothing.
+        pre_state=stamped('[appearance]\ntheme_mode = "light"\n'),
+    ),
+    Scenario(
+        name="apply-motion",
+        argv=("set", "appearance.reduce_motion", "true"),
+        fixtures="session",
+        # The one applier that deliberately does *not* go through eval_config():
+        # per-leaf speeds are top-level hl.animation() calls rather than a single
+        # hl.config table, and none of the blur write-back is wanted. Route::Motion
+        # also rewrites the bar's own Reduce Motion and reloads it.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="apply-bar-style",
+        argv=("set", "bar.padding_scale", "2.0"),
+        fixtures="session",
+        # The narrow stylesheet applier: one file, written in place because waybar
+        # watches it, and one SIGUSR2. Deliberately not a theme render, which would
+        # rewrite twenty toolkit configs per slider notch.
+        pre_state=stamped('[appearance]\ntheme_mode = "dark"\n'),
+    ),
+    Scenario(
+        name="apply-bar-widgets",
+        argv=("set", "bar.media_player", "false"),
+        fixtures="session",
+        # Media spans two fragments -- its definition is widget-owned, its place
+        # after the workspace indicator is left-side-owned -- so both are
+        # republished before the one reload.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-bar-workspaces",
+        argv=("set", "workspaces.indicator", "false"),
+        fixtures="session",
+        # The other bar route: the module list alone, and the compositor untouched.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-workspace-plan",
+        argv=("set", "workspaces.default_count", "6"),
+        fixtures="session",
+        # The salvage choreography, end to end through the CLI: read the clients,
+        # remap, reap, render, reload, restore. garage-apply's own
+        # workspace_traces.json drives the same code in-process with a fake runner;
+        # this is the claim that the command reaches it.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-input",
+        argv=("set", "input.pointer_sensitivity", "0.4"),
+        fixtures="session",
+        # The whole input section reaches the compositor through a plain reload,
+        # which is the shortest run_or_raise route in the table.
+        pre_state=stamped(""),
+    ),
+    Scenario(
+        name="apply-launcher",
+        argv=("set", "general.builtin_launcher", "false"),
+        fixtures="session",
+        # Route::Launcher signals nothing at all: the wrapper reads the marker on
+        # every press and the shell watches it, so the switch takes effect as it is
+        # written. The one route whose trace is empty, which is worth pinning
+        # precisely because an over-eager port would add a reload.
+        pre_state=stamped(""),
+    ),
+)
 # Grown from tests/test_session_surfaces.py: apply, and every gsettings /
-# hyprctl / systemctl call it makes. Almost purely a trace-surface family.
+# hyprctl / systemctl call it makes. Almost purely a trace-surface family, and
+# the family task 3.10+3.11 exists for -- every route in PREFERENCE_ROUTES that
+# ends in a signal has a case here or in `palette`.
 
 # The layout displays.toml starts on for the cases that plant one: the same two monitors the
 # fixture reports, side by side, so a revert lands back on exactly what was already there.
@@ -774,9 +1114,264 @@ DISPLAYS: tuple[Scenario, ...] = (
 # Grown from tests/test_recovery.py: display-test, display-confirm,
 # display-revert and the watchdog, plus displays.toml round-tripping.
 
-FILES: tuple[Scenario, ...] = ()
+FILES: tuple[Scenario, ...] = (
+    Scenario(
+        name="set-terminal",
+        argv=("set", "general.terminal", '"kitty.desktop"'),
+        fixtures="session",
+        pre_state=stamped("") | dict(APPLICATIONS),
+        # Route::Terminal, and the case that settles where the *browser* marker is
+        # written. The Python's render_general() writes three markers and this
+        # applier calls it; the port's renderer writes two, because resolving a
+        # browser association runs `gio mime` and a renderer structurally has no
+        # runner -- so the third is written from the apply side, at the same point
+        # in the same order. All three markers and the three `gio mime` calls are
+        # on this trace in both backends.
+    ),
+    Scenario(
+        name="action-defaults-files",
+        argv=("action", "defaults.files", '"thunar.desktop"'),
+        fixtures="session",
+        pre_state=dict(APPLICATIONS),
+        # A non-browser role: the mimeapps override is rewritten and nothing else
+        # happens -- no marker, no reload. The counterpart to
+        # `action-defaults-browser` in the `actions` family, which does both.
+    ),
+    Scenario(
+        name="action-defaults-not-installed",
+        argv=("action", "defaults.files", '"nautilus.desktop"'),
+        fixtures="session",
+        pre_state=dict(APPLICATIONS),
+        # `{desktop_id} is not installed`, refused before anything is written.
+    ),
+)
 # Grown from tests/test_files.py, tests/test_file_index.py and
 # tests/test_launcher.py: the default-application roles and the mime writes.
+
+# ---------------------------------------------------------------------------
+# actions: `garage action NAME [JSON]`, the second dispatch table
+# ---------------------------------------------------------------------------
+# An action is not a preference: it has no key in preferences.toml and no route
+# of its own. Most of these either read from or write straight to the world --
+# wpctl, pactl, loginctl, timedatectl -- with nothing to persist, so the family is
+# almost purely trace. The two that *are* read-modify-writes under the preferences
+# lock (`appearance.night_shift.toggle` and `glass.reset`) carry the digest too.
+
+ACTIONS: tuple[Scenario, ...] = (
+    Scenario(
+        name="action-night-shift-toggle",
+        argv=("action", "appearance.night_shift.toggle"),
+        fixtures="session",
+        # The one action that inverts a stored boolean and then walks that key's
+        # ordinary route. The pane fires this rather than a `set` because it does
+        # not know the current value and must not race a second toggle into
+        # reading the same one twice. Off here, so it comes back on and the
+        # temperature reaches hyprsunset -- start == end, so no clock is involved.
+        pre_state=stamped(
+            '[appearance]\nnight_shift_enabled = false\n'
+            'night_shift_start = "12:00"\nnight_shift_end = "12:00"\n'
+        ),
+    ),
+    Scenario(
+        name="action-night-shift-toggle-off",
+        argv=("action", "appearance.night_shift.toggle"),
+        fixtures="session",
+        # The other direction: on becomes off, and the identity call goes out.
+        # The digest is what says the file now carries the departure.
+        pre_state=stamped(
+            '[appearance]\nnight_shift_enabled = true\n'
+            'night_shift_start = "12:00"\nnight_shift_end = "12:00"\n'
+        ),
+    ),
+    Scenario(
+        name="action-glass-reset",
+        argv=("action", "glass.reset"),
+        fixtures="session",
+        # Every `glass_*` key walked back to its shipped default, under the
+        # preferences lock, then rendered and pushed with the same live eval a
+        # single slider takes. The prefix *is* the list -- no key names appear in
+        # the implementation -- so the digest here is the claim that all seven
+        # departures below leave and nothing else does.
+        pre_state=stamped(
+            '[appearance]\ntheme_mode = "dark"\nglass_mode = "frosted"\n'
+            'glass_blur = "heavy"\nglass_transparency = 0.2\n'
+            'glass_edge_width = 40\nglass_refraction = 0.2\n'
+            'glass_clarity = 0.4\nglass_highlight = 0.4\n'
+            'accent_color = "teal"\n'
+        ),
+    ),
+    Scenario(
+        name="action-audio-output-volume",
+        argv=("action", "audio.output.volume", "0.35"),
+        # `str(float(value))` is the whole of what wpctl is handed, and the
+        # default sink is addressed by alias rather than by name so a device
+        # swapped between the read and the write still moves the right slider.
+    ),
+    Scenario(
+        name="action-audio-output-volume-integer",
+        argv=("action", "audio.output.volume", "1"),
+        # The case a port gets wrong in the safe-looking direction: JSON `1` is a
+        # Python `float` by the time wpctl sees it, so the argument is `1.0` and
+        # not `1`. Rust's own `Display` for `f64` writes `1`.
+    ),
+    Scenario(
+        name="action-audio-input-volume",
+        argv=("action", "audio.input.volume", "0.5"),
+    ),
+    Scenario(
+        name="action-audio-output-mute",
+        argv=("action", "audio.output.mute", "true"),
+        # `"1" if value else "0"`: Python truthiness, not JSON's.
+    ),
+    Scenario(
+        name="action-audio-input-mute-falsy",
+        argv=("action", "audio.input.mute", "0"),
+        # The falsy half of that truthiness, spelled as a number rather than as
+        # `false`, which is what the pane's own binding sends for "unmuted".
+    ),
+    Scenario(
+        name="action-audio-output-default",
+        argv=("action", "audio.output.default", '"alsa_output.usb-Generic_USB_Audio-00.analog-stereo"'),
+        # The one audio concept `wpctl` has no verb for, so it goes to `pactl`.
+    ),
+    Scenario(
+        name="action-audio-input-default",
+        argv=("action", "audio.input.default", '"alsa_input.pci-0000_00_1f.3.analog-stereo"'),
+    ),
+    Scenario(
+        name="action-audio-volume-not-a-number",
+        argv=("action", "audio.output.volume", '"loud"'),
+        # `float()`'s own ValueError, through the envelope, with nothing reaching
+        # wpctl. The wording is CPython's because that is what the pane shows.
+    ),
+    Scenario(
+        name="action-defaults-browser",
+        argv=("action", "defaults.browser", '"firefox.desktop"'),
+        fixtures="session",
+        pre_state=dict(APPLICATIONS),
+        # The role that does more than write mimeapps.list: the browser marker is
+        # republished from the freshly resolved association and the compositor is
+        # reloaded, because binds.lua reads that marker the way it reads the
+        # terminal one. Three `gio mime` calls, then the marker, then the reload.
+    ),
+    Scenario(
+        name="action-defaults-unknown-role",
+        argv=("action", "defaults.spreadsheet", '"gnumeric.desktop"'),
+        # `Unknown default application: spreadsheet`, before anything is read.
+    ),
+    Scenario(
+        name="action-lock-now",
+        argv=("action", "lock.now"),
+        # One call to logind, checked: a lock that did not happen is worth saying.
+    ),
+    Scenario(
+        name="action-datetime-ntp",
+        argv=("action", "datetime.ntp", "true"),
+        # Spawned detached rather than run to completion: nothing reads a result
+        # and systemd-timedated does the work over the bus, so waiting would stall
+        # the settings path for an answer nobody uses. The shim records the exec
+        # either way, which is what makes the two backends comparable here.
+    ),
+    Scenario(
+        name="action-datetime-timezone",
+        argv=("action", "datetime.timezone", '"Europe/Amsterdam"'),
+        fixtures="session",
+        # Checked against `timedatectl list-timezones` every time rather than
+        # cached: a tzdata update between the pane populating its picker and the
+        # user choosing is exactly the case the check exists for.
+    ),
+    Scenario(
+        name="action-datetime-timezone-unknown",
+        argv=("action", "datetime.timezone", '"Mars/Olympus"'),
+        fixtures="session",
+        # `Unknown timezone`, and nothing spawned.
+    ),
+    Scenario(
+        name="action-datetime-timezone-no-timedatectl",
+        argv=("action", "datetime.timezone", '"Europe/Amsterdam"'),
+        # No fixture, so `timedatectl list-timezones` answers nothing and *every*
+        # timezone is unknown. That is the Python's behaviour as written, and the
+        # safe direction to fail in -- pinned so a port cannot "improve" it into
+        # accepting anything when the list cannot be read.
+    ),
+    Scenario(
+        name="action-keybind-rebind-unpublished",
+        argv=("action", "keybind.rebind", '{"id": "super+t", "keys": "SUPER+ALT+T"}'),
+        # The catalog fragment has never been published on this scratch machine,
+        # so the change is refused with the sentence that says why rather than
+        # with "there is no shortcut called super+t". The fail-closed half of the
+        # catalog contract, reached through `action` rather than in-process.
+    ),
+    Scenario(
+        name="action-unknown",
+        argv=("action", "nope.nothing"),
+        # The final `else`: `Unknown action: nope.nothing`.
+    ),
+    Scenario(
+        name="action-no-name",
+        argv=("action",),
+        # `argv[2]` with nothing there. The Python raises IndexError, which
+        # main()'s except tuple does not catch -- a traceback on stderr and exit 1
+        # -- where the port answers through the envelope. Written down in
+        # deviations.toml; the exit status is 1 either way.
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# snapshot: `garage snapshot`, and the default with no command at all
+# ---------------------------------------------------------------------------
+# The heaviest shim traffic in the corpus: monitors, devices, pipewire, pulse,
+# timedatectl, locale, mime lookups. Almost all of the work is in the trace, which
+# is exactly the surface a port is most likely to get quietly wrong -- and the
+# stdout is one JSON object whose key order is the Python dict's insertion order,
+# so the envelope is compared byte for byte.
+
+SNAPSHOT: tuple[Scenario, ...] = (
+    Scenario(
+        name="snapshot-empty",
+        argv=("snapshot",),
+        pre_state=dict(APPLICATIONS),
+        # A machine with no preferences.toml, no displays.toml and no keybindings:
+        # every section is answered from the fixtures alone.
+    ),
+    Scenario(
+        name="snapshot-default-command",
+        argv=(),
+        fixtures="snapshot-empty",
+        pre_state=dict(APPLICATIONS),
+        # No subcommand at all, which `main()` resolves to `snapshot`. The same
+        # answer as above, which is the point: this pins the default, and the
+        # QML client's simplest possible invocation is exactly this one.
+    ),
+    Scenario(
+        name="snapshot-degraded",
+        argv=("snapshot",),
+        fixtures="snapshot-empty",
+        pre_state=dict(APPLICATIONS) | prefs("this is not toml\n"),
+        # The degrade path: preferences that cannot be read fall back to a deep
+        # copy of the shipped defaults and the refusal is carried in `error`, so
+        # the pane comes up able to say what is wrong instead of not coming up.
+    ),
+    Scenario(
+        name="snapshot-with-a-saved-layout",
+        argv=("snapshot",),
+        fixtures="snapshot-empty",
+        pre_state=dict(APPLICATIONS) | {
+            ".config/garage/displays.toml":
+                'primary = "DP-2"\n\n[[display]]\noutput = "DP-2"\n'
+                'description = "Dell Inc. DELL U2720Q (DP-2)"\nenabled = true\n'
+                'mode = "3840x2160@59.9"\nx = 0\ny = 0\nscale = 1.5\n'
+                'transform = 0\nvrr = 2\n',
+        },
+        # The fold between what the compositor reports and what displays.toml
+        # remembers: the saved `mode` and the saved `vrr` outrank the live ones,
+        # and the saved primary outranks $HYPR_PRIMARY_MONITOR. Also the case
+        # where workspaces_snapshot() sees a display for the first time and
+        # writes workspace-blocks.toml on a read, which the digest records.
+    ),
+)
+
 
 # ---------------------------------------------------------------------------
 # doctor: the three commands that print lines for a person
@@ -863,16 +1458,19 @@ FAMILIES = (
     ),
     Family(
         name="smoke",
-        active=False,
-        note="the harness proving it compares things; not a layer claim",
+        active=True,
+        note="the harness proving it compares things; not a layer claim. Its two other "
+             "cases graduated to `snapshot` and `palette` when task 3.10+3.11 ported the "
+             "layers under them.",
         scenarios=SMOKE,
     ),
-    Family(name="preferences", active=False,
-           note="load/validate/save; from test_preferences.py, test_schema.py. "
-                "The load half is ported (task 3.1, garage-prefs) and reaches the "
-                "CLI through render-idle (task 3.15); the `set` half is dispatched "
-                "and writes the file, but its route walk ends in whichever renderer "
-                "or applier is still owed. Activated by task 3.2.",
+    Family(name="preferences", active=True,
+           note="load/validate/save and the whole `set` argv surface; from "
+                "test_preferences.py, test_schema.py. The load half is task 3.1's "
+                "(garage-prefs) and the schema is task 3.2's; task 3.10+3.11 made the "
+                "route walk complete, which is what let the `set` half be claimed. Active "
+                "with five written-down deviations, every one of them a consequence of the "
+                "schema being *typed* here and a dict there -- see deviations.toml.",
            scenarios=PREFERENCES),
     Family(name="render", active=True,
            note="`garage render`; task 3.7 wired render_all() to completion for a scratch "
@@ -891,11 +1489,16 @@ FAMILIES = (
     Family(name="render_wallpaper", active=True,
            note="`garage render-wallpaper`; task 3.7 wired render_wallpaper() to the CLI.",
            scenarios=RENDER_WALLPAPER),
-    Family(name="palette", active=False,
-           note="theme and wallpaper markers; from test_palette.py",
+    Family(name="palette", active=True,
+           note="theme-sync, night-shift-sync, the accent push and the whole wallpaper "
+                "resolver; task 3.10+3.11 ported push_theme(), apply_wallpaper(), "
+                "wallpaper_target() and solid_wallpaper(). From test_palette.py and "
+                "test_wallpapers.py.",
            scenarios=PALETTE),
-    Family(name="apply", active=False,
-           note="session signalling; from test_session_surfaces.py",
+    Family(name="apply", active=True,
+           note="`garage apply` and every route in PREFERENCE_ROUTES that ends in a signal; "
+                "task 3.10+3.11 ported the apply layer. Almost purely a trace-surface "
+                "family. From test_session_surfaces.py.",
            scenarios=APPLY),
     Family(name="displays", active=True,
            note="display test/confirm/revert and the fifteen-second watchdog; task 3.8 "
@@ -903,9 +1506,20 @@ FAMILIES = (
                 "garage-render and the transaction, the geometry check, the snapshot and the "
                 "seeding into garage-apply, and wired all four commands in the CLI.",
            scenarios=DISPLAYS),
-    Family(name="files", active=False,
-           note="default applications and mime; from test_files.py",
+    Family(name="files", active=True,
+           note="default applications, the mime override and the three general markers; "
+                "task 3.10+3.11 wired apply_terminal() and set_default_app() to the CLI. "
+                "From test_files.py, test_file_index.py, test_launcher.py.",
            scenarios=FILES),
+    Family(name="actions", active=True,
+           note="`garage action`, the second dispatch table; task 3.10+3.11 ported action() "
+                "and toggle_boolean_preference(). From test_files.py and test_keybinds.py.",
+           scenarios=ACTIONS),
+    Family(name="snapshot", active=True,
+           note="`garage snapshot` and the bare-argv default; task 3.10+3.11 ported "
+                "make_snapshot() and its eight live reads. From test_schema.py and "
+                "test_files.py.",
+           scenarios=SNAPSHOT),
     Family(name="doctor", active=True,
            note="`garage doctor`, `garage repair` and `garage update`; tasks 3.12-3.14 "
                 "ported all three and wired them to the CLI's plain-command arms. Active "

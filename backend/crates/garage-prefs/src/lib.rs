@@ -52,7 +52,7 @@ pub use doc::{
     report_preference_notes, same_default,
 };
 pub use error::PrefsError;
-pub use load::{load_preferences, load_toml, shipped_defaults};
+pub use load::{load_effective, load_preferences, load_toml, shipped_defaults, Effective};
 pub use lock::{LockError, PrefLock};
 pub use migrate::{
     compact_preferences_file, migrate_preference_values, migrate_preferences, schema_version,

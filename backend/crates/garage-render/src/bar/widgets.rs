@@ -255,7 +255,7 @@ pub(crate) fn bar_widget_modules(prefs: &Preferences) -> (Vec<String>, Vec<Strin
 /// # Errors
 ///
 /// [`RenderError::Atomic`] if the fragment cannot be replaced.
-pub(crate) fn render_bar_widgets(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_bar_widgets(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let (right, center, definitions) = bar_widget_modules(cx.prefs());
     let mut fragment: Vec<(String, Value)> = vec![
         ("height".to_owned(), Value::Int(cx.prefs().bar.height.get())),

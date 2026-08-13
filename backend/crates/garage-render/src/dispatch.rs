@@ -24,7 +24,9 @@ pub fn run_render(step: RenderStep, cx: &RenderCx<'_>) -> Result<(), RenderError
         RenderStep::SearchEngine => search::render_search_engine(cx),
         RenderStep::Preferences => preferences::render_preferences(cx),
         RenderStep::Motion => motion::render_motion(cx),
-        RenderStep::General => general::render_general(cx),
+        // `None`: this step has no session behind it. See `general`'s own docs -- the
+        // apply-side route walk routes `General` through its own three-marker publisher.
+        RenderStep::General => general::render_general(cx, None),
         RenderStep::Idle => idle::render_idle(cx),
     }
 }

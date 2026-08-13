@@ -10,14 +10,26 @@
 //! stub's fixed `Result<(), ApplyError>` shape is a placeholder for that distinction, which
 //! Phase 3 restores.
 
-use crate::cx::SessionCx;
-use crate::error::ApplyError;
+use garage_render::theme::night_shift_active;
 
-/// Put the current night shift schedule into hyprsunset.
+use crate::command::run;
+use crate::cx::SessionCx;
+
+/// Put the current night shift schedule into hyprsunset. `true` if it took
+/// (garage:4797-4811).
 ///
-/// # Errors
-///
-/// Always [`ApplyError::PortPending`] until Phase 3 replaces this stub.
-pub(crate) fn apply_night_shift(_cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
-    Err(ApplyError::PortPending("apply_night_shift"))
+/// Reports a `bool` rather than a `Result`, which is the Python's own signature: the call is
+/// answered by hyprsunset over Hyprland's IPC and fails when hyprsunset is not up yet --
+/// exactly the case at session start, where `autostart.lua` runs `garage apply` without
+/// waiting for it. `apply_preferences()` drops the answer; `night-shift-sync` is the one
+/// caller that can do something about it, and reports it in its own response.
+pub fn apply_night_shift(cx: &mut SessionCx<'_>) -> bool {
+    let prefs = cx.render().prefs();
+    let result = if night_shift_active(prefs) {
+        let temperature = prefs.appearance.night_shift_temperature.get().to_string();
+        run(cx, &["hyprctl", "hyprsunset", "temperature", &temperature])
+    } else {
+        run(cx, &["hyprctl", "hyprsunset", "identity"])
+    };
+    result.status == 0
 }

@@ -61,7 +61,7 @@ use crate::theme::resolve_theme;
 /// [`RenderError::Marker`] if the material marker could not be written,
 /// [`RenderError::Lua`] if the generated fragment could not be staged, checked or installed,
 /// or whatever [`render_idle`] returns.
-pub(crate) fn render_preferences(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_preferences(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let prefs = cx.prefs();
     let paths = cx.paths();
 

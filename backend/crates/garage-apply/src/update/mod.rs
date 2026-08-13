@@ -42,16 +42,14 @@
 //! refusals it treats as notes rather than failures, and the `git_output()` wrapper
 //! `doctor`'s `checkout_commit()` shares with it.
 //!
-//! # What is owed
-//!
-//! Step 4's push half. The Python loads the preferences (which runs any schema migration a
-//! pull brought in), renders, and then calls `push_accent()`, `push_corner_radius()` and
-//! `push_theme()` -- "the toolkit configs it just rewrote are half a theme until the portal
-//! setting, xsettingsd and the two signalled clients agree with them". The render is ported
-//! and runs; those three pushes have no entry point in this crate yet, so a real (non
-//! `--dry-run`) update stops there with [`ApplyError::PortPending`] naming them, the same
-//! shape an exception out of `push_theme()` would give the Python. `--dry-run` never reaches
-//! it.
+//! Step 4 is the one step that both renders and pushes: the Python loads the preferences
+//! (which runs any schema migration a pull brought in), renders everything, and then calls
+//! `push_accent()`, `push_corner_radius()` and `push_theme()` -- "the toolkit configs it just
+//! rewrote are half a theme until the portal setting, xsettingsd and the two signalled
+//! clients agree with them". Not `apply_preferences()`, which would additionally seed
+//! `displays.toml`, dress the wallpaper and restart `hypridle`: the compositor's own reload is
+//! step 6, which knows how to skip a TTY, and an update is a convergence rather than a session
+//! start. `--dry-run` reaches none of it.
 
 use std::path::PathBuf;
 
@@ -59,13 +57,20 @@ use garage_core::paths::Paths;
 use garage_core::shlex::shlex_quote;
 use garage_core::traits::{Runner, DEFAULT_RUN_TIMEOUT};
 use garage_prefs::load_preferences;
-use garage_proc::{Hyprctl, Luac, System};
+use garage_proc::{Hyprctl, Luac};
 use garage_render::all::render_all;
 use garage_render::cx::RenderCx;
 
-use crate::doctor::{dangling_repo_links, hyprland_report, plugin_state, stow_state, DoctorCx};
+use crate::corner::push_corner_radius;
+use crate::cx::SessionCx;
+use crate::doctor::{
+    dangling_repo_links, hyprland_report, plugin_state, stow_state, tilde, DoctorCx,
+};
 use crate::error::ApplyError;
 use crate::keybind::load_keybindings;
+use crate::route::push_accent as apply_accent_push;
+use crate::terminal::resolve_browser;
+use crate::theme::push_theme;
 
 mod pull;
 #[cfg(test)]
@@ -120,8 +125,7 @@ impl Report {
 ///
 /// [`ApplyError::Settings`] for an argument this command does not take, for a binary that is
 /// not inside a Garage checkout, and for a checkout with no `bootstrap.sh`; whatever the
-/// render raises; and [`ApplyError::PortPending`] for step 4's push half -- see the module
-/// doc.
+/// render raises; and whatever step 4's push half raises.
 pub fn update(paths: &Paths, proc: &dyn Runner, argv: &[String]) -> Result<i32, ApplyError> {
     update_at(paths, proc, argv, None, None)
 }
@@ -186,7 +190,7 @@ fn run_steps(cx: &DoctorCx<'_>, report: &mut Report, dry_run: bool) -> Result<i3
     if bootstrap_step(cx, report)? != 0 {
         return Ok(1);
     }
-    render_step(paths, report)?;
+    render_step(paths, cx.proc, report)?;
     plugin_step(cx, report, &mut problems, &before, &after);
     reload_step(cx, report, &mut problems);
 
@@ -318,7 +322,7 @@ fn bootstrap_step(cx: &DoctorCx<'_>, report: &mut Report) -> Result<i32, ApplyEr
 /// The load *is* the migration: it is version-gated and runs inside `load_preferences()`, so a
 /// pull that bumped the schema is applied here. The corrected file itself is written on the
 /// next save, which is the same contract every other command works under.
-fn render_step(paths: &Paths, report: &mut Report) -> Result<(), ApplyError> {
+fn render_step(paths: &Paths, proc: &dyn Runner, report: &mut Report) -> Result<(), ApplyError> {
     report.step("Rendering the generated state");
     if report.dry_run {
         report.info("would load the preferences (running any schema migration) and render");
@@ -326,19 +330,33 @@ fn render_step(paths: &Paths, report: &mut Report) -> Result<(), ApplyError> {
     }
     let config =
         load_preferences(paths, None).map_err(|error| ApplyError::Settings(error.to_string()))?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
-    let cx = RenderCx::new(&config, paths, &monitors, &lua);
-    render_all(&cx, &load_keybindings(paths, None))?;
-    // `render_all()` only writes files now. push_accent(), push_corner_radius() and
-    // push_theme() are what it used to push from inside itself, and an update still owes them:
-    // the toolkit configs it just rewrote are half a theme until the portal setting,
-    // xsettingsd and the two signalled clients agree with them. The compositor's own reload is
-    // step 6, which knows how to skip a TTY.
-    Err(ApplyError::PortPending(
-        "update's push_accent/push_corner_radius/push_theme",
-    ))
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
+    let mut cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
+    {
+        // Scoped, so the resolver's borrow of the context ends before the three pushes below
+        // take it mutably. `render_all()` writes all three general markers here, exactly as
+        // the Python's does: an update holds a runner.
+        let session: &SessionCx<'_> = &cx;
+        let resolve = resolve_browser(session);
+        render_all(
+            session.render(),
+            &load_keybindings(paths, None),
+            Some(&resolve),
+        )?;
+    }
+    // `render_all()` only writes files now. These three are what it used to push from inside
+    // itself, and an update still owes them: the toolkit configs it just rewrote are half a
+    // theme until the portal setting, xsettingsd and the two signalled clients agree with
+    // them. The compositor's own reload is step 6, which knows how to skip a TTY.
+    apply_accent_push(&mut cx);
+    push_corner_radius(&mut cx);
+    push_theme(&mut cx)?;
+    report.note(&format!(
+        "rewrote the fragments under {}.",
+        tilde(&paths.home, &paths.generated)
+    ));
+    Ok(())
 }
 
 /// Step 5: the plugin ABI, and whether a redeploy is owed.

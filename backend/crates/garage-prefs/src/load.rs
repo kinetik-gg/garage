@@ -95,15 +95,69 @@ pub fn shipped_defaults(paths: &Paths) -> Result<Defaults, PrefsError> {
 /// corrected it would not open either.
 pub fn load_preferences(
     paths: &Paths,
-    mut sink: Option<&mut Vec<String>>,
+    sink: Option<&mut Vec<String>>,
 ) -> Result<Preferences, PrefsError> {
+    Ok(load_effective(paths, sink)?.preferences)
+}
+
+/// Everything `deep_merge(defaults, stored)` answers with, including the one section a
+/// [`Preferences`] cannot hold.
+///
+/// The Python's `load_preferences()` returns a plain dict, and `[schema]` is in it: the
+/// shipped defaults file carries the stamp, the merge keeps it, and every caller that prints
+/// the configuration -- `set`'s envelope and `make_snapshot()`'s `preferences` field --
+/// prints it too. A [`Preferences`] is the *validated* sections and deliberately has no room
+/// for bookkeeping, so the stamp travels beside it rather than inside it, and only the two
+/// printing callers ask for it.
+#[derive(Debug, Clone)]
+pub struct Effective {
+    /// Layers 1 and 2, migrated, merged and coerced.
+    pub preferences: Preferences,
+    /// `deep_merge(defaults, stored)["schema"]`: the stamp section as the merged document
+    /// carries it, or empty when neither layer had one.
+    pub schema: toml::Table,
+}
+
+/// [`load_preferences`], keeping the `[schema]` stamp the merge produced.
+///
+/// # Errors
+///
+/// The same set [`load_preferences`] raises -- it is this function.
+pub fn load_effective(
+    paths: &Paths,
+    mut sink: Option<&mut Vec<String>>,
+) -> Result<Effective, PrefsError> {
     let defaults = shipped_defaults(paths)?;
+    // Layer 1's own stamp, read from the file rather than from `Defaults`: the typed layer
+    // has no room for it either, and the Python's `shipped_defaults()` is exactly this read.
+    // A machine with no shipped file falls back to the compiled copy, which is
+    // `FALLBACK_DEFAULTS` there -- derived from the schema table, and carrying no stamp.
+    let mut schema = stamp_section(&if paths.defaults_path.exists() {
+        load_toml(&paths.defaults_path)?
+    } else {
+        toml::Table::new()
+    });
     let stored = load_toml(&paths.host.preferences)?;
     let stored = migrate_preferences(paths, stored, &defaults, sink.as_deref_mut())?;
+    // `deep_merge` over the one section: layer 2's stamp wins key by key, and a key only
+    // layer 1 has survives.
+    schema.extend(stamp_section(&stored));
     let mut notes = Notes::new();
     let preferences = Preferences::coerce_from(&stored, &defaults, &mut notes);
     report_preference_notes(notes.as_slice(), sink);
-    Ok(preferences)
+    Ok(Effective {
+        preferences,
+        schema,
+    })
+}
+
+/// One document's `[schema]` table, or an empty one when it has none or it is not a table.
+fn stamp_section(document: &toml::Table) -> toml::Table {
+    document
+        .get("schema")
+        .and_then(toml::Value::as_table)
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

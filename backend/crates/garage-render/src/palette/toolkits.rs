@@ -53,29 +53,42 @@ use crate::theme::opaque;
 /// What one appearance is called by each toolkit that names a theme rather than reading a
 /// palette (`THEME_TOOLKITS`, garage:284-289).
 ///
-/// The portal's own `color-scheme` value (`prefer-dark` / `prefer-light`) is the fifth key of
-/// the Python's table and is deliberately absent here: it is read by `push_theme()`, on the
-/// apply side, and nothing this crate writes carries it.
-struct Look {
-    gtk: &'static str,
-    icons: &'static str,
-    prefer_dark: u8,
-    qt_colors: &'static str,
+/// All five keys of the Python's table, including the portal's own `color-scheme` value
+/// (`prefer-dark` / `prefer-light`) -- which nothing this crate writes carries, but which
+/// `push_theme()` on the apply side reads out of the same row. Kept together rather than
+/// split across the two crates so a future appearance is named once.
+#[derive(Copy, Clone, Debug)]
+pub struct Look {
+    /// The GTK theme name `adw-gtk3` ships under, for `gsettings set ... gtk-theme`.
+    pub gtk: &'static str,
+    /// The icon theme name, for `gsettings set ... icon-theme`.
+    pub icons: &'static str,
+    /// `gtk-application-prefer-dark-theme`, which is an integer in the settings.ini it lands
+    /// in rather than a boolean.
+    pub prefer_dark: u8,
+    /// The qt6ct colour file this appearance selects.
+    pub qt_colors: &'static str,
+    /// The XDG portal's `color-scheme`, read only by `push_theme()`.
+    pub portal: &'static str,
 }
 
-const fn look(scheme: Scheme) -> Look {
+/// `THEME_TOOLKITS[scheme]` (garage:284-289).
+#[must_use]
+pub const fn look(scheme: Scheme) -> Look {
     match scheme {
         Scheme::Dark => Look {
             gtk: "adw-gtk3-dark",
             icons: "Papirus-Dark",
             prefer_dark: 1,
             qt_colors: "vanta.conf",
+            portal: "prefer-dark",
         },
         Scheme::Light => Look {
             gtk: "adw-gtk3",
             icons: "Papirus-Light",
             prefer_dark: 0,
             qt_colors: "vanta-light.conf",
+            portal: "prefer-light",
         },
     }
 }

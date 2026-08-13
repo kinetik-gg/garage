@@ -20,7 +20,7 @@ use garage_core::paths::Paths;
 use garage_core::traits::Runner;
 use garage_prefs::load_preferences;
 use garage_proc::run::enter_new_session;
-use garage_proc::{Hyprctl, Luac, System};
+use garage_proc::{Hyprctl, Luac};
 use garage_render::cx::RenderCx;
 use serde_json::Value;
 
@@ -37,19 +37,19 @@ use crate::error::CliError;
 /// in the Python -- uncaught, so a traceback on stderr and exit 1 -- because `argv[2]` is
 /// indexed rather than checked. Here it is the envelope's own refusal, in the shape `set`'s
 /// argument-count guard already uses. The exit status is 1 either way.
-pub(crate) fn display_test(paths: &Paths, argv: &[String]) -> Result<Value, CliError> {
+pub(crate) fn display_test(
+    paths: &Paths,
+    proc: &dyn Runner,
+    argv: &[String],
+) -> Result<Value, CliError> {
     let payload: Value = serde_json::from_str(
         argv.get(2)
             .ok_or(CliError::DisplayUsage("garage display-test JSON"))?,
     )?;
     let config = load_preferences(paths, None)?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
-    let cx = SessionCx::new(
-        RenderCx::new(&config, paths, &monitors, &lua),
-        &system as &dyn Runner,
-    );
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
+    let cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
     let token = transaction::display_test(&cx, &payload, &primary_from_environment())?;
     Ok(serde_json::json!({ "token": token }))
 }
@@ -58,6 +58,7 @@ pub(crate) fn display_test(paths: &Paths, argv: &[String]) -> Result<Value, CliE
 /// followed by `response(True)`. Same missing-argument deviation as [`display_test`].
 pub(crate) fn display_finish(
     paths: &Paths,
+    proc: &dyn Runner,
     argv: &[String],
     confirm: bool,
 ) -> Result<Value, CliError> {
@@ -68,13 +69,9 @@ pub(crate) fn display_finish(
     };
     let token = argv.get(2).ok_or(CliError::DisplayUsage(usage))?;
     let config = load_preferences(paths, None)?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
-    let cx = SessionCx::new(
-        RenderCx::new(&config, paths, &monitors, &lua),
-        &system as &dyn Runner,
-    );
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
+    let cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
     transaction::display_finish(&cx, token, confirm)?;
     Ok(Value::Bool(true))
 }
@@ -96,20 +93,16 @@ pub(crate) fn display_finish(
 /// Every failure is swallowed and nothing is printed, which is the Python's own
 /// `except (SettingsError, OSError, json.JSONDecodeError): pass` around this call: there is
 /// nobody left to read an envelope, and exit 0 regardless.
-pub(crate) fn watchdog(paths: &Paths, argv: &[String]) {
+pub(crate) fn watchdog(paths: &Paths, proc: &dyn Runner, argv: &[String]) {
     enter_new_session();
     thread::sleep(Duration::from_secs(CONFIRM_WINDOW));
     let Some(token) = argv.get(2) else {
         return;
     };
     if let Ok(config) = load_preferences(paths, None) {
-        let system = System;
-        let monitors = Hyprctl::new(&system);
-        let lua = Luac::new(&system);
-        let cx = SessionCx::new(
-            RenderCx::new(&config, paths, &monitors, &lua),
-            &system as &dyn Runner,
-        );
+        let monitors = Hyprctl::new(proc);
+        let lua = Luac::new(proc);
+        let cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
         drop(transaction::display_finish(&cx, token, false));
     }
 }

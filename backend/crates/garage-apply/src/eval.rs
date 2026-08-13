@@ -22,3 +22,44 @@
 //! one sibling that deliberately does not use it: its per-leaf speeds are top-level
 //! `hl.animation()` calls rather than a single `hl.config()` table, and it needs none of the
 //! blur write-back this appends.
+
+use garage_core::traits::Output;
+
+use crate::command::run;
+use crate::cx::SessionCx;
+
+/// Set live Hyprland options from a Lua table body, without a reload (garage:4703-4727).
+///
+/// Returns the captured `hyprctl eval` result rather than a `Result`, exactly as the Python
+/// does: every caller has its own fallback for a refused eval -- three of them reload the
+/// compositor instead -- and only one of them turns the refusal into an error at all. Handing
+/// back the outcome is what lets each decide.
+pub(crate) fn eval_config(cx: &SessionCx<'_>, body: &str) -> Output {
+    let code = format!(
+        "hl.config({{{body}}}) hl.config({{decoration = {{blur = \
+         {{size = hl.get_config(\"decoration:blur:size\")}}}}}})"
+    );
+    run(cx, &["hyprctl", "eval", &code])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::eval_config;
+    use crate::testing::{Script, World};
+
+    #[test]
+    fn the_blur_write_back_is_its_own_config_call() {
+        // A second `decoration` key in the same table constructor is a plain Lua overwrite,
+        // and the options it was meant to accompany would be dropped without any error. The
+        // two `hl.config(` occurrences are what says the nudge is separate.
+        let world = World::plain("eval-writeback", Script::new());
+        world.with(|cx| drop(eval_config(cx, "general = {border_size = 2}")));
+        let trace = world.trace();
+        let code = trace.first().expect("one eval was issued");
+        assert!(code.starts_with("hyprctl eval hl.config({general = {border_size = 2}}) "));
+        assert_eq!(code.matches("hl.config(").count(), 2);
+        assert!(code.ends_with(
+            "hl.config({decoration = {blur = {size = hl.get_config(\"decoration:blur:size\")}}})"
+        ));
+    }
+}

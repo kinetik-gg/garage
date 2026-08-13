@@ -22,26 +22,34 @@
 //! the watchdog's own re-entry point and not something a person types), `theme-sync` and
 //! `night-shift-sync`.
 //!
-//! # What is wired and what is owed
+//! # Where each name lands
 //!
-//! The *structure* below is final; several of the layers it calls into are not. A command
-//! whose layer is still a stub fails through the envelope naming itself, which is the honest
-//! answer and the one the differential harness can read. `help`, `render` (through
-//! [`render_all`]), `render-idle` (through [`run_render`]), `render-bar` (through
-//! [`garage_render::all::render_bar`]) and `render-wallpaper` (through
-//! [`garage_render::all::render_wallpaper`]) all reach real code now; `set` reaches the real
-//! load, the real write and the real route walk, failing only at the first step of the
-//! route. `render` itself completes end to end, with or without a saved layout, since task
-//! 3.8 replaced `render_displays()`'s stub. The four display commands -- `display-test`,
-//! `display-confirm`, `display-revert` and the watchdog -- are real, and live in
-//! [`crate::displays`]. `apply` has no entry
-//! point in `garage-apply` to call yet; it is wired the moment that crate grows one, and
-//! nothing here changes when it does.
+//! Every one of them reaches a real layer; the table is complete. `help` is answered here.
+//! The four render commands go to `garage-render` -- [`render_all`] for the whole set,
+//! [`run_render`] for `render-idle`'s one step, and
+//! [`render_bar`](garage_render::all::render_bar) /
+//! [`render_wallpaper`](garage_render::all::render_wallpaper) for the two narrow unit
+//! `ExecStartPre`s. `set` is [`crate::set`], the four display commands are
+//! [`crate::displays`], and the four that move the running session -- `apply`, `action`,
+//! `theme-sync`, `night-shift-sync` -- are [`crate::session`]. `snapshot` is
+//! [`garage_apply::make_snapshot`], which is also what a bare `garage` with no argument at
+//! all resolves to.
+//!
+//! # The runner is a parameter, not a global
+//!
+//! [`run`] builds one [`System`] and hands it down; nothing below reaches for a process on
+//! its own. That is what makes the dispatch testable now that most of these commands signal
+//! the session: a test that used the real runner would `hyprctl reload` the developer's
+//! desktop to find out whether a name is dispatched. The render-only arms take it too, for
+//! the compositor question `render_workspaces()` asks and the `luac -p` every Lua fragment
+//! is checked with.
 
 use garage_apply::keybind::load_keybindings;
-use garage_apply::{doctor, repair, update};
+use garage_apply::terminal::resolve_browser;
+use garage_apply::{doctor, make_snapshot, repair, update, SessionCx};
 use garage_core::paths::Paths;
 use garage_core::schema::RenderStep;
+use garage_core::traits::Runner;
 use garage_prefs::{load_preferences, migrate_config_root};
 use garage_proc::{Hyprctl, Luac, System};
 use garage_render::all::{render_all, render_bar, render_wallpaper};
@@ -52,6 +60,7 @@ use serde_json::Value;
 use crate::displays::{display_finish, display_test, watchdog};
 use crate::error::CliError;
 use crate::response::{emit, USAGE};
+use crate::session::{acted, applied, synced_night_shift, synced_theme};
 use crate::set;
 
 /// The three commands that answer a person rather than the QML client, so their output is
@@ -66,7 +75,7 @@ const PLAIN_COMMANDS: [&str; 3] = ["doctor", "repair", "update"];
 /// Two shapes, because `_display-watchdog` is the one command in the table that prints
 /// nothing at all: it runs unattended, fifteen seconds after the process that started it has
 /// already answered, and there is nobody left to read an envelope.
-enum Emitted {
+pub(crate) enum Emitted {
     /// Print this payload with an empty `error`.
     Envelope(Value),
     /// Print nothing. Exit 0 regardless.
@@ -85,10 +94,11 @@ pub(crate) fn run(argv: &[String]) -> u8 {
         return 0;
     }
     let paths = Paths::from_env();
+    let system = System;
     if PLAIN_COMMANDS.contains(&command) {
-        return plain(&paths, command, argv);
+        return plain(&paths, &system, command, argv);
     }
-    match settings(&paths, command, argv) {
+    match settings(&paths, &system, command, argv) {
         Ok(Emitted::Envelope(data)) => {
             emit(&data, "");
             0
@@ -110,14 +120,14 @@ pub(crate) fn run(argv: &[String]) -> u8 {
 /// on the way to succeeding has already gone to stdout by then -- they are commands that
 /// print as they go, not commands that assemble an answer -- so a failure late in `update`
 /// leaves the transcript above it on screen, which is the point.
-fn plain(paths: &Paths, command: &str, argv: &[String]) -> u8 {
+fn plain(paths: &Paths, proc: &dyn Runner, command: &str, argv: &[String]) -> u8 {
     let arguments: &[String] = argv.get(2..).unwrap_or_default();
     let outcome = migrate_config_root(paths)
         .map_err(CliError::from)
         .and_then(|()| match command {
-            "doctor" => Ok(doctor(paths, &System, arguments)?),
+            "doctor" => Ok(doctor(paths, proc, arguments)?),
             "repair" => Ok(repair(paths, arguments)?),
-            "update" => Ok(update(paths, &System, arguments)?),
+            "update" => Ok(update(paths, proc, arguments)?),
             // Unreachable: `run()` only calls this for a name in `PLAIN_COMMANDS`, and this
             // match covers all three. Answered rather than panicked for the same reason the
             // workspace denies `panic!`.
@@ -136,53 +146,65 @@ fn plain(paths: &Paths, command: &str, argv: &[String]) -> u8 {
 ///
 /// `migrate_config_root()` runs first and its failure travels through the envelope, which is
 /// the Python's placement -- inside the `try`, ahead of the dispatch.
-fn settings(paths: &Paths, command: &str, argv: &[String]) -> Result<Emitted, CliError> {
+fn settings(
+    paths: &Paths,
+    proc: &dyn Runner,
+    command: &str,
+    argv: &[String],
+) -> Result<Emitted, CliError> {
     migrate_config_root(paths)?;
     match command {
-        // make_snapshot(): task 3.9.
-        "snapshot" => Err(CliError::PortPending("snapshot")),
+        "snapshot" => Ok(Emitted::Envelope(make_snapshot(paths, proc)?)),
         // Files only. Every fragment is rewritten and nothing is signalled: see
         // render_all(). `apply` is the one that also moves the session.
-        "render" => rendered(paths, None),
+        "render" => rendered(paths, proc, None),
         // hypridle's ExecStartPre. One file, which is all hypridle reads -- and all it may
         // render, because `set lock.*` restarts that unit synchronously while holding
         // PREFERENCES_LOCK.
-        "render-idle" => rendered(paths, Some(RenderStep::Idle)),
+        "render-idle" => rendered(paths, proc, Some(RenderStep::Idle)),
         // waybar's ExecStartPre: render_region + render_bar_workspaces + render_bar_widgets,
         // narrow rather than a full render.
-        "render-bar" => rendered_bar(paths),
+        "render-bar" => rendered_bar(paths, proc),
         // hyprpaper's ExecStartPre, deliberately not "render".
-        "render-wallpaper" => rendered_wallpaper(paths),
-        // apply_preferences(): task 3.7.
-        "apply" => Err(CliError::PortPending("apply")),
-        "set" => set::set(paths, argv).map(Emitted::Envelope),
-        // action(): task 3.10.
-        "action" => Err(CliError::PortPending("action")),
-        "display-test" => display_test(paths, argv).map(Emitted::Envelope),
-        "display-confirm" => display_finish(paths, argv, true).map(Emitted::Envelope),
-        "display-revert" => display_finish(paths, argv, false).map(Emitted::Envelope),
+        "render-wallpaper" => rendered_wallpaper(paths, proc),
+        // render, then push everything into the running session.
+        "apply" => applied(paths, proc),
+        "set" => set::set(paths, proc, argv).map(Emitted::Envelope),
+        "action" => acted(paths, proc, argv),
+        "display-test" => display_test(paths, proc, argv).map(Emitted::Envelope),
+        "display-confirm" => display_finish(paths, proc, argv, true).map(Emitted::Envelope),
+        "display-revert" => display_finish(paths, proc, argv, false).map(Emitted::Envelope),
         "_display-watchdog" => {
-            watchdog(paths, argv);
+            watchdog(paths, proc, argv);
             Ok(Emitted::Silent)
         }
-        // theme-sync and night-shift-sync: task 3.6.
-        "theme-sync" => Err(CliError::PortPending("theme-sync")),
-        "night-shift-sync" => Err(CliError::PortPending("night-shift-sync")),
+        "theme-sync" => synced_theme(paths, proc),
+        "night-shift-sync" => synced_night_shift(paths, proc),
         other => Err(CliError::UnknownCommand(other.to_owned())),
     }
 }
 
 /// `render_all(load_preferences())`, or one named step of it.
 ///
-/// The context is assembled per invocation and thrown away with it. It carries no lock and
-/// no runner -- see [`RenderCx`] -- so this path is structurally unable to reach either,
-/// which is what lets `render-idle` be re-entered from `hypridle.service`'s `ExecStartPre`
-/// while a `set lock.*` is holding `PREFERENCES_LOCK`.
-fn rendered(paths: &Paths, step: Option<RenderStep>) -> Result<Emitted, CliError> {
+/// The context is assembled per invocation and thrown away with it, and it carries no lock
+/// -- see [`RenderCx`] -- which is what lets `render-idle` be re-entered from
+/// `hypridle.service`'s `ExecStartPre` while a `set lock.*` is holding `PREFERENCES_LOCK`.
+/// Neither arm below can reach one, and neither wants to.
+///
+/// The full render additionally builds a [`SessionCx`], for one argument and one only: the
+/// browser command `render_general()` publishes as its third marker, which resolves through
+/// `gio mime` and therefore needs a runner. Handing the value in is not handing the render
+/// half a capability -- see [`garage_render::render_general`] for the whole of that
+/// reasoning -- and `garage render` writes the same three markers the Python's does because
+/// of it. `render-idle` takes the narrow arm and builds no session at all.
+fn rendered(
+    paths: &Paths,
+    proc: &dyn Runner,
+    step: Option<RenderStep>,
+) -> Result<Emitted, CliError> {
     let config = load_preferences(paths, None)?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
     let cx = RenderCx::new(&config, paths, &monitors, &lua);
     match step {
         // `render_all(load_keybindings())` in the Python, where the load happens inside the
@@ -190,7 +212,11 @@ fn rendered(paths: &Paths, step: Option<RenderStep>) -> Result<Emitted, CliError
         // it against the published catalog is `garage-apply`'s, and `garage-render` cannot
         // reach that crate -- see `render_all`'s own doc. Notes go to stderr, as they do
         // there.
-        None => render_all(&cx, &load_keybindings(paths, None))?,
+        None => {
+            let session = SessionCx::new(cx, proc);
+            let resolve = resolve_browser(&session);
+            render_all(&cx, &load_keybindings(paths, None), Some(&resolve))?;
+        }
         Some(step) => run_render(step, &cx)?,
     }
     Ok(Emitted::Envelope(Value::Bool(true)))
@@ -203,11 +229,10 @@ fn rendered(paths: &Paths, step: Option<RenderStep>) -> Result<Emitted, CliError
 /// # Errors
 ///
 /// Whatever [`garage_render::all::render_bar`] returns.
-fn rendered_bar(paths: &Paths) -> Result<Emitted, CliError> {
+fn rendered_bar(paths: &Paths, proc: &dyn Runner) -> Result<Emitted, CliError> {
     let config = load_preferences(paths, None)?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
     let cx = RenderCx::new(&config, paths, &monitors, &lua);
     render_bar(&cx)?;
     Ok(Emitted::Envelope(Value::Bool(true)))
@@ -221,11 +246,10 @@ fn rendered_bar(paths: &Paths) -> Result<Emitted, CliError> {
 /// # Errors
 ///
 /// Whatever [`garage_render::all::render_wallpaper`] returns.
-fn rendered_wallpaper(paths: &Paths) -> Result<Emitted, CliError> {
+fn rendered_wallpaper(paths: &Paths, proc: &dyn Runner) -> Result<Emitted, CliError> {
     let config = load_preferences(paths, None)?;
-    let system = System;
-    let monitors = Hyprctl::new(&system);
-    let lua = Luac::new(&system);
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
     let cx = RenderCx::new(&config, paths, &monitors, &lua);
     let _moved = render_wallpaper(&cx)?;
     Ok(Emitted::Envelope(Value::Bool(true)))
@@ -235,6 +259,7 @@ fn rendered_wallpaper(paths: &Paths) -> Result<Emitted, CliError> {
 mod tests {
     use super::{settings, Emitted, PLAIN_COMMANDS};
     use crate::error::CliError;
+    use crate::testing::Offline;
     use garage_core::paths::Paths;
     use std::collections::HashMap;
 
@@ -250,6 +275,24 @@ mod tests {
         Paths::from_env_map(&env)
     }
 
+    /// The whole of USAGE's settings backend, plus the name that is not in it: the default
+    /// when no subcommand is given. The watchdog is deliberately absent -- it sleeps fifteen
+    /// seconds by design.
+    const COMMANDS: [&str; 12] = [
+        "snapshot",
+        "render",
+        "render-idle",
+        "render-bar",
+        "render-wallpaper",
+        "apply",
+        "action",
+        "display-test",
+        "display-confirm",
+        "display-revert",
+        "theme-sync",
+        "night-shift-sync",
+    ];
+
     fn argv(parts: &[&str]) -> Vec<String> {
         std::iter::once("garage")
             .chain(parts.iter().copied())
@@ -261,6 +304,7 @@ mod tests {
     fn an_unknown_command_carries_the_pythons_own_wording() {
         let error = settings(
             &paths(),
+            &Offline::new(),
             "definitely-not-a-command",
             &argv(&["definitely-not-a-command"]),
         )
@@ -274,26 +318,10 @@ mod tests {
 
     #[test]
     fn every_command_in_the_table_is_reachable_and_none_of_them_is_unknown() {
-        // The whole of USAGE's settings backend, plus the two names that are not in it: the
-        // default when no subcommand is given, and the watchdog's re-entry point. A command
-        // this dispatch forgot would come back as "Unknown command", which is the one
-        // failure this test exists to catch.
-        let commands = [
-            "snapshot",
-            "render",
-            "render-idle",
-            "render-bar",
-            "render-wallpaper",
-            "apply",
-            "action",
-            "display-test",
-            "display-confirm",
-            "display-revert",
-            "theme-sync",
-            "night-shift-sync",
-        ];
-        for command in commands {
-            let outcome = settings(&paths(), command, &argv(&[command]));
+        // See COMMANDS: a command this dispatch forgot would come back as "Unknown command",
+        // which is the one failure this test exists to catch.
+        for command in COMMANDS {
+            let outcome = settings(&paths(), &Offline::new(), command, &argv(&[command]));
             assert!(
                 !matches!(outcome, Err(CliError::UnknownCommand(_))),
                 "{command} is not dispatched"
@@ -301,23 +329,43 @@ mod tests {
         }
     }
 
+    /// The claim that replaced "a stub names the command that is owed": there is no stub
+    /// left. Every name in the table reaches a real layer, so a failure here is always
+    /// something the machine or the argument said -- against this deliberately unwritable
+    /// `HOME`, a filesystem refusal naming the path.
     #[test]
-    fn a_stub_names_the_command_that_is_owed() {
-        let error = settings(&paths(), "theme-sync", &argv(&["theme-sync"]))
-            .err()
-            .map(|error| error.to_string());
-        assert_eq!(error.as_deref(), Some("theme-sync has not been ported yet"));
+    fn no_command_in_the_table_answers_that_it_has_not_been_ported() {
+        for command in COMMANDS {
+            let message = settings(&paths(), &Offline::new(), command, &argv(&[command]))
+                .err()
+                .map(|error| error.to_string())
+                .unwrap_or_default();
+            assert!(
+                !message.contains("has not been ported yet"),
+                "{command}: {message}"
+            );
+        }
     }
 
     #[test]
     fn set_with_the_wrong_argument_count_is_a_usage_message_not_a_schema_refusal() {
-        let error = settings(&paths(), "set", &argv(&["set", "appearance.accent_color"]))
-            .err()
-            .map(|error| error.to_string());
+        let error = settings(
+            &paths(),
+            &Offline::new(),
+            "set",
+            &argv(&["set", "appearance.accent_color"]),
+        )
+        .err()
+        .map(|error| error.to_string());
         assert_eq!(error.as_deref(), Some("Usage: garage set KEY JSON_VALUE"));
-        let too_many = settings(&paths(), "set", &argv(&["set", "a.b", "1", "2"]))
-            .err()
-            .map(|error| error.to_string());
+        let too_many = settings(
+            &paths(),
+            &Offline::new(),
+            "set",
+            &argv(&["set", "a.b", "1", "2"]),
+        )
+        .err()
+        .map(|error| error.to_string());
         assert_eq!(
             too_many.as_deref(),
             Some("Usage: garage set KEY JSON_VALUE")
@@ -357,8 +405,13 @@ mod tests {
     #[test]
     fn render_bar_writes_the_three_bar_fragments_and_nothing_else() {
         let paths = scratch_paths("render-bar");
-        let outcome = settings(&paths, "render-bar", &argv(&["render-bar"]))
-            .expect("render-bar succeeds against a real scratch HOME");
+        let outcome = settings(
+            &paths,
+            &Offline::new(),
+            "render-bar",
+            &argv(&["render-bar"]),
+        )
+        .expect("render-bar succeeds against a real scratch HOME");
         assert!(
             matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
         );
@@ -378,7 +431,7 @@ mod tests {
     #[test]
     fn render_completes_end_to_end_with_no_displays_toml() {
         let paths = scratch_paths("render-all");
-        let outcome = settings(&paths, "render", &argv(&["render"]))
+        let outcome = settings(&paths, &Offline::new(), "render", &argv(&["render"]))
             .expect("render completes with no displays.toml in scratch");
         assert!(
             matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
@@ -392,8 +445,13 @@ mod tests {
     #[test]
     fn render_wallpaper_writes_only_hyprpaper_conf() {
         let paths = scratch_paths("render-wallpaper");
-        let outcome = settings(&paths, "render-wallpaper", &argv(&["render-wallpaper"]))
-            .expect("render-wallpaper succeeds against a real scratch HOME");
+        let outcome = settings(
+            &paths,
+            &Offline::new(),
+            "render-wallpaper",
+            &argv(&["render-wallpaper"]),
+        )
+        .expect("render-wallpaper succeeds against a real scratch HOME");
         assert!(
             matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
         );

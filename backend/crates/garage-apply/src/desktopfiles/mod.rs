@@ -22,5 +22,10 @@
 #![allow(dead_code)]
 
 mod entry;
-mod mime;
-mod roles;
+pub(crate) mod mime;
+pub(crate) mod roles;
+
+/// `DesktopFileError`'s two refusals reach the JSON envelope through
+/// [`ApplyError::DesktopFile`](crate::error::ApplyError::DesktopFile), so the type is part of
+/// this crate's public surface even though nothing outside names the module it lives in.
+pub use mime::DesktopFileError;

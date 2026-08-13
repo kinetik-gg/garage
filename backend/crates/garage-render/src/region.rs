@@ -104,7 +104,7 @@ fn waybar_clock_json(prefs: &Preferences) -> String {
 /// # Errors
 ///
 /// [`RenderError::Atomic`] if either fragment could not be replaced.
-pub(crate) fn render_region(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_region(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     atomic_write(&cx.paths().fragments.locale_env, &locale_env(cx.prefs()))?;
     atomic_write(
         &cx.paths().fragments.waybar_clock,

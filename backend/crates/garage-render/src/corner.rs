@@ -22,7 +22,7 @@ use crate::lua::emit::corner_rounding;
 /// # Errors
 ///
 /// [`RenderError::Marker`] if the marker could not be written.
-pub(crate) fn render_corner_radius(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_corner_radius(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let rounding = corner_rounding(cx.prefs());
     write_marker(&cx.paths().markers.corner_radius, &format!("{rounding}\n"))?;
     Ok(())

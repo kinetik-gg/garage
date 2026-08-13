@@ -19,32 +19,96 @@
 //! under `~/.config` waybar watches does: a rename past its `inotify` watch is a change it
 //! never hears about.
 
+use garage_core::fs::marker::write_marker;
+use garage_render::theme::resolve_theme;
+use garage_render::{render_bar_widgets, render_bar_workspaces, waybar_style_css};
+
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
+use crate::workspaces::reload_bar;
 
-/// Publish the bar's module list (menu, workspaces, media) and signal the bar to re-read it.
+/// Publish the bar's module list (menu, workspaces, media) and signal the bar to re-read it
+/// (garage:4581-4590).
 ///
 /// # Errors
 ///
-/// Always [`ApplyError::PortPending`] until Phase 3 replaces this stub.
-pub(crate) fn apply_bar_workspaces(_cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
-    Err(ApplyError::PortPending("apply_bar_workspaces"))
+/// [`ApplyError::Render`] if the fragment could not be written.
+pub(crate) fn apply_bar_workspaces(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
+    render_bar_workspaces(cx.render())?;
+    reload_bar(cx);
+    Ok(())
 }
 
-/// Rewrite the bar's stylesheet alone and have the bar re-read it.
+/// Rewrite the bar's stylesheet alone, for the resolved appearance (garage:4600-4606).
+///
+/// `write_marker()`, not an atomic rename, for the reason every path under `~/.config` waybar
+/// watches uses it: a rename past its `inotify` watch is a change it never hears about.
 ///
 /// # Errors
 ///
-/// Always [`ApplyError::PortPending`] until Phase 3 replaces this stub.
-pub(crate) fn apply_bar_style(_cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
-    Err(ApplyError::PortPending("apply_bar_style"))
+/// [`ApplyError::Marker`] if the stylesheet could not be written in place.
+fn render_bar_style(cx: &SessionCx<'_>) -> Result<(), ApplyError> {
+    let prefs = cx.render().prefs();
+    let css = waybar_style_css(resolve_theme(prefs), prefs);
+    write_marker(&cx.render().paths().toolkit.waybar_style, &css)?;
+    Ok(())
 }
 
-/// Republish the bar's widgets and have the bar re-read them.
+/// Rewrite the bar's stylesheet alone and have the bar re-read it (garage:4609-4612).
 ///
 /// # Errors
 ///
-/// Always [`ApplyError::PortPending`] until Phase 3 replaces this stub.
-pub(crate) fn apply_bar_widgets(_cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
-    Err(ApplyError::PortPending("apply_bar_widgets"))
+/// Whatever [`render_bar_style`] returns.
+pub(crate) fn apply_bar_style(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
+    render_bar_style(cx)?;
+    reload_bar(cx);
+    Ok(())
+}
+
+/// Republish the bar's widgets and have the bar re-read them (garage:4615-4625).
+///
+/// Both fragments, not just the widget one: media's definition is widget-owned while its
+/// place immediately after the workspace indicator is left-side-owned, so a media toggle has
+/// to republish both before the one reload. The other widget toggles harmlessly reproduce the
+/// unchanged left fragment.
+///
+/// # Errors
+///
+/// [`ApplyError::Render`] if either fragment could not be written.
+pub(crate) fn apply_bar_widgets(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
+    render_bar_workspaces(cx.render())?;
+    render_bar_widgets(cx.render())?;
+    reload_bar(cx);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_bar_style, apply_bar_widgets, apply_bar_workspaces};
+    use crate::testing::{Script, World};
+
+    #[test]
+    fn all_three_end_at_the_one_signal_and_never_touch_the_compositor() {
+        for (label, applier) in [
+            (
+                "bar-workspaces",
+                apply_bar_workspaces as fn(&mut crate::cx::SessionCx<'_>) -> _,
+            ),
+            ("bar-style", apply_bar_style),
+            ("bar-widgets", apply_bar_widgets),
+        ] {
+            let world = World::plain(label, Script::new());
+            world.with(|cx| applier(cx).expect("the fragment is written"));
+            assert_eq!(world.signals(), ["pkill -USR2 -x waybar"], "{label}");
+        }
+    }
+
+    #[test]
+    fn the_stylesheet_is_written_in_place_where_waybar_is_watching() {
+        let world = World::plain("bar-style-file", Script::new());
+        world.with(|cx| apply_bar_style(cx).expect("the stylesheet is written"));
+        let css = std::fs::read_to_string(&world.paths.toolkit.waybar_style)
+            .expect("the stylesheet exists");
+        assert!(css.contains("@define-color"), "{css}");
+    }
 }

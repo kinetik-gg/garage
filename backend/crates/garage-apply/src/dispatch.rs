@@ -19,13 +19,11 @@ use crate::{
 ///
 /// # Errors
 ///
-/// Whatever the dispatched applier returns. [`ApplyStep::WorkspacePlan`] reaches a real
-/// implementation as of task 3.5; the rest are still stubs -- see [`ApplyError::PortPending`]
-/// -- and Phase 3 replaces the bodies this calls into, not this match.
+/// Whatever the dispatched applier returns. Every variant reaches a real implementation.
 pub fn run_apply(step: ApplyStep, cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     match step {
-        ApplyStep::Wallpaper => wallpaper::apply_wallpaper(cx),
-        ApplyStep::LiveWallpaper(_) => wallpaper::apply_live_wallpaper(cx),
+        ApplyStep::Wallpaper => wallpaper::apply_wallpaper(cx, wallpaper::Moved::Ask),
+        ApplyStep::LiveWallpaper(scheme) => wallpaper::apply_live_wallpaper(cx, scheme),
         ApplyStep::Accent => route::apply_accent(cx),
         ApplyStep::CornerRadius => corner::apply_corner_radius(cx),
         ApplyStep::Border => border::apply_border(cx),
@@ -33,10 +31,15 @@ pub fn run_apply(step: ApplyStep, cx: &mut SessionCx<'_>) -> Result<(), ApplyErr
         ApplyStep::BarStyle => bar::apply_bar_style(cx),
         ApplyStep::ThemeIfSchemeMoved => theme::apply_theme_if_scheme_moved(cx),
         ApplyStep::Glass => glass::apply_glass(cx),
-        ApplyStep::NightShift => night_shift::apply_night_shift(cx),
+        ApplyStep::NightShift => {
+            // The Python drops the flag here too: `("apply_night_shift",)` is a route step
+            // like any other, and only `night-shift-sync` reads the answer.
+            let _took = night_shift::apply_night_shift(cx);
+            Ok(())
+        }
         ApplyStep::Terminal => terminal::apply_terminal(cx),
         ApplyStep::FileIndex => file_index::apply_file_index(cx),
-        ApplyStep::RunOrRaise { .. } => route::run_or_raise(cx),
+        ApplyStep::RunOrRaise { command, message } => route::run_or_raise(cx, command, message),
         ApplyStep::Locale => locale::apply_locale(cx),
         ApplyStep::Region => region::apply_region(cx),
         ApplyStep::WorkspacePlan => workspaces::apply_workspace_plan(cx),

@@ -58,3 +58,31 @@ pub mod workspaces;
 
 pub use cx::RenderCx;
 pub use error::RenderError;
+
+// The render halves of `garage-apply`'s render-then-push pairs, and the two palette builders
+// its narrow appliers need.
+//
+// Most of this crate is reached from outside through [`dispatch::run_render`], which is the
+// route table's own door and is exhaustive over [`RenderStep`](garage_core::schema::routes::
+// RenderStep). These are the renderers that have no `RenderStep` of their own, because the
+// Python calls them from inside an *applier* rather than from a route: `apply_accent()` is
+// `render_accent()` then `push_accent()`, `apply_corner_radius()` is `render_corner_radius()`
+// then `push_corner_radius()`, `apply_theme()` is `render_theme()` then `push_theme()`, and
+// `apply_region()`, `apply_bar_workspaces()`, `apply_bar_widgets()` and `apply_terminal()`
+// are each their own renderer followed by one signal.
+//
+// Publishing them widens what may be *called*, not what this crate may *do*: every one still
+// takes a [`RenderCx`], which carries no runner and no lock, so nothing here gains the
+// ability to signal anything by being reachable from a crate that can. That is the same
+// argument [`displays`] and [`workspaces`] are already public under.
+pub use accent::render_accent;
+pub use bar::widgets::render_bar_widgets;
+pub use bar::workspaces::render_bar_workspaces;
+pub use corner::render_corner_radius;
+pub use general::{render_general, BrowserCommand};
+pub use palette::accents::border_colors;
+pub use palette::toolkits::{look, Look};
+pub use palette::waybar::waybar_style_css;
+pub use preferences::render_preferences;
+pub use region::render_region;
+pub use theme::render_theme;

@@ -37,9 +37,9 @@ use garage_core::pyrepr::py_format_g;
 use garage_render::displays::{load_display_config, DisplayEntry, DisplayLayout, LayoutValue};
 use serde_json::Value;
 
+use crate::command::json_list;
 use crate::cx::SessionCx;
 use crate::displays::wire::from_json;
-use crate::workspaces::json_list;
 
 /// `display_snapshot()` (garage:4956-5015): the arrangement the Displays pane draws.
 ///

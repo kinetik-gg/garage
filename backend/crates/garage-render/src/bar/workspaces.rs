@@ -61,7 +61,7 @@ fn modules_left_json(modules: &[&str]) -> String {
 /// # Errors
 ///
 /// [`RenderError::Atomic`] if the fragment cannot be replaced.
-pub(crate) fn render_bar_workspaces(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_bar_workspaces(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let mut modules: Vec<&str> = WAYBAR_MODULES_LEFT.to_vec();
     if cx.prefs().workspaces.indicator {
         modules.push(WAYBAR_WORKSPACE_MODULE);

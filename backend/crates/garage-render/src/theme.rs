@@ -65,7 +65,7 @@ use crate::search::render_search_engine;
 ///
 /// [`RenderError::Marker`] if the bar foreground or search engine marker could not be
 /// written, or whatever [`render_toolkits`] returns.
-pub(crate) fn render_theme(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+pub fn render_theme(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let scheme = resolve_theme(cx.prefs());
     render_search_engine(cx)?;
     // The bar's widgets draw their own SVG text, which no stylesheet reaches. Publish the
