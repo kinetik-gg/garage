@@ -619,7 +619,12 @@ for garage_binary in garage garage-metrics garage-file-index garage-ai-usage; do
     garage_command_path="$HOME/.local/bin/$garage_binary"
     if [[ -L $garage_command_path ]]; then
         garage_command_target=$(readlink -m -- "$garage_command_path")
-        if [[ $garage_command_target == "$repo_dir" || $garage_command_target == "$repo_dir/"* ]]; then
+        # A repo-owned link keeps its name only while its target still exists:
+        # a dangling link into the checkout is a leftover from before the
+        # Python backend was deleted, and preserving it would leave the command
+        # broken until the next restow. Repoint it like any unclaimed name.
+        if [[ -e $garage_command_target ]] &&
+            [[ $garage_command_target == "$repo_dir" || $garage_command_target == "$repo_dir/"* ]]; then
             info "keeping $garage_command_path (owned by the stowed Python backend)"
             continue
         fi
