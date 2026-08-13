@@ -45,6 +45,8 @@ SHELL_DIR = REPO_ROOT / "desktop" / ".config" / "quickshell" / "garage"
 MEDIA_PALETTE_QML = SHELL_DIR / "MediaPalette.qml"
 MEDIA_CARD_QML = SHELL_DIR / "MediaCard.qml"
 SHELL_QML = SHELL_DIR / "shell.qml"
+PANEL_ACTION = (REPO_ROOT / "backend" / "crates" / "garage-apply" / "src" /
+                "actions" / "panel.rs")
 
 # The scripts this wave superseded. garage-metrics answers for all four now, and
 # a config.jsonc that still names one would point the bar at a file that is gone.
@@ -145,44 +147,25 @@ class BaseSheetOwnsNoSpacing(BackendTestCase):
 
 
 class BarPanelToggle(unittest.TestCase):
-    """Bar clicks reach their output-local anchors even with stale state."""
+    """The shell boundary translates old Waybar calls into panel.toggle payloads."""
 
     TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
 
-    def fake_desktop(self, root: Path, cursor_x: int = 150) -> tuple[Path, Path]:
-        bin_dir = root / "bin"
-        capture = root / "qs-call"
-        bin_dir.mkdir()
-        hyprctl = bin_dir / "hyprctl"
-        hyprctl.write_text(
-            "#!/bin/sh\n"
-            "case \"$1\" in\n"
-            f"  cursorpos) printf '%s\\n' '{{\"x\":{cursor_x},\"y\":10}}' ;;\n"
-            "  monitors) printf '%s\\n' "
-            "'[{\"name\":\"DP-1\",\"x\":0,\"y\":0,"
-            "\"width\":1920,\"height\":1080,\"scale\":1}]' ;;\n"
-            "  workspaces) printf '%s\\n' "
-            "'[{\"name\":\"1\",\"monitor\":\"DP-1\"},"
-            "{\"name\":\"2\",\"monitor\":\"DP-1\"},"
-            "{\"name\":\"3\",\"monitor\":\"DP-1\"},"
-            "{\"name\":\"4\",\"monitor\":\"DP-1\"}]' ;;\n"
-            "esac\n",
-            encoding="utf-8")
-        qs = bin_dir / "qs"
-        qs.write_text(
+    def fake_backend(self, root: Path) -> Path:
+        bin_dir = root / ".local" / "bin"
+        capture = root / "garage-call"
+        bin_dir.mkdir(parents=True)
+        garage = bin_dir / "garage"
+        garage.write_text(
             "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$CAPTURE\"\n",
             encoding="utf-8")
-        hyprctl.chmod(0o755)
-        qs.chmod(0o755)
-        return bin_dir, capture
+        garage.chmod(0o755)
+        return capture
 
-    def run_toggle(self, root: Path, *arguments: str, cursor_x: int = 150) -> str:
-        bin_dir, capture = self.fake_desktop(root, cursor_x)
+    def run_toggle(self, root: Path, *arguments: str) -> str:
+        capture = self.fake_backend(root)
         env = os.environ | {
-            "PATH": f"{bin_dir}:/usr/bin",
             "HOME": str(root),
-            "XDG_STATE_HOME": str(root / "state"),
-            "XDG_CONFIG_HOME": str(root / "config"),
             "CAPTURE": str(capture),
         }
         subprocess.run([str(self.TOGGLE), *arguments], env=env,
@@ -198,71 +181,51 @@ class BarPanelToggle(unittest.TestCase):
         (generated / "waybar-widgets.jsonc").write_text(fragment, encoding="utf-8")
         (waybar / "style.css").write_text(stylesheet, encoding="utf-8")
 
-    def test_the_anchor_is_the_centre_of_the_whole_metric_group(self) -> None:
-        # Two strips of 100 with 12px of padding a side: a 248px group ending
-        # 300px in from the right edge of a 1920px output. Its centre is
-        # 1920 - 300 - 124. Both numbers come out of the generated files rather
-        # than out of the script, which is the property this pins.
+    def test_a_monitor_widget_becomes_the_action_payload(self) -> None:
         with tempfile.TemporaryDirectory() as root_text:
             root = Path(root_text)
-            self.desktop_state(root, json.dumps({
-                "group/monitoring": {
-                    "modules": ["image#metric-cpu", "image#metric-gpu"],
-                },
-                "image#metric-cpu": {"size": 100},
-                "image#metric-gpu": {"size": 100},
-            }), "#image {\n  padding: 0 12px;\n}\n"
-                "#status-tail {\n  min-width: 300px;\n}\n")
             call = self.run_toggle(root, "monitor", "cpu")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1496\n", call)
+        self.assertEqual(
+            'action panel.toggle {"panel":"monitor","widget":"cpu"}\n', call)
 
-    def test_the_click_lands_in_the_same_place_whichever_strip_it_was(self) -> None:
-        """The reason no cursor coordinate reaches the anchor."""
-        fragment = json.dumps({
-            "group/monitoring": {
-                "modules": ["image#metric-cpu", "image#metric-gpu"],
-            },
-            "image#metric-cpu": {"size": 100},
-            "image#metric-gpu": {"size": 100},
-        })
-        stylesheet = ("#image {\n  padding: 0 12px;\n}\n"
-                      "#status-tail {\n  min-width: 300px;\n}\n")
-        anchors = set()
-        for widget in ("cpu", "gpu"):
+    def test_all_six_metric_names_cross_the_shim_unchanged(self) -> None:
+        for widget in ("cpu", "memory", "network", "temp", "disk", "gpu"):
             with tempfile.TemporaryDirectory() as root_text:
                 root = Path(root_text)
-                self.desktop_state(root, fragment, stylesheet)
-                anchors.add(self.run_toggle(root, "monitor", widget))
-        self.assertEqual(1, len(anchors), anchors)
+                call = self.run_toggle(root, "monitor", widget)
+            with self.subTest(widget=widget):
+                self.assertEqual(
+                    f'action panel.toggle {{"panel":"monitor",'
+                    f'"widget":"{widget}"}}\n', call)
 
-    def test_a_broken_widget_fragment_still_opens_on_the_shipped_defaults(self) -> None:
-        # Runtime state a half-finished upgrade or a hand edit left unreadable.
-        # Under `set -e` this is the difference between a slightly misplaced
-        # dashboard and a bar click that does nothing at all.
+    def test_the_shim_never_reads_a_broken_generated_fragment(self) -> None:
+        # The backend owns the shipped-default fallback now; the boundary must
+        # forward the click without trying to parse that state a second time.
         with tempfile.TemporaryDirectory() as root_text:
             root = Path(root_text)
             self.desktop_state(root, "not json\n", "")
             call = self.run_toggle(root, "monitor", "cpu")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
+        self.assertEqual(
+            'action panel.toggle {"panel":"monitor","widget":"cpu"}\n', call)
 
     def test_the_widgetless_command_is_still_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as root_text:
             call = self.run_toggle(Path(root_text), "monitor")
-        self.assertEqual("-c garage ipc call shell monitorOn DP-1 1600\n", call)
+        self.assertEqual('action panel.toggle {"panel":"monitor"}\n', call)
 
-    def test_media_uses_one_group_anchor_wherever_the_label_is_clicked(self) -> None:
-        calls = set()
-        for cursor_x in (180, 420):
+    def test_every_non_monitor_panel_omits_the_widget_field(self) -> None:
+        for panel in ("notifications", "control-center", "media", "ai-usage"):
             with tempfile.TemporaryDirectory() as root_text:
-                calls.add(self.run_toggle(Path(root_text), "media",
-                                          cursor_x=cursor_x))
-        self.assertEqual({"-c garage ipc call shell mediaOn DP-1 347\n"}, calls)
+                call = self.run_toggle(Path(root_text), panel)
+            with self.subTest(panel=panel):
+                self.assertEqual(
+                    f'action panel.toggle {{"panel":"{panel}"}}\n', call)
 
-    def test_an_unknown_widget_is_refused_before_querying_the_compositor(self) -> None:
-        result = subprocess.run([str(self.TOGGLE), "monitor", "bogus"],
-                                capture_output=True, text=True)
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("usage:", result.stderr)
+    def test_an_unknown_widget_is_left_for_the_action_to_refuse(self) -> None:
+        with tempfile.TemporaryDirectory() as root_text:
+            call = self.run_toggle(Path(root_text), "monitor", "bogus")
+        self.assertEqual(
+            'action panel.toggle {"panel":"monitor","widget":"bogus"}\n', call)
 
 
 class MediaPalettePlacement(unittest.TestCase):
@@ -284,10 +247,11 @@ class MediaPalettePlacement(unittest.TestCase):
 
     def test_the_click_calculation_uses_the_palettes_real_width(self) -> None:
         palette = MEDIA_PALETTE_QML.read_text(encoding="utf-8")
-        script = BarPanelToggle.TOGGLE.read_text(encoding="utf-8")
+        action = PANEL_ACTION.read_text(encoding="utf-8")
         qml_width = int(re.search(r"implicitWidth:\s*(\d+)", palette).group(1))
-        script_width = int(re.search(r"palette_width=(\d+)", script).group(1))
-        self.assertEqual(qml_width, script_width)
+        action_width = int(re.search(
+            r"const PALETTE_WIDTH: i64 = (\d+);", action).group(1))
+        self.assertEqual(qml_width, action_width)
 
     def test_playerctld_is_not_presented_as_a_second_real_player(self) -> None:
         for path in (MEDIA_PALETTE_QML, MEDIA_CARD_QML):
@@ -314,9 +278,7 @@ class MediaPaletteArtwork(unittest.TestCase):
 
 
 class MonitorAnchorIsOneNumber(BackendTestCase):
-    """The tail width the bar lays out and the one the click reads are one value."""
-
-    TOGGLE = REPO_ROOT / "desktop" / ".local" / "bin" / "garage-panel-toggle"
+    """The tail width the bar lays out and the action reads are one value."""
 
     def test_the_generated_sheet_publishes_the_tail_width(self) -> None:
         css = self.garage.waybar_spacing_css(
@@ -324,13 +286,15 @@ class MonitorAnchorIsOneNumber(BackendTestCase):
         self.assertIn(f"min-width: {self.garage.WAYBAR_STATUS_TAIL_WIDTH}px", css,
                       "garage-panel-toggle reads this back out of the sheet")
 
-    def test_the_scripts_fallback_is_the_same_number(self) -> None:
-        # The script cannot import the constant, so the one copy it does carry --
-        # for the case where the sheet is missing -- is checked against it here.
-        script = self.TOGGLE.read_text(encoding="utf-8")
-        self.assertIn(f"tail_width={self.garage.WAYBAR_STATUS_TAIL_WIDTH}\n", script)
-        self.assertIn(f"tail_width=${{configured_tail:-"
-                      f"{self.garage.WAYBAR_STATUS_TAIL_WIDTH}}}", script)
+    def test_the_actions_fallback_is_the_same_number(self) -> None:
+        action = PANEL_ACTION.read_text(encoding="utf-8")
+        default = re.search(
+            r"impl MonitorCss \{.*?const DEFAULT: Self = Self \{.*?"
+            r"tail_width: (\d+),", action, re.DOTALL)
+        self.assertIsNotNone(default)
+        self.assertEqual(self.garage.WAYBAR_STATUS_TAIL_WIDTH,
+                         int(default.group(1)))
+        self.assertIn("unwrap_or(Self::DEFAULT.tail_width)", action)
 
 
 class BarGlyphs(unittest.TestCase):
