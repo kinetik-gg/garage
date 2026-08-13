@@ -27,8 +27,9 @@ configuration an installer cannot adopt without losing part of it.
 
 **Re-running where Garage is already installed is supported and not blocked**: the
 gate recognises an existing install, `pacman` runs with `--needed`, the link step
-with `--restow`, and generated per-user files are written only when absent — so a
-re-run neither reinstalls nor overwrites your edits.
+with `--restow`, and mutable per-user files are written only when absent. Managed
+artifacts and release binaries are rebuilt so the installed code converges; host
+preferences and user-owned files are not overwritten.
 
 To proceed on a used system anyway:
 
@@ -86,14 +87,16 @@ without stopping on it, and checks package names against the current sync databa
 | 3 | **Installs the package set**: Hyprland and its portals, Quickshell, Waybar, Kitty, Fish, Rofi, SwayOSD, PipeWire, Thunar and its file integrations, the GNOME utility apps it uses, fonts, and the Node/Rust/C++ toolchains — plus NVIDIA packages when NVIDIA hardware is detected. |
 | 4 | **Installs the sign-in surface, then enables system services.** The complete root-owned SDDM theme is staged and atomically published before NetworkManager, Bluetooth, Docker, and SDDM are enabled, so the reboot lands in the Garage login screen. Sets `fish` as your login shell. |
 | 5 | **Creates the home directory layout** (`~/Documents`, `~/repositories`, the rest of the XDG set). |
-| 6 | **Clears the way, then links the configuration.** It moves pre-existing real files at the paths `stow` will claim to `~/.garage-backup/<timestamp>/`, deletes stale links from a checkout that has since moved, then runs `stow --restow --no-folding desktop`; a remaining conflict stops the run with the list rather than leaving your home half-linked. `fc-cache` follows, so the bundled fonts (Phosphor, Plus Jakarta Sans, Geist Mono, linked into `~/.local/share/fonts` by the same pass) are ready at first login. It also builds Garage's authentication modal from the checksum-pinned `hyprpolkitagent` 0.1.3 backend into the user's private prefix. |
-| 7 | **Writes the per-user generated files**: `~/.config/swayosd/config.toml`, `~/.config/gtk-3.0/bookmarks`, Thunar's first-run xfconf layout. Mutable or embedding an absolute `$HOME`, they are real files rather than links, so changing columns, geometry, bookmarks, or the OSD does not dirty Garage. |
-| 8 | **Picks a window material your GPU can afford** (below); with a discrete GPU it writes nothing at all. |
-| 9 | **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset, the polkit agent, SwayOSD, cliphist, xsettingsd, the Garage shell, background file indexing, the plugin ABI check, and the theme and Night Shift timers — and masks `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's notification daemon. Nothing is *started*: each unit is wanted by `graphical-session.target` or `timers.target` and comes up at your first graphical login. |
-| 10 | **Installs the Pure Fish prompt** at a pinned tag, and the stable Rust toolchain. |
-| 11 | **Installs the plugin ABI hook** — pacman hook, the root script it runs, the pinned plugin commits (below) — always, even with no plugin source present: it is the part that notices a broken plugin, so it must be in place before the upgrade that breaks one. |
-| 12 | **Deploys the optional Hyprland plugins**, if their source is present. |
-| 13 | **Prints a summary and tells you to reboot.** SDDM starts on the next boot; pick **Hyprland (UWSM)** and log in. |
+| 6 | **Clears the way, then links the configuration.** It moves pre-existing real files at the paths `stow` will claim to `~/.garage-backup/<timestamp>/`, deletes stale links from a checkout that has since moved, then runs `stow --restow --no-folding desktop`; a remaining conflict stops the run with the list rather than leaving your home half-linked. `fc-cache` follows, so the bundled fonts (Phosphor, Plus Jakarta Sans, Geist Mono, linked into `~/.local/share/fonts` by the same pass) are ready at first login. It seeds Hyprlock's all-monitor fallback and builds the Thunar-only GTK module. |
+| 7 | **Selects the stable Rust toolchain, then builds Garage's authentication modal** from the checksum-pinned `hyprpolkitagent` 0.1.3 source into the user's private prefix. |
+| 8 | **Builds and installs the Rust backend.** One release build produces `garage`, `garage-metrics`, `garage-file-index`, `garage-ai-usage`, and `garage-waybar-module`; the executable copies land in `~/.local/lib/garage/bin`, with command symlinks under `~/.local/bin`. |
+| 9 | **Writes the per-user generated files**: `~/.config/swayosd/config.toml`, `~/.config/gtk-3.0/bookmarks`, Thunar's first-run xfconf layout. Mutable or embedding an absolute `$HOME`, they are real files rather than links, so changing columns, geometry, bookmarks, or the OSD does not dirty Garage. |
+| 10 | **Picks a window material your GPU can afford** (below); with a discrete GPU it writes nothing at all. |
+| 11 | **Enables the per-user services** — Waybar, hypridle, hyprpaper, hyprsunset, the polkit agent, SwayOSD, cliphist, xsettingsd, the Garage shell, background file indexing, the plugin ABI check, and the theme and Night Shift timers — and masks `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's notification daemon. Nothing is *started*: each unit is wanted by `graphical-session.target` or `timers.target` and comes up at your first graphical login. |
+| 12 | **Installs the Pure Fish prompt** at a pinned tag. |
+| 13 | **Installs the plugin ABI hook** — pacman hook, the root script it runs, the pinned plugin commits (below) — always, even with no plugin source present: it is the part that notices a broken plugin, so it must be in place before the upgrade that breaks one. |
+| 14 | **Deploys the optional Hyprland plugins**, if their source is present. |
+| 15 | **Prints a summary and tells you to reboot.** SDDM starts on the next boot; pick **Hyprland (UWSM)** and log in. |
 
 ## Why bootstrap does not render your settings
 
@@ -103,8 +106,9 @@ first graphical login, driven by the `garage apply` in Hyprland's autostart; the
 waybar, hyprpaper and hypridle units each render their own fragment in an
 `ExecStartPre` (`garage render-bar`, `garage render-wallpaper`,
 `garage render-idle`) on the way up — which is why the first login takes a few
-seconds longer than the ones after it. The settings CLI that renders and manages
-preferences is `garage` (`~/.local/bin/garage`), with helpers prefixed `garage-`.
+seconds longer than the ones after it. The release binaries live in
+`~/.local/lib/garage/bin`; `~/.local/bin/garage` and the four backend helper names are
+symlinks into that private install, so units and interactive shells use stable command paths.
 SDDM and Hyprlock ownership, monitor routing, power confirmation, and safe test
 procedures are documented in [SESSION-SURFACES.md](SESSION-SURFACES.md).
 
@@ -190,8 +194,8 @@ bootstrap cannot do**:
    because `$HOME` is full of symlinks that dangle legitimately, and a broader
    sweep would eventually delete one.
 3. **Re-run `bootstrap.sh`**, which installs packages the list has gained, enables
-   units it has gained, writes new per-user files, backs up anything in the way,
-   and restows — safely, for the reasons in
+   units it has gained, rebuilds and installs the five Rust backend binaries, writes
+   new per-user files, backs up anything in the way, and restows — safely, for the reasons in
    [the freshness policy](#the-freshness-policy). This is also why update asks for
    `sudo` and can upgrade the system: installing a newly listed package on Arch
    without a full upgrade first is a partial upgrade, which is unsupported.
@@ -240,6 +244,8 @@ out and back in.
 
 If a `stow` conflict stops the run, each line names a path that already exists and
 is not a Garage link: move it aside and re-run `./bootstrap.sh`. Everything Garage
-manages under `~/.config` and `~/.local` is a symlink into the repository, not a
-copy — delete one by mistake and `stow --restow --no-folding desktop` from the
-repository root puts it back without touching anything else.
+tracks under `~/.config` and `~/.local` is linked from the repository; rendered files,
+mutable per-user files, and bootstrap-built artifacts are the documented real-file
+exceptions, while the backend commands link to `~/.local/lib/garage/bin`. Delete a tracked
+link by mistake and `stow --restow --no-folding desktop` from the repository root puts it
+back without touching anything else.
