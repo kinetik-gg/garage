@@ -22,7 +22,7 @@ failures.
 Phase 4 retires the DOCTOR_* constants in favour of reading the manifests
 directly. When that lands, the thing this module compares no longer exists and
 the module goes with it. Do not extend it into a general manifest test: the real
-parser is exercised by rust/crates/garage-core/src/manifest.rs's own tests, and
+parser is exercised by backend/crates/garage-core/src/manifest.rs's own tests, and
 the format itself is documented in the file headers.
 
 The parsing below is the same three lines bootstrap.sh runs -- strip a trailing

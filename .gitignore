@@ -46,4 +46,4 @@ desktop/.config/garage/displays.toml
 .config/user-dirs.dirs
 
 # Rust build artifacts. Cargo.lock is committed; the target/ output is not.
-rust/target/
+backend/target/

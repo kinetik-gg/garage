@@ -32,6 +32,10 @@ use garage_core::schema::enums::{AccentColor, Scheme};
 
 /// The nine accents in Appearance-pane order, each paired with the hex
 /// [`AccentColor::hex()`] draws it as.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "consumed by the toolkit emitters, task 3.4b")
+)]
 pub(crate) const ACCENTS: [(&str, &str); 9] = [
     (AccentColor::Blue.as_str(), AccentColor::Blue.hex()),
     (AccentColor::Teal.as_str(), AccentColor::Teal.hex()),

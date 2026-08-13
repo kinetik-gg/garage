@@ -191,6 +191,10 @@ pub(crate) fn role(scheme: Scheme, name: &str) -> Option<&'static str> {
 /// not padded out to match [`GTK4_TOKENS`] -- a token a toolkit does not define today is a
 /// token its stylesheet is currently getting from its own theme, and defining it here would
 /// silently restyle the desktop. (`GTK3_TOKENS`, garage:611-653)
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "consumed by the toolkit emitters, task 3.4b")
+)]
 pub(crate) const GTK3_TOKENS: &[(&str, &str)] = &[
     ("accent_color", "accent_soft"),
     ("accent_bg_color", "accent"),
@@ -231,6 +235,10 @@ pub(crate) const GTK3_TOKENS: &[(&str, &str)] = &[
 /// Which palette role each GTK4 token name reads. GTK4 needs the status pairs and the shade
 /// libadwaita draws with, which GTK3 does not carry -- see [`GTK3_TOKENS`] for why neither
 /// list is padded out to the other. (`GTK4_TOKENS`, garage:654-684)
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "consumed by the toolkit emitters, task 3.4b")
+)]
 pub(crate) const GTK4_TOKENS: &[(&str, &str)] = &[
     ("accent-color", "accent_soft"),
     ("accent-bg-color", "accent"),
@@ -269,6 +277,10 @@ pub(crate) const GTK4_TOKENS: &[(&str, &str)] = &[
 /// `qt6ct`'s parser takes `#rrggbb` and nothing else, so a composited role would write the
 /// literal string `rgba(...)` and the whole scheme would fail to load.
 /// (`QT_ROLES`, garage:686-718)
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "consumed by the toolkit emitters, task 3.4b")
+)]
 pub(crate) const QT_ROLES: &[(&str, &str, &str, &str)] = &[
     ("WindowText", "fg", "fg_backdrop", "fg_faint"),
     ("Button", "bg", "bg", "bg"),

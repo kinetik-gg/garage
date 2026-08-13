@@ -1,6 +1,6 @@
 """The Rust workspace lints itself, and this makes that a checked-in fact.
 
-Task 2.2 of the Rust-port sprint: rust/ (11 crates under rust/crates/) is now
+Task 2.2 of the Rust-port sprint: backend/ (11 crates under backend/crates/) is now
 part of the product, not a side experiment, so its formatting, its clippy
 configuration and its structural rules deserve the same "fails the build if
 violated" treatment as the Python/Lua side. Everything here shells out to
@@ -25,7 +25,7 @@ import unittest
 
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
-RUST_ROOT = REPO_ROOT / "rust"
+RUST_ROOT = REPO_ROOT / "backend"
 CRATES_DIR = RUST_ROOT / "crates"
 
 # Cold `target/` compiles every crate from scratch before clippy can even
@@ -33,11 +33,11 @@ CRATES_DIR = RUST_ROOT / "crates"
 # doesn't masquerade as a lint failure.
 SUBPROCESS_TIMEOUT = 300
 
-# rust/crates/**/src files over 500 lines, and why each is allowed to be.
+# backend/crates/**/src files over 500 lines, and why each is allowed to be.
 # The rule is data so an exception is a one-line diff here instead of a
 # special case in the test body.
 EXCEPTIONS: dict[str, str] = {
-    "rust/crates/garage-core/src/schema/prefs.rs":
+    "backend/crates/garage-core/src/schema/prefs.rs":
         "the schema table is one table; splitting it would hide drift",
 }
 
@@ -54,7 +54,7 @@ def require_cargo() -> str:
         raise AssertionError(
             "cargo is not on PATH -- the Rust toolchain is part of the "
             "product now, so this cannot be skipped. Install it (see "
-            "rust/rust-toolchain.toml) and re-run.")
+            "backend/rust-toolchain.toml) and re-run.")
     return cargo
 
 
@@ -113,7 +113,7 @@ class Clippy(unittest.TestCase):
     def test_clippy_clean(self) -> None:
         """`cargo clippy --all-targets -- -D warnings` passes clean.
 
-        rust/Cargo.toml's [workspace.lints.clippy] table denies clippy::all
+        backend/Cargo.toml's [workspace.lints.clippy] table denies clippy::all
         and warns on pedantic plus a long list of specific lints
         (unwrap_used, panic, indexing_slicing, ...); `-D warnings` on top of
         that turns every warning-level lint into a build failure too, so this
@@ -128,7 +128,7 @@ class Clippy(unittest.TestCase):
     def test_every_configured_lint_resolves(self) -> None:
         """No configured lint name has gone unknown or been renamed/removed.
 
-        rust/Cargo.toml and rust/clippy.toml name specific lints by string.
+        backend/Cargo.toml and backend/clippy.toml name specific lints by string.
         A toolchain bump can rename or remove a lint clippy used to know
         about; when that happens the lint silently stops being enforced and
         clippy reports it as an `unknown_lints` / `renamed_and_removed_lints`
@@ -152,7 +152,7 @@ class Clippy(unittest.TestCase):
 
 class FileShape(unittest.TestCase):
     def test_no_file_over_500_lines(self) -> None:
-        """No .rs file under rust/crates/**/src exceeds 500 lines.
+        """No .rs file under backend/crates/**/src exceeds 500 lines.
 
         The same shape rule the rest of this repo applies to Lua/Python
         files, made data instead of prose: EXCEPTIONS maps a repo-relative
@@ -175,7 +175,7 @@ class UnsafeForbidden(unittest.TestCase):
     def test_every_crate_forbids_unsafe(self) -> None:
         """Every crate root (lib.rs or main.rs) carries #![forbid(unsafe_code)].
 
-        rust/Cargo.toml already sets `unsafe_code = "forbid"` at the
+        backend/Cargo.toml already sets `unsafe_code = "forbid"` at the
         workspace-lint level, but a crate can still override that locally;
         this checks the crate-level attribute itself is present so the
         guarantee does not depend on every crate's Cargo.toml continuing to
