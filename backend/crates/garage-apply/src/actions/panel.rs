@@ -14,9 +14,10 @@
 use std::fs;
 use std::path::Path;
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
-use crate::command::{json_list, json_object, run};
+use super::hyprland::{output_at_cursor, OutputTarget};
+use crate::command::{json_list, run};
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
 
@@ -65,18 +66,6 @@ impl Panel {
             Self::AiUsage => "aiUsageOn",
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct OutputTarget {
-    name: String,
-    logical_width: f64,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Point {
-    x: f64,
-    y: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -190,45 +179,6 @@ fn validate_widget(panel: Panel, widget: Option<&Value>) -> Result<(), ApplyErro
 
 fn setting(message: &str) -> ApplyError {
     ApplyError::Settings(message.to_owned())
-}
-
-fn output_at_cursor(cx: &SessionCx<'_>) -> Result<OutputTarget, ApplyError> {
-    let cursor = json_object(cx, &["hyprctl", "cursorpos", "-j"]);
-    let monitors = json_list(cx, &["hyprctl", "monitors", "-j"]);
-    let point = point(&cursor).ok_or_else(|| setting("No monitor under cursor"))?;
-    monitors
-        .iter()
-        .filter_map(monitor_geometry)
-        .find(|(_, x, y, width, height)| {
-            point.x >= *x && point.x < *x + *width && point.y >= *y && point.y < *y + *height
-        })
-        .map(|(name, _, _, logical_width, _)| OutputTarget {
-            name,
-            logical_width,
-        })
-        .ok_or_else(|| setting("No monitor under cursor"))
-}
-
-fn point(cursor: &Map<String, Value>) -> Option<Point> {
-    Some(Point {
-        x: cursor.get("x")?.as_f64()?,
-        y: cursor.get("y")?.as_f64()?,
-    })
-}
-
-fn monitor_geometry(value: &Value) -> Option<(String, f64, f64, f64, f64)> {
-    let monitor = value.as_object()?;
-    let scale = monitor.get("scale")?.as_f64()?;
-    if scale <= 0.0 {
-        return None;
-    }
-    Some((
-        monitor.get("name")?.as_str()?.to_owned(),
-        monitor.get("x")?.as_f64()?,
-        monitor.get("y")?.as_f64()?,
-        monitor.get("width")?.as_f64()? / scale,
-        monitor.get("height")?.as_f64()? / scale,
-    ))
 }
 
 /// The monitoring dashboard is anchored under the centre of Waybar's metric group. The

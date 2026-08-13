@@ -1,6 +1,6 @@
 //! Modes
 //!
-//! The three things this binary can be asked to do, and the reason each exists.
+//! The four things this binary can be asked to do, and the reason each exists.
 //!
 //!   `--bar-svg <widget>`  One shot per waybar tick. Waybar's image module runs a
 //!                         command on an interval and reads two lines back: a path to an
@@ -17,6 +17,10 @@
 //!
 //!   `--once`              One snapshot, then exit. Smoke tests and scripts.
 //!
+//!   `--vram-info`         The two-column compatibility protocol `AboutPalette` already reads.
+//!                         It uses this collector's vendor discovery instead of probing the
+//!                         same hardware a second way in shell.
+//!
 //! The rate metrics (CPU, network, disk) are counter deltas, so every mode has to carry
 //! the previous counters somewhere. `--bar-svg` carries them in the on-disk state file,
 //! because each tick is a fresh process; `--stream` and `--once` carry them in memory.
@@ -27,6 +31,7 @@ use crate::fault::Fault;
 use crate::json::{dumps, object, Value};
 use crate::render::render_svg;
 use crate::snapshot::{now, seed_object, Snapshotter};
+use crate::sources::gpu;
 use crate::state::{load_state, mark_unavailable, tooltip_for, update_state};
 use garage_core::fs::atomic::atomic_write;
 use std::fs::OpenOptions;
@@ -225,12 +230,34 @@ pub(crate) fn once() -> Result<(), ModeError> {
     Ok(())
 }
 
+/// GPU names and fitted VRAM as the two-column protocol `AboutPalette` already consumes.
+pub(crate) fn vram_info() {
+    let table = vram_table(&gpu::discover());
+    let mut stdout = io::stdout().lock();
+    let _ = stdout.write_all(table.as_bytes());
+}
+
+fn vram_table(gpus: &[gpu::Gpu]) -> String {
+    let mut table = String::new();
+    for card in gpus {
+        let Some(total) = card.vram_total.filter(|total| *total > 0) else {
+            continue;
+        };
+        table.push_str(&card.name);
+        table.push('\t');
+        table.push_str(&total.to_string());
+        table.push('\n');
+    }
+    table
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{bar_svg, Lock};
+    use super::{bar_svg, vram_table, Lock};
     use crate::dirs::Dirs;
     use crate::json::{dumps, object, Value};
     use crate::scratch::Scratch;
+    use crate::sources::gpu::Gpu;
     use std::fs;
 
     /// A state file whose `last_sample` is far in the future, so `update_state`'s
@@ -248,6 +275,32 @@ mod tests {
             "period" => Value::Float(2.0),
         };
         fs::write(dirs.state_file(widget), dumps(&Value::Object(state))).expect("write");
+    }
+
+    fn gpu(name: &str, total: Option<i64>) -> Gpu {
+        Gpu {
+            name: name.to_owned(),
+            vendor: "amd",
+            load: None,
+            load_kind: None,
+            vram_used: None,
+            vram_total: total,
+            temp_c: None,
+            discrete: total.is_some(),
+        }
+    }
+
+    #[test]
+    fn vram_compatibility_output_is_tab_separated_and_skips_missing_capacity() {
+        assert_eq!(
+            vram_table(&[
+                gpu("NVIDIA GeForce RTX 5080", Some(17_094_934_528)),
+                gpu("Intel Graphics", None),
+                gpu("Broken reading", Some(0)),
+                gpu("AMD Radeon Graphics", Some(25_769_803_776)),
+            ]),
+            "NVIDIA GeForce RTX 5080\t17094934528\nAMD Radeon Graphics\t25769803776\n"
+        );
     }
 
     #[test]

@@ -7,12 +7,12 @@
 //! debugged against this hardware over months; what is new here is that there is now
 //! exactly one of each.
 //!
-//! Three modes, and the reason each exists -- see [`modes`] for the long version.
+//! Four modes, and the reason each exists -- see [`modes`] for the long version.
 //!
 //! The rate metrics (CPU, network, disk) are counter deltas, so every mode has to carry
 //! the previous counters somewhere. `--bar-svg` carries them in the on-disk state file,
 //! because each tick is a fresh process; `--stream` and `--once` carry them in memory.
-//! That is the only structural difference between the two halves.
+//! `--vram-info` is the compatibility output for `AboutPalette` and needs no rate counters.
 //!
 //! Nothing outside the standard library and this workspace's own crates, plus nvidia-smi
 //! and findmnt when they happen to be installed. This runs on the bar's interval and a
@@ -48,11 +48,12 @@ use std::process::ExitCode;
 
 /// What an argument this does not understand gets, on stderr, before exiting 2.
 const USAGE: &str = concat!(
-    "usage: garage-metrics --bar-svg <widget> | --stream | --once\n",
+    "usage: garage-metrics --bar-svg <widget> | --stream | --once | --vram-info\n",
     "\n",
     "  --bar-svg <widget>  render one waybar strip; prints the SVG path then the tooltip\n",
     "  --stream            one JSON snapshot per line at 1 Hz, seeded from bar history\n",
     "  --once              one JSON snapshot, then exit\n",
+    "  --vram-info         GPU name and VRAM bytes as tab-separated lines\n",
     "\n",
     "  widgets: cpu memory network temp disk gpu\n",
 );
@@ -70,6 +71,10 @@ fn main() -> ExitCode {
     let command = arguments.get(1).map_or("", String::as_str);
     if matches!(command, "-h" | "--help" | "help") {
         print!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
+    if command == "--vram-info" {
+        modes::vram_info();
         return ExitCode::SUCCESS;
     }
     let dirs = Dirs::from_env();
@@ -107,6 +112,7 @@ mod tests {
     #[test]
     fn the_usage_lists_every_widget_in_the_order_the_table_holds_them() {
         assert!(USAGE.contains("widgets: cpu memory network temp disk gpu"));
+        assert!(USAGE.contains("--vram-info"));
         assert_eq!(WIDGETS.join(" "), "cpu memory network temp disk gpu");
     }
 

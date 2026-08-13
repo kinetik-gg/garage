@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# slurp must run as an interruptible background child, never inside a command
+# LOAD-BEARING: slurp must run as an interruptible background child, never inside a command
 # substitution: a substitution is the script's foreground work, and bash defers
 # signal traps until foreground work finishes -- so the shell's capture timeout
 # (shell.qml's wedge guard, 120s) would kill this wrapper while slurp kept the

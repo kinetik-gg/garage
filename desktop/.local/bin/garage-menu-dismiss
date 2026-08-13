@@ -1,32 +1,3 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-# Layer-shell catch surfaces are not guaranteed to receive pointer events below
-# another overlay surface. Let Hyprland observe the press, but do not consume it.
-if hyprctl layers -j | jq -e '
-    any(.. | objects;
-        .namespace? == "garage-session-confirmation"
-        or .namespace? == "garage-screenshot")
-' >/dev/null 2>&1; then
-    exit 0
-fi
-
-menu_box=$(hyprctl layers -j | jq -r '
-    first(.. | objects | select(.namespace? == "garage-session-menu"))
-    | [.x, .y, .w, .h]
-    | @tsv
-' 2>/dev/null) || exit 0
-
-[[ -n "$menu_box" ]] || exit 0
-
-cursor=$(hyprctl cursorpos -j 2>/dev/null) || exit 0
-cursor_x=$(jq -r '.x | floor' <<< "$cursor") || exit 0
-cursor_y=$(jq -r '.y | floor' <<< "$cursor") || exit 0
-
-IFS=$'\t' read -r menu_x menu_y menu_w menu_h <<< "$menu_box"
-
-if (( cursor_x >= menu_x && cursor_x < menu_x + menu_w \
-   && cursor_y >= menu_y && cursor_y < menu_y + menu_h )); then
-    exit 0
-fi
-
-qs ipc -c garage call shell closeSession >/dev/null 2>&1
+exec "$HOME/.local/bin/garage" action menu.dismiss
