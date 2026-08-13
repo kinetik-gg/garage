@@ -688,7 +688,7 @@ else
 fi
 
 if [[ ! -e "${HOME}/.local/share/wallpaper/current" ]]; then
-    run ln -s "$repo_dir/desktop/Wallpaper/Dark/Nebula - Martin Martz.jpg" \
+    run ln -s "$repo_dir/desktop/Wallpaper/Dark/rMRT4hF-Fsg.jpg" \
         "${HOME}/.local/share/wallpaper/current"
     record "selected the default wallpaper"
 fi
