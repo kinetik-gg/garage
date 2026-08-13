@@ -1,2 +1,23 @@
 //! Pure renderers: write files, signal nothing, structurally cannot take the preferences lock.
+//!
+//! A render reads layers 1 and 2 -- the shipped defaults and the user's own files -- and
+//! writes layer 3, the generated fragments and markers under `~/.local/state/garage`.
+//! Losing the whole of layer 3 costs one render and no settings, which is the property
+//! that makes a renderer safe to run at any moment, from a unit's `ExecStartPre`, from an
+//! apply, or by hand.
+//!
+//! "Signals nothing" is the contract rather than a happy accident: no `gsettings`, no
+//! service restart, no `pkill`, no `hyprctl eval` or `reload`. Everything that moves the
+//! running desktop is `garage-apply`'s.
+//!
+//! "Structurally lock-free" is the stronger half. This crate depends on `garage-core` and
+//! nothing else of Garage's -- in particular not on `garage-prefs`, which owns
+//! `PrefLock`, nor on `garage-proc`, which owns process execution. A renderer here cannot
+//! take `PREFERENCES_LOCK` because the code that takes it does not resolve from this
+//! crate, and `tests/test_lint.py` fails the build if that edge ever appears. See
+//! [`cx::RenderCx`] for the deadlock that rule exists to prevent.
 #![forbid(unsafe_code)]
+
+pub mod cx;
+
+pub use cx::RenderCx;
