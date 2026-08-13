@@ -128,8 +128,12 @@ class FileIndexLifecycle(unittest.TestCase):
     def test_bootstrap_enables_a_low_priority_background_service(self) -> None:
         service = (REPO_ROOT / "desktop" / ".config" / "systemd" / "user"
                    / "garage-file-index.service").read_text(encoding="utf-8")
-        bootstrap = (REPO_ROOT / "bootstrap.sh").read_text(encoding="utf-8")
-        self.assertIn("garage-file-index.service", bootstrap)
+        # bootstrap.sh enables whatever system/manifest/units.list names, so
+        # that file is where the unit has to appear for the installer to reach
+        # it. `running`: it is a daemon, not a Type=oneshot task.
+        units = (REPO_ROOT / "system" / "manifest"
+                 / "units.list").read_text(encoding="utf-8")
+        self.assertRegex(units, r"(?m)^garage-file-index\.service\s+running\b")
         self.assertIn("Nice=10", service)
         self.assertIn("IOSchedulingClass=idle", service)
         self.assertIn("CPUSchedulingPolicy=batch", service)

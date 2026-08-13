@@ -1,0 +1,193 @@
+# Every Arch package Garage installs, one per line.
+#
+# Format: whitespace-separated fields. Field 1 is the package name. Field 2, if
+# present, is `critical`. Blank lines are ignored; `#` starts a comment, either
+# on its own line or trailing after the fields.
+#
+# The `critical` flag marks the subset `garage doctor` checks by name. From the
+# backend's DOCTOR_PACKAGES, which this replaces as the source of truth:
+#
+#   Named because losing one of these is a broken desktop rather than a missing
+#   extra: the shell, the bar, the terminal, the idle and wallpaper daemons, the
+#   linker that puts the configuration in place, and the two theme assets that
+#   every toolkit config names by string. The full package set lives here and is
+#   not duplicated in the doctor -- `garage update` re-runs this whole list
+#   through pacman anyway, which is a better check than repeating it.
+#
+# So `critical` is deliberately a small subset, not a judgement that the rest is
+# optional. Everything in this file is installed; only the flagged ones are
+# additionally asserted present by the doctor.
+#
+# NOT here: the NVIDIA set (nvidia-open, nvidia-utils, egl-wayland,
+# libva-nvidia-driver). Those are appended by bootstrap.sh only when lspci sees
+# an NVIDIA device, which is a decision about the machine rather than a fact
+# about Garage, so it stays in bootstrap logic instead of becoming a flag here.
+
+# Build tooling and the linker that puts the configuration in place
+base-devel
+git
+curl
+stow                            critical
+cmake
+meson
+cpio
+pkgconf
+linux-headers
+
+# The compositor and its portals
+hyprland
+uwsm
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+
+# The Hyprland session daemons
+hypridle                        critical
+hyprlock
+hyprpaper                       critical
+hyprpolkitagent
+hyprsunset
+
+# The shell surfaces: bar, launcher, terminal, login shell
+waybar                          critical
+quickshell                      critical
+rofi
+kitty                           critical
+fish                            critical
+fisher
+
+# On-screen feedback, clipboard and media keys
+swayosd
+cliphist
+wl-clipboard
+playerctl
+
+# Screenshot and annotation
+grim
+slurp
+satty
+hyprpicker
+
+# Networking and Bluetooth
+networkmanager
+bluez
+bluez-utils
+
+# Audio
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+pavucontrol
+cava
+
+# The file manager and everything its panes need
+thunar
+thunar-archive-plugin
+thunar-media-tags-plugin
+tumbler
+catfish
+file-roller
+ffmpegthumbnailer
+poppler-glib
+gvfs
+gvfs-smb
+
+# Small GNOME apps wired up as the default handlers
+gnome-text-editor
+gnome-calculator
+loupe
+
+# Terminal utilities and the Qt bridge
+btop
+fastfetch
+micro
+qt6ct
+qt6-wayland
+xsettingsd
+
+# Scripting runtimes the backend and its helpers call
+python
+python-pip
+python-pipx
+uv
+lua
+jq
+zenity
+file
+libnotify
+7zip
+
+# Theme assets every toolkit config names by string
+papirus-icon-theme
+adw-gtk-theme                   critical
+
+# UI faces (Plus Jakarta Sans, Geist Mono) are bundled under
+# desktop/.local/share/fonts, alongside Phosphor -- not Arch-packaged, and
+# picked up by the post-stow fc-cache run in bootstrap.sh.
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+ttf-cascadia-mono-nerd
+awesome-terminal-fonts
+
+# The login manager and the hardware-facing utilities
+remmina
+freerdp
+sddm
+lm_sensors
+xdg-user-dirs
+desktop-file-utils
+pciutils
+
+# Desktop applications
+spotify-launcher
+discord
+zed
+
+# Containers
+docker
+docker-buildx
+docker-compose
+
+# JavaScript and TypeScript toolchain
+nodejs
+npm
+pnpm
+bun
+deno
+typescript-language-server
+bash-language-server
+
+# Rust toolchain
+rustup
+rust-analyzer
+
+# Native toolchain and the profilers
+clang
+lldb
+gdb
+ninja
+ccache
+mold
+valgrind
+perf
+strace
+
+# Shell tooling and the fast CLI replacements
+shellcheck
+shfmt
+ripgrep
+fd
+fzf
+bat
+eza
+hyperfine
+just
+protobuf
+
+# Documentation and media
+man-db
+man-pages
+ffmpeg
+imagemagick
+obs-studio

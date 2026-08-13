@@ -250,38 +250,34 @@ fi
 # Packages
 # ---------------------------------------------------------------------------
 
-packages=(
-    base-devel git curl stow cmake meson cpio pkgconf linux-headers
-    hyprland uwsm xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
-    hypridle hyprlock hyprpaper hyprpolkitagent hyprsunset
-    waybar quickshell rofi kitty fish fisher
-    swayosd cliphist wl-clipboard playerctl
-    grim slurp satty hyprpicker
-    networkmanager bluez bluez-utils
-    pipewire pipewire-alsa pipewire-pulse wireplumber pavucontrol cava
-    thunar thunar-archive-plugin thunar-media-tags-plugin tumbler
-    catfish file-roller ffmpegthumbnailer poppler-glib gvfs gvfs-smb
-    gnome-text-editor gnome-calculator loupe
-    btop fastfetch micro qt6ct qt6-wayland xsettingsd
-    python python-pip python-pipx uv lua jq zenity file libnotify 7zip
-    papirus-icon-theme adw-gtk-theme
-    # UI faces (Plus Jakarta Sans, Geist Mono) are bundled under
-    # desktop/.local/share/fonts, alongside Phosphor -- not Arch-packaged, and
-    # picked up by the post-stow fc-cache run below.
-    noto-fonts noto-fonts-cjk noto-fonts-emoji
-    ttf-cascadia-mono-nerd awesome-terminal-fonts
-    remmina freerdp sddm lm_sensors xdg-user-dirs desktop-file-utils pciutils
-    spotify-launcher discord zed
-    docker docker-buildx docker-compose
-    nodejs npm pnpm bun deno typescript-language-server bash-language-server
-    rustup rust-analyzer
-    clang lldb gdb ninja ccache mold valgrind perf strace
-    shellcheck shfmt ripgrep fd fzf bat eza hyperfine just protobuf
-    man-db man-pages ffmpeg imagemagick obs-studio
-)
+# The package set is data, not an array here: system/manifest/packages.list. The
+# Rust port reads the same file, `garage doctor` reads the `critical` flag out of
+# it, and tests/test_manifest.py checks the two agree -- none of which is
+# possible while the only copy is a bash array.
+#
+# The three lines inside the loop are the whole format: strip a trailing `#`
+# comment, split the rest into fields, skip what is left of a blank or
+# comment-only line. Field 2 (`critical`) is not read here; pacman installs
+# every line regardless.
+packages=()
+while IFS= read -r manifest_line; do
+    manifest_line=${manifest_line%%#*}
+    read -r package_name _ <<<"$manifest_line"
+    [[ -n $package_name ]] || continue
+    packages+=("$package_name")
+done <"$repo_dir/system/manifest/packages.list"
 
+# A truncated or unreadable manifest would otherwise turn into a successful run
+# that installs nothing and leaves you at a TTY wondering why.
+if ((${#packages[@]} == 0)); then
+    echo "error: system/manifest/packages.list named no packages." >&2
+    exit 1
+fi
+
+# The one part of the package set that is a fact about the machine rather than
+# about Garage, so it stays logic here instead of becoming a flag in the file.
 # pciutils is in the `base` group, so lspci is there on a minimal install and
-# this check works before the package phase. It is named in the list above
+# this check works before the package phase. It is named in packages.list
 # anyway: two decisions now depend on it -- the NVIDIA driver set here and the
 # window material gate further down -- and neither should quietly fall back to
 # "cannot tell" because something removed it.
@@ -308,7 +304,7 @@ if pacman -Si pacman >/dev/null 2>&1; then
             printf '  - %s\n' "$package" >&2
         done
         printf '\nRun `sudo pacman -Syy`, check that the extra repository is enabled,\n' >&2
-        printf 'then fix the list in bootstrap.sh before re-running.\n' >&2
+        printf 'then fix system/manifest/packages.list before re-running.\n' >&2
         exit 1
     fi
     info "all ${#packages[@]} package names resolve."
@@ -859,22 +855,29 @@ run systemctl --user daemon-reload
 # installed at all.
 run systemctl --user mask dunst.service || true
 
-user_units=(
-    waybar.service    # + ExecStartPre=garage render-bar
-    hyprpaper.service # + ExecStartPre=garage render-wallpaper
-    hypridle.service  # + ExecStartPre=garage render-idle
-    hyprsunset.service
-    hyprpolkitagent.service
-    swayosd.service
-    cliphist.service
-    cliphist-image.service
-    xsettingsd.service
-    garage-plugins-check.service # tells you when a Hyprland update broke the plugins
-    garage-file-index.service
-    garage-shell.service
-    garage-theme.timer
-    garage-night-shift.timer
-)
+# Data, for the same reasons as packages.list: system/manifest/units.list. Field
+# 2 is `running` or `oneshot` -- what a healthy session looks like for that unit,
+# which is `garage doctor`'s question rather than this script's. It is read here
+# only to reject a line that has no flag at all, because a unit whose kind nobody
+# declared is a unit the doctor will silently stop checking.
+user_units=()
+while IFS= read -r manifest_line; do
+    manifest_line=${manifest_line%%#*}
+    read -r unit_name unit_kind _ <<<"$manifest_line"
+    [[ -n $unit_name ]] || continue
+    if [[ $unit_kind != running && $unit_kind != oneshot ]]; then
+        echo "error: system/manifest/units.list: $unit_name is not marked" \
+             "running or oneshot." >&2
+        exit 1
+    fi
+    user_units+=("$unit_name")
+done <"$repo_dir/system/manifest/units.list"
+
+if ((${#user_units[@]} == 0)); then
+    echo "error: system/manifest/units.list named no units." >&2
+    exit 1
+fi
+
 run systemctl --user enable "${user_units[@]}"
 record "enabled ${#user_units[@]} per-user units"
 

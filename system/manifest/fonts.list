@@ -1,0 +1,13 @@
+# The fontconfig family names every toolkit config asks for by string.
+#
+# fc-list family names, not package names: a font can be installed and still not
+# be found by fontconfig. Both are bundled under desktop/.local/share/fonts and
+# picked up by the post-stow fc-cache run, so neither has an Arch package to
+# check in packages.list instead.
+#
+# One family per line, and the whole line (after any trailing `#` comment) is the
+# family name -- a family name may contain spaces, so this file has no flag
+# column and never will. Blank lines are ignored; `#` starts a comment.
+
+Plus Jakarta Sans
+Geist Mono

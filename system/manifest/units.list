@@ -1,0 +1,28 @@
+# The per-user systemd units this checkout owns, plus the ones it extends with a
+# drop-in. bootstrap.sh enables every line here; `garage doctor` checks them.
+#
+# Format: whitespace-separated fields. Field 1 is the unit name, field 2 is its
+# kind. Blank lines are ignored; `#` starts a comment, either on its own line or
+# trailing after the fields.
+#
+# Kinds:
+#   running   a live graphical session should show this active. Long-running
+#             daemons, and the two timers -- a timer that is not active is a
+#             schedule that is not running.
+#   oneshot   Type=oneshot: it runs, says its piece and exits, so "inactive" is
+#             its healthy steady state and only "enabled" means anything.
+
+waybar.service               running   # + ExecStartPre=garage render-bar
+hyprpaper.service            running   # + ExecStartPre=garage render-wallpaper
+hypridle.service             running   # + ExecStartPre=garage render-idle
+hyprsunset.service           running
+hyprpolkitagent.service      running   # drop-in points at ~/.local/lib/garage
+swayosd.service              running
+cliphist.service             running
+cliphist-image.service       running
+xsettingsd.service           running
+garage-plugins-check.service oneshot   # tells you when a Hyprland update broke the plugins
+garage-file-index.service    running
+garage-shell.service         running
+garage-theme.timer           running
+garage-night-shift.timer     running

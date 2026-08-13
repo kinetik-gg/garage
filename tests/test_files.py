@@ -204,8 +204,11 @@ class ThunarIntegration(unittest.TestCase):
         self.assertIn("ExecStart=%h/.local/bin/thunar --daemon", dropin)
 
     def test_bootstrap_installs_the_complete_thunar_stack(self) -> None:
-        bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
-        package_block = bootstrap.split("packages=(", 1)[1].split("\n)", 1)[0]
+        # The package set moved out of a bootstrap.sh array and into
+        # system/manifest/packages.list, which bootstrap.sh reads; that file is
+        # now where "does the installer install this" is answered.
+        package_block = (REPO_ROOT / "system" / "manifest"
+                         / "packages.list").read_text(encoding="utf-8")
         for package in ("thunar", "thunar-archive-plugin",
                         "thunar-media-tags-plugin", "tumbler", "catfish",
                         "file-roller", "ffmpegthumbnailer", "poppler-glib",

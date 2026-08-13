@@ -101,7 +101,10 @@ class AuthenticationIntegration(unittest.TestCase):
 
     def test_bootstrap_keeps_the_distro_backend_and_builds_the_garage_surface(self) -> None:
         bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
-        package_block = bootstrap.split("packages=(", 1)[1].split("\n)", 1)[0]
+        # The package set is data now: system/manifest/packages.list, read by
+        # bootstrap.sh. The build steps below are still logic and still here.
+        package_block = (REPO_ROOT / "system" / "manifest"
+                         / "packages.list").read_text(encoding="utf-8")
         self.assertRegex(package_block, r"\bhyprpolkitagent\b")
         self.assertRegex(package_block, r"\bcurl\b")
         self.assertIn('system/hyprpolkitagent/build"', bootstrap)

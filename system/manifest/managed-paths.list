@@ -1,0 +1,93 @@
+# Everything Garage puts on disk outside the package manager, and by what means.
+#
+# Format: whitespace-separated fields, `KIND PATH [OWNER]`. Blank lines are
+# ignored; `#` starts a comment, either on its own line or trailing after the
+# fields. Paths are relative to $HOME unless they name a repository directory,
+# which the stow-tree kind does.
+#
+# Columns:
+#   KIND   how the path comes to exist -- see the four below.
+#   PATH   the location, $HOME-relative, no leading `~/` or `/`. A trailing `/`
+#          means a directory and everything under it.
+#   OWNER  optional. The single package the path belongs to, where there is
+#          exactly one: kitty's theme is kitty's, btop's theme is btop's. Left
+#          empty where a path is read by many programs (the GTK settings and
+#          stylesheets) or by none of the installed packages (the mimeapps
+#          override, which is read by the portal).
+#
+# Kinds:
+#   stow-tree  a directory stowed into $HOME as symlinks. Not enumerated here:
+#              it expands to whatever the tree contains at stow time, minus the
+#              patterns in its .stow-local-ignore -- which is exactly the set of
+#              rendered files listed below as `generated`. Walk the tree and
+#              apply that ignore file to get the real link list.
+#   generated  written as a real file by the backend's render pass, replaced on
+#              every theme change, and therefore deliberately not stowed. Safe
+#              to delete: the next render writes it again.
+#   artifact   compiled or downloaded by bootstrap.sh into the user's private
+#              prefix. Not tracked, not rendered; rebuilt by re-running
+#              bootstrap.
+#   override   a real file the user is expected to edit. Written once if absent
+#              and then left alone -- a re-run must not clobber it.
+
+# ---------------------------------------------------------------------------
+# The tracked tree
+# ---------------------------------------------------------------------------
+
+stow-tree desktop/
+
+# ---------------------------------------------------------------------------
+# Rendered output
+# ---------------------------------------------------------------------------
+
+# Layer 3. The whole directory is generated, so nothing inside it is listed
+# individually: hyprlock-theme.conf, the Hyprland fragments, the wallpaper and
+# idle configs all live here and all come back on the next render.
+generated .local/state/garage/generated/
+
+# The toolkit files that cannot live under generated/, because each program
+# reads its configuration from a fixed path in ~/.config and offers no way to
+# redirect it. Every one is written by render_toolkits() in the backend.
+generated .config/gtk-3.0/settings.ini
+generated .config/gtk-3.0/gtk.css
+generated .config/gtk-3.0/apple-dark.css
+generated .config/gtk-3.0/apple-light.css
+generated .config/gtk-4.0/settings.ini
+generated .config/gtk-4.0/gtk.css
+generated .config/gtk-4.0/apple.css
+generated .config/xsettingsd/xsettingsd.conf   xsettingsd
+generated .config/qt6ct/qt6ct.conf             qt6ct
+generated .config/qt6ct/colors/vanta.conf      qt6ct
+generated .config/qt6ct/colors/vanta-light.conf qt6ct
+generated .config/rofi/config.rasi             rofi
+generated .config/rofi/apple-dark.rasi         rofi
+generated .config/rofi/apple-light.rasi        rofi
+generated .config/waybar/style.css             waybar
+generated .config/swayosd/style.css            swayosd
+generated .config/swayosd/swayosd-dark.css     swayosd
+generated .config/swayosd/swayosd-light.css    swayosd
+generated .config/kitty/theme.conf             kitty
+generated .config/btop/themes/vanta.theme      btop
+generated .config/micro/settings.json          micro
+
+# ---------------------------------------------------------------------------
+# Built by bootstrap.sh
+# ---------------------------------------------------------------------------
+
+# The narrowly scoped GTK3 module that supplies Thunar's missing CSS semantics,
+# compiled from system/gtk-modules/garage-thunar.c against the installed GTK.
+artifact .local/share/garage/gtk-modules/garage-thunar.so thunar
+
+# The checksum-pinned upstream polkit agent rebuilt with Garage's compact modal.
+# The distro package still owns the authentication backend; the tracked drop-in
+# only points the unit at this binary.
+artifact .local/lib/garage/hyprpolkitagent hyprpolkitagent
+
+# ---------------------------------------------------------------------------
+# Yours to edit
+# ---------------------------------------------------------------------------
+
+# The desktop-specific mimeapps override, which takes precedence over
+# ~/.config/mimeapps.list. Named for $XDG_CURRENT_DESKTOP, so on any other
+# compositor the file is a different name and this one is inert.
+override .config/hyprland-mimeapps.list
