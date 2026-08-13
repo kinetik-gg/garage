@@ -6,6 +6,8 @@ Human commands:
   repair [--reset]        recover an unparseable preferences.toml; reports unless
                           given --reset, which backs the file up and writes a fresh one
   update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload
+  reconcile [--dry-run] [--prune] [--json]
+                          converge manifest paths; optionally guarded-prune obsolete ones
   help                    print this
 
 Settings backend (each prints one JSON object: {"ok","data","error"}):

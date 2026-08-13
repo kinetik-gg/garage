@@ -99,7 +99,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
- "tz-rs",
 ]
 
 [[package]]
@@ -125,6 +124,7 @@ dependencies = [
  "serde",
  "thiserror",
  "toml",
+ "tz-rs",
 ]
 
 [[package]]

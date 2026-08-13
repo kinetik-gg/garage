@@ -9,7 +9,14 @@
 
 mod desired;
 mod error;
+mod execute;
+mod human;
+mod ledger;
+mod path;
 mod plan;
+mod prune;
+mod run;
+mod time;
 mod types;
 
 #[cfg(test)]
@@ -17,5 +24,10 @@ mod tests;
 
 pub use desired::{desired_state, DesiredState};
 pub use error::ReconcileError;
+pub use human::render_human;
 pub use plan::diff;
-pub use types::{Action, ActualState, DesiredPath, Diff, PlanItem, Unit};
+pub use run::{reconcile, reconcile_at};
+pub use time::RunTime;
+pub use types::{
+    Action, ActualState, DesiredPath, Diff, Options, PlanItem, PruneRefusal, Report, Unit,
+};

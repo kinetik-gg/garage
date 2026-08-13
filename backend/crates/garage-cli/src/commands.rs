@@ -7,10 +7,12 @@
 //! `help`, `-h` and `--help` are recognised before any preferences file is touched, so
 //! `garage help` never fails even on a machine with no config directory yet.
 //!
-//! The three plumbing commands -- `doctor`, `repair`, `update` -- are dispatched from a
+//! The three legacy plumbing commands -- `doctor`, `repair`, `update` -- are dispatched from a
 //! separate table checked before the JSON path, and their errors go to stderr as plain text
-//! rather than through [`crate::response`]'s envelope; see [`garage_apply`] for why. Every
-//! other command runs `migrate_config_root()` once, ahead of its own dispatch rather than
+//! rather than through [`crate::response`]'s envelope; see [`garage_apply`] for why.
+//! `reconcile` is the hybrid beside them: human by default, one response envelope with
+//! `--json`, and always dispatched before config migration so `--dry-run` has no hidden write.
+//! Every other command runs `migrate_config_root()` once, ahead of its own dispatch rather than
 //! inside a loader, because an action like `keybind.rebind` or `display-test` reaches
 //! `keybindings.toml` or `displays.toml` directly without ever loading the preferences, and
 //! either one arriving first at the old config layout would write a fresh file at the new
@@ -95,6 +97,9 @@ pub(crate) fn run(argv: &[String]) -> u8 {
     }
     let paths = Paths::from_env();
     let system = System;
+    if command == "reconcile" {
+        return crate::reconcile::run(&paths, argv);
+    }
     if PLAIN_COMMANDS.contains(&command) {
         return plain(&paths, &system, command, argv);
     }

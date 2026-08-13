@@ -2,9 +2,10 @@
 //! help text `garage help` prints verbatim.
 //!
 //! `response()` is one line of compact JSON -- `{"ok", "data", "error"}` -- printed to
-//! stdout by every command except the three plumbing ones (`doctor`, `repair`, `update`,
-//! which print lines for a person rather than JSON for the QML client) and the watchdog,
-//! which runs unattended and has nobody to report to. `ok` is simply `not error`, so a
+//! stdout by every settings command. The three legacy plumbing commands (`doctor`, `repair`,
+//! `update`) always print lines; `reconcile` prints lines unless `--json` asks it to use this
+//! same envelope. The watchdog runs unattended and has nobody to report to. `ok` is simply
+//! `not error`, so a
 //! caller never has to reconcile the two fields disagreeing; `data` is `null` for a command
 //! that only signals success (`render`, `apply`, `action`) and the actual payload for one
 //! that answers a question (`snapshot`, `set`, `display-test`, `theme-sync`). Separators are
@@ -19,9 +20,9 @@
 //! `USAGE` is the text `garage help`, `garage -h` and `garage --help` all print unchanged,
 //! and the only place command names and their arguments are written down together for a
 //! person to read. It is split into two groups matching the two kinds of command this binary
-//! has: the human commands (`doctor`, `repair`, `update`, `help`), which print lines and
-//! never go through `response()`, and the settings backend, which always prints exactly one
-//! JSON object. `_display-watchdog` is deliberately absent from it -- it is the watchdog's
+//! has: the human commands (`doctor`, `repair`, `update`, `reconcile`, `help`) and the
+//! settings backend, which always prints exactly one JSON object. Reconcile is the documented
+//! hybrid. `_display-watchdog` is deliberately absent from it -- it is the watchdog's
 //! own re-entry point, not something a person types.
 
 use serde_json::Value;
@@ -38,6 +39,8 @@ Human commands:
   repair [--reset]        recover an unparseable preferences.toml; reports unless
                           given --reset, which backs the file up and writes a fresh one
   update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload
+  reconcile [--dry-run] [--prune] [--json]
+                          converge manifest paths; optionally guarded-prune obsolete ones
   help                    print this
 
 Settings backend (each prints one JSON object: {"ok","data","error"}):
@@ -144,6 +147,32 @@ mod tests {
             "{\"ok\":false,\"data\":null,\"error\":\"\\u2728 caf\\u00e9 \\ud83d\\ude80 \
              \\t\\\"quo\\\\ted\\\" \\u0001\"}"
         );
+    }
+
+    #[test]
+    fn reconcile_json_is_one_envelope_carrying_the_plan_and_result() {
+        let report = garage_reconcile::Report {
+            dry_run: true,
+            prune: false,
+            checkout: "/checkout".to_owned(),
+            home: "/home/test".to_owned(),
+            desired: Vec::new(),
+            units: Vec::new(),
+            actual: garage_reconcile::ActualState::default(),
+            plan: Vec::new(),
+            refused: Vec::new(),
+            applied: 0,
+        };
+        let payload = serde_json::to_value(report).expect("report serializes");
+        let text = envelope(&payload, "");
+        assert_eq!(text.lines().count(), 1);
+        let decoded: Value = serde_json::from_str(&text).expect("envelope is JSON");
+        assert_eq!(decoded.get("ok"), Some(&Value::Bool(true)));
+        assert_eq!(decoded.get("error"), Some(&Value::String(String::new())));
+        let data = decoded.get("data").expect("data field");
+        assert_eq!(data.get("dry_run"), Some(&Value::Bool(true)));
+        assert!(data.get("plan").is_some_and(Value::is_array));
+        assert_eq!(data.get("applied"), Some(&Value::from(0)));
     }
 
     /// The help text against the Python's own, extracted from the backend at the time this

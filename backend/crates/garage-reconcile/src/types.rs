@@ -47,6 +47,8 @@ pub enum Action {
     Relink,
     /// Move a plain path into the backup tree, then link it.
     BackupAndLink,
+    /// Remove an obsolete path admitted by the prune guard.
+    Prune,
 }
 
 /// One ordered filesystem change in a plan.
@@ -59,7 +61,8 @@ pub struct PlanItem {
     /// Why the current state requires the operation.
     pub reason: String,
     /// Checkout source the target will link to.
-    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     /// Backup destination for [`Action::BackupAndLink`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backup: Option<String>,
@@ -67,6 +70,51 @@ pub struct PlanItem {
     pub kind: String,
     /// Package owner written to the future ledger.
     pub owner: Option<String>,
+}
+
+/// An obsolete present path denied by both independent prune authorities.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PruneRefusal {
+    /// `$HOME`-relative candidate.
+    pub path: String,
+    /// Why it looked obsolete.
+    pub reason: String,
+    /// The guard that denied deletion.
+    pub guard: String,
+}
+
+/// Runtime switches accepted by `garage reconcile`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Options {
+    /// Report the complete plan and cross the write boundary for nothing.
+    pub dry_run: bool,
+    /// Include guarded removal of obsolete managed paths.
+    pub prune: bool,
+}
+
+/// One complete command result, suitable for the CLI response envelope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Report {
+    /// Whether the executor was structurally bypassed.
+    pub dry_run: bool,
+    /// Whether obsolete-path discovery ran.
+    pub prune: bool,
+    /// Checkout supplying desired links.
+    pub checkout: String,
+    /// Redirectable home examined by this run.
+    pub home: String,
+    /// Every desired manifest path after owner filtering.
+    pub desired: Vec<DesiredPath>,
+    /// Units reported but never enabled or restarted.
+    pub units: Vec<Unit>,
+    /// Five-way stow outcome counts observed before execution.
+    pub actual: ActualState,
+    /// Ordered changes planned from that snapshot.
+    pub plan: Vec<PlanItem>,
+    /// Obsolete paths denied by the prune guard.
+    pub refused: Vec<PruneRefusal>,
+    /// Plan items completed; always zero in dry-run mode.
+    pub applied: usize,
 }
 
 /// The read-only desired/actual diff.

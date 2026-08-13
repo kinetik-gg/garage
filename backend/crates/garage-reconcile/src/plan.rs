@@ -79,7 +79,7 @@ fn plan_one(
         action,
         path: path.path.clone(),
         reason: reason.to_owned(),
-        source: root.join("desktop").join(&path.path).display().to_string(),
+        source: Some(root.join("desktop").join(&path.path).display().to_string()),
         backup,
         kind: path.kind.clone(),
         owner: path.owner.clone(),

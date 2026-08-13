@@ -1,12 +1,13 @@
 //! Desired-state construction from the three settled manifests.
 
 use std::collections::BTreeSet;
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 use garage_core::manifest::{self, ManagedPath, PathKind, UnitKind};
 use garage_core::paths::Paths;
 
 use crate::error::ReconcileError;
+use crate::path::safe_relative;
 use crate::types::{DesiredPath, Unit};
 
 /// Manifest entries rejected only because their named package owner is absent.
@@ -26,6 +27,8 @@ pub struct DesiredState {
     pub(crate) stow: Vec<DesiredPath>,
     /// Present manifest records whose package owner left `packages.list`.
     pub(crate) excluded: Vec<ExcludedPath>,
+    /// Every package name, used to explain why a historical owner became obsolete.
+    pub(crate) packages: BTreeSet<String>,
     /// Unit declarations, reported only.
     pub units: Vec<Unit>,
 }
@@ -45,6 +48,7 @@ pub fn desired_state(paths: &Paths, root: &Path) -> Result<DesiredState, Reconci
         paths: Vec::new(),
         stow: Vec::new(),
         excluded: Vec::new(),
+        packages: package_names.clone(),
         units: units.into_iter().map(unit).collect(),
     };
     for entry in managed {
@@ -125,20 +129,6 @@ fn desired(path: String, kind: PathKind, owner: Option<String>) -> DesiredPath {
         path,
         kind: kind_name(kind).to_owned(),
         owner,
-    }
-}
-
-fn safe_relative(raw: &str) -> Result<(), ReconcileError> {
-    let path = PathBuf::from(raw);
-    let safe = !path.as_os_str().is_empty()
-        && !path.is_absolute()
-        && path
-            .components()
-            .all(|part| matches!(part, Component::Normal(_)));
-    if safe {
-        Ok(())
-    } else {
-        Err(ReconcileError::UnsafePath { path })
     }
 }
 

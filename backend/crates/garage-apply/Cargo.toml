@@ -24,8 +24,4 @@ serde_json = { version = "1.0.145", features = ["preserve_order"] }
 # `PREFERENCES_LOCK` from.
 rustix = { version = "1.1.4", features = ["fs"] }
 thiserror = "2.0.20"
-# `doctor --report`'s `generated_at` and `repair`'s `modified` are local time with a UTC
-# offset, and std has none. The same reader garage-render already uses: TZ first,
-# /etc/localtime after it, exactly as libc does for the Python's time.localtime().
-tz-rs = "0.7.3"
 toml = { version = "1.1.4", features = ["preserve_order"] }

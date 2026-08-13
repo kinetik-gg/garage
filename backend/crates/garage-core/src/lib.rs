@@ -10,6 +10,7 @@ pub mod pyrepr;
 pub mod schema;
 pub mod shlex;
 pub mod stow;
+pub mod time;
 pub mod toml_emit;
 #[cfg(test)]
 mod toml_emit_tests;

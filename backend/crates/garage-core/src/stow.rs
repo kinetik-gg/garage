@@ -119,6 +119,23 @@ pub fn dangling_repo_links(paths: &Paths, root: &Path) -> Vec<PathBuf> {
     found
 }
 
+/// Every symlink under the managed roots that resolves or points lexically into this checkout.
+///
+/// Unlike [`dangling_repo_links`], healthy links are included. Guarded prune uses this reverse
+/// walk to find a link that a previous manifest shipped but the current tree no longer names.
+#[must_use]
+pub fn checkout_links(paths: &Paths, root: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut seen = HashSet::new();
+    for scan_root in scan_roots(paths) {
+        if scan_root.is_dir() {
+            sweep_links(root, scan_root, &mut seen, &mut found);
+        }
+    }
+    found.sort();
+    found
+}
+
 /// Where a symlink points after exactly one hop, absolute and unresolved.
 #[must_use]
 pub fn link_hop(path: &Path) -> Option<PathBuf> {
@@ -265,6 +282,27 @@ fn sweep(root: &Path, scan_root: PathBuf, seen: &mut HashSet<PathBuf>, found: &m
                 && !path.exists()
                 && points_into(&path, &root.join("desktop"));
             if dangles {
+                found.push(path);
+            } else if !path.is_symlink() && directories.contains(name) {
+                queue.push(path);
+            }
+        }
+    }
+}
+
+fn sweep_links(
+    root: &Path,
+    scan_root: PathBuf,
+    seen: &mut HashSet<PathBuf>,
+    found: &mut Vec<PathBuf>,
+) {
+    let mut queue = vec![scan_root];
+    while let Some(here) = queue.pop() {
+        let (directories, files) = scan(&here);
+        for name in directories.iter().chain(files.iter()) {
+            let path = here.join(name);
+            let ours = path.is_symlink() && seen.insert(path.clone()) && points_into(&path, root);
+            if ours {
                 found.push(path);
             } else if !path.is_symlink() && directories.contains(name) {
                 queue.push(path);

@@ -1,13 +1,14 @@
 //! Scratch-tree tests for desired-state expansion and the read-only diff.
 
-use std::collections::HashMap;
+use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use garage_core::paths::Paths;
 
-use crate::{desired_state, diff, Action};
+use crate::{desired_state, diff, reconcile_at, Action, Options, RunTime};
 
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -57,6 +58,30 @@ impl World {
 
     fn home(&self, relative: &str) -> PathBuf {
         self.paths.home.join(relative)
+    }
+
+    fn run(&self, options: Options) -> crate::Report {
+        reconcile_at(
+            &self.paths,
+            &self.checkout,
+            options,
+            &RunTime::fixed("2026-08-14T12:34:56+0700", "fixed"),
+        )
+        .expect("scratch reconcile")
+    }
+
+    fn ledger(&self, path: &str, owner: Option<&str>) {
+        let ledger = self.paths.state_root.join("manifest.json");
+        fs::create_dir_all(ledger.parent().expect("ledger parent")).expect("ledger parent");
+        let owner = owner.map_or_else(|| "null".to_owned(), |name| format!("\"{name}\""));
+        fs::write(
+            ledger,
+            format!(
+                "{{\"version\":1,\"paths\":[{{\"path\":\"{path}\",\"kind\":\"generated\",\
+                 \"owner\":{owner},\"timestamp\":\"older\"}}]}}\n"
+            ),
+        )
+        .expect("seed ledger");
     }
 }
 
@@ -108,25 +133,7 @@ fn desired_expands_stow_ignores_and_package_ownership() {
 
 #[test]
 fn diff_uses_all_five_doctor_outcomes_and_collision_safe_backup_root() {
-    let world = World::new("five-states");
-    for name in ["linked", "other", "broken", "plain", "missing"] {
-        world.tracked(&format!(".config/{name}"));
-    }
-    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
-    world.manifest("", "stow-tree desktop/\n");
-    link(
-        world.checkout.join("desktop/.config/linked"),
-        world.home(".config/linked"),
-    );
-    let other = world.root.join("other/desktop/.config/other");
-    fs::create_dir_all(other.parent().expect("other parent")).expect("other parent");
-    fs::write(&other, "other").expect("other file");
-    link(&other, world.home(".config/other"));
-    link("/definitely/gone", world.home(".config/broken"));
-    fs::write(world.home(".config/plain"), "mine").expect("plain conflict");
-    let collision = world.home(".garage-backup/fixed/.config/plain");
-    fs::create_dir_all(collision.parent().expect("collision parent")).expect("collision parent");
-    fs::write(collision, "older").expect("older backup");
+    let world = five_state_world("five-state-diff");
 
     let desired = desired_state(&world.paths, &world.checkout).expect("desired state");
     let plan = diff(&world.paths, &world.checkout, desired, "fixed");
@@ -154,4 +161,200 @@ fn diff_uses_all_five_doctor_outcomes_and_collision_safe_backup_root() {
                 .as_ref()
         )
     );
+}
+
+#[test]
+fn every_doctor_stow_outcome_converges_to_this_checkout() {
+    let world = five_state_world("five-state-converge");
+    let report = world.run(Options::default());
+    assert_eq!(report.applied, 4);
+    for name in ["linked", "other", "broken", "plain", "missing"] {
+        let target = world.home(&format!(".config/{name}"));
+        assert!(target.is_symlink(), "{name} did not converge to a link");
+        assert!(garage_core::stow::points_into(
+            &target,
+            &world.checkout.join("desktop")
+        ));
+    }
+    assert_eq!(
+        fs::read_to_string(world.home(".garage-backup/fixed-2/.config/plain"))
+            .expect("plain backup"),
+        "mine"
+    );
+    let ledger =
+        fs::read_to_string(world.paths.state_root.join("manifest.json")).expect("install ledger");
+    assert_eq!(ledger.matches("\"path\"").count(), 4);
+}
+
+fn five_state_world(label: &str) -> World {
+    let world = World::new(label);
+    for name in ["linked", "other", "broken", "plain", "missing"] {
+        world.tracked(&format!(".config/{name}"));
+    }
+    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
+    world.manifest("", "stow-tree desktop/\n");
+    link(
+        world.checkout.join("desktop/.config/linked"),
+        world.home(".config/linked"),
+    );
+    let other = world.root.join("other/desktop/.config/other");
+    fs::create_dir_all(other.parent().expect("other parent")).expect("other parent");
+    fs::write(&other, "other").expect("other file");
+    link(&other, world.home(".config/other"));
+    link("/definitely/gone", world.home(".config/broken"));
+    fs::write(world.home(".config/plain"), "mine").expect("plain conflict");
+    let collision = world.home(".garage-backup/fixed/.config/plain");
+    fs::create_dir_all(collision.parent().expect("collision parent")).expect("collision parent");
+    fs::write(collision, "older").expect("older backup");
+    world
+}
+
+#[test]
+fn prune_refuses_an_unledgered_non_checkout_path() {
+    let world = World::new("prune-refusal");
+    world.manifest("", "generated .config/btop/themes/vanta.theme btop\n");
+    let target = world.home(".config/btop/themes/vanta.theme");
+    fs::create_dir_all(target.parent().expect("target parent")).expect("target parent");
+    fs::write(&target, "user file").expect("unledgered path");
+
+    let report = world.run(Options {
+        prune: true,
+        dry_run: false,
+    });
+
+    assert!(target.exists());
+    assert!(report.plan.is_empty());
+    assert_eq!(report.refused.len(), 1);
+    assert!(!world.paths.state_root.join("reconcile.log").exists());
+}
+
+#[test]
+fn prune_removes_a_ledgered_path_after_its_owner_leaves_and_logs_it() {
+    let world = World::new("prune-ledger");
+    let relative = ".config/btop/themes/vanta.theme";
+    world.manifest("", &format!("generated {relative} btop\n"));
+    let target = world.home(relative);
+    fs::create_dir_all(target.parent().expect("target parent")).expect("target parent");
+    fs::write(&target, "generated").expect("managed path");
+    world.ledger(relative, Some("btop"));
+
+    let report = world.run(Options {
+        prune: true,
+        dry_run: false,
+    });
+
+    assert!(!target.exists());
+    assert_eq!(report.applied, 1);
+    assert_eq!(
+        report.plan.first().map(|item| item.action),
+        Some(Action::Prune)
+    );
+    let log = fs::read_to_string(world.paths.state_root.join("reconcile.log")).expect("prune log");
+    assert!(log.contains(relative));
+    assert!(log.contains("owner btop removed from packages.list"));
+    assert!(log.contains("2026-08-14T12:34:56+0700"));
+}
+
+#[test]
+fn prune_removes_an_unledgered_link_into_this_checkout() {
+    let world = World::new("prune-checkout-link");
+    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
+    world.manifest("", "stow-tree desktop/\n");
+    let relative = ".config/obsolete";
+    let target = world.home(relative);
+    link(world.checkout.join("desktop/.config/obsolete"), &target);
+
+    let report = world.run(Options {
+        prune: true,
+        dry_run: false,
+    });
+
+    assert!(!target.is_symlink());
+    assert_eq!(report.applied, 1);
+    assert_eq!(
+        report.plan.first().map(|item| item.action),
+        Some(Action::Prune)
+    );
+    let log = fs::read_to_string(world.paths.state_root.join("reconcile.log"))
+        .expect("checkout-link prune log");
+    assert!(log.contains("path removed from managed-paths.list"));
+}
+
+#[test]
+fn dry_run_leaves_a_zero_filesystem_delta_even_with_converge_and_prune_work() {
+    let world = World::new("dry-digest");
+    world.tracked(".config/missing");
+    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
+    world.manifest(
+        "",
+        "stow-tree desktop/\ngenerated .config/btop/themes/vanta.theme btop\n",
+    );
+    let obsolete = world.home(".config/btop/themes/vanta.theme");
+    fs::create_dir_all(obsolete.parent().expect("obsolete parent")).expect("obsolete parent");
+    fs::write(&obsolete, "old").expect("obsolete path");
+    world.ledger(".config/btop/themes/vanta.theme", Some("btop"));
+    let before = tree_digest(&world.root);
+
+    let report = world.run(Options {
+        dry_run: true,
+        prune: true,
+    });
+
+    assert_eq!(report.plan.len(), 2);
+    assert_eq!(report.applied, 0);
+    assert_eq!(tree_digest(&world.root), before);
+}
+
+#[test]
+fn a_second_run_has_an_empty_plan_and_empty_log_delta() {
+    let world = World::new("idempotent");
+    world.tracked(".config/once");
+    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
+    world.manifest("", "stow-tree desktop/\n");
+
+    let first = world.run(Options::default());
+    assert_eq!(first.applied, 1);
+    let ledger_path = world.paths.state_root.join("manifest.json");
+    let ledger_before = fs::read(&ledger_path).expect("ledger after first run");
+    let log_path = world.paths.state_root.join("reconcile.log");
+    let log_before = fs::read(&log_path).unwrap_or_default();
+
+    let second = world.run(Options::default());
+
+    assert!(second.plan.is_empty());
+    assert_eq!(second.applied, 0);
+    assert_eq!(
+        fs::read(ledger_path).expect("unchanged ledger"),
+        ledger_before
+    );
+    assert_eq!(fs::read(log_path).unwrap_or_default(), log_before);
+}
+
+fn tree_digest(root: &Path) -> u64 {
+    let mut entries = Vec::new();
+    collect_tree(root, root, &mut entries);
+    entries.sort();
+    let mut digest = DefaultHasher::new();
+    entries.hash(&mut digest);
+    digest.finish()
+}
+
+fn collect_tree(root: &Path, here: &Path, entries: &mut Vec<String>) {
+    let Ok(children) = fs::read_dir(here) else {
+        return;
+    };
+    for child in children.flatten() {
+        let path = child.path();
+        let relative = path.strip_prefix(root).unwrap_or(&path).display();
+        if path.is_symlink() {
+            let target = fs::read_link(&path).unwrap_or_default();
+            entries.push(format!("L {relative} {}", target.display()));
+        } else if path.is_dir() {
+            entries.push(format!("D {relative}"));
+            collect_tree(root, &path, entries);
+        } else {
+            let bytes = fs::read(&path).unwrap_or_default();
+            entries.push(format!("F {relative} {bytes:?}"));
+        }
+    }
 }

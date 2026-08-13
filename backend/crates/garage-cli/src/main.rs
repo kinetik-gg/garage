@@ -11,6 +11,7 @@ mod commands;
 mod displays;
 mod error;
 mod pyjson;
+mod reconcile;
 mod response;
 mod session;
 mod set;

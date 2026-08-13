@@ -12,10 +12,10 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use garage_core::manifest::{self, ManifestError, PackageEntry, UnitEntry};
 use garage_core::paths::Paths;
+pub(crate) use garage_core::time::{local_backup_stamp, local_iso8601, now_seconds};
 use garage_core::traits::Runner;
 
 use crate::error::ApplyError;
@@ -193,76 +193,6 @@ pub(crate) fn checkout_root(paths: &Paths) -> Result<PathBuf, ApplyError> {
 /// deliberately second, so a running checkout never reads a stale published copy.
 fn manifest_dir(paths: &Paths, root: &Path) -> PathBuf {
     garage_core::checkout::manifest_dir(paths, root)
-}
-
-/// Seconds since the Unix epoch, for the two timestamps that are printed.
-pub(crate) fn now_seconds() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(0))
-}
-
-/// `time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(seconds))`.
-///
-/// Local time with its UTC offset, which is ISO 8601 and is what a person reading their own
-/// report expects to see. `tz-rs` reads `TZ` first and `/etc/localtime` after it, exactly as
-/// libc does for the Python's `time.localtime()`, so both binaries resolve the same wall
-/// clock on the same machine; a machine with neither falls back to UTC, which is libc's own
-/// fallback.
-pub(crate) fn local_iso8601(seconds: i64) -> String {
-    let Ok(utc) = tz::UtcDateTime::from_timespec(seconds, 0) else {
-        return String::new();
-    };
-    let local = tz::TimeZone::local()
-        .ok()
-        .and_then(|zone| utc.project(zone.as_ref()).ok());
-    let (year, month, day, hour, minute, second, offset) = local.map_or_else(
-        || {
-            (
-                utc.year(),
-                utc.month(),
-                utc.month_day(),
-                utc.hour(),
-                utc.minute(),
-                utc.second(),
-                0,
-            )
-        },
-        |here| {
-            (
-                here.year(),
-                here.month(),
-                here.month_day(),
-                here.hour(),
-                here.minute(),
-                here.second(),
-                here.local_time_type().ut_offset(),
-            )
-        },
-    );
-    let sign = if offset < 0 { '-' } else { '+' };
-    let minutes = offset.abs() / 60;
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{sign}{:02}{:02}",
-        minutes / 60,
-        minutes % 60
-    )
-}
-
-/// `time.strftime(BACKUP_STAMP)`: `%Y%m%d-%H%M%S` in local time, for [`crate::repair`]'s
-/// backup names.
-pub(crate) fn local_backup_stamp(seconds: i64) -> String {
-    let stamp = local_iso8601(seconds);
-    // `YYYY-MM-DDTHH:MM:SS+ZZZZ` -> `YYYYMMDD-HHMMSS`: the same fields with the separators the
-    // Python's second format string leaves out, rather than a second clock read that could
-    // land in the next second.
-    let kept: String = stamp
-        .chars()
-        .take(19)
-        .filter(char::is_ascii_digit)
-        .collect();
-    let (date, time) = kept.split_at(kept.len().min(8));
-    format!("{date}-{time}")
 }
 
 /// `shutil.which()`: the first executable of that name on `PATH`, or `None`.
