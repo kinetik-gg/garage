@@ -17,4 +17,6 @@ garage-proc = { path = "../garage-proc" }
 garage-render = { path = "../garage-render" }
 garage-apply = { path = "../garage-apply" }
 garage-reconcile = { path = "../garage-reconcile" }
-anyhow = "1.0.104"
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
+thiserror = "2.0.20"
+toml = { version = "1.1.4", features = ["preserve_order"] }

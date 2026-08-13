@@ -72,14 +72,21 @@ APPLICATIONS = {
 
 
 # ---------------------------------------------------------------------------
-# smoke: the harness proving itself
+# cli: main()'s own surface, which task 3.15 ported ahead of the layers
 # ---------------------------------------------------------------------------
-# Not a layer. Five invocations chosen because between them they touch every
-# comparison surface the runner has: a pure-stdout command, an error path, a
-# file-writing command with no external calls, a command that is almost entirely
-# external calls, and a command that reads, validates, writes and signals.
+# The first active family, and deliberately the smallest one that can be active:
+# every case here is answered by main() itself -- the USAGE text, the argument
+# count, the unknown-command message and the envelope they travel in -- with no
+# layer underneath it that is still a stub. That is the whole test for whether a
+# case belongs here. `snapshot` is the obvious fourth (it is what a bare `garage`
+# dispatches to) and it is not here, because make_snapshot() is task 3.9 and the
+# case would be claiming parity for something that does not exist yet.
+#
+# These three moved out of `smoke`, which keeps the cases whose layers are still
+# owed. `help` and `unknown-command` were written there to prove the harness
+# compares things; they now prove something about the port instead.
 
-SMOKE = (
+CLI = (
     Scenario(
         name="help",
         argv=("help",),
@@ -92,8 +99,32 @@ SMOKE = (
         argv=("definitely-not-a-command",),
         # The JSON error envelope, exit 1. Pins the *shape* of failure -- ok
         # false with a message -- which is the contract every other command
-        # falls back to.
+        # falls back to. Also pins migrate_config_root(), which runs ahead of
+        # the dispatch and therefore ahead of this refusal: the digest surface
+        # is what says the two backends touch the same nothing on the way past.
     ),
+    Scenario(
+        name="cli-set-wrong-argc",
+        argv=("set", "appearance.accent_color"),
+        # main()'s `len(argv) != 4` guard, which is the one `set` refusal that
+        # happens before PREFERENCES_LOCK is taken and before the schema is
+        # consulted -- so it is answerable today while the rest of `set` is not.
+        # The same argv appears in the preferences family as
+        # prefs-set-wrong-argument-count, where it is one refusal among many;
+        # here it is the claim that the guard itself is ported.
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# smoke: the harness proving itself
+# ---------------------------------------------------------------------------
+# Not a layer. Three invocations chosen because between them they touch the
+# comparison surfaces main()'s own cases cannot: a file-writing command with no
+# external calls, a command that is almost entirely external calls, and a command
+# that reads, validates, writes and signals.
+
+SMOKE = (
     Scenario(
         name="render-idle-empty",
         argv=("render-idle",),
@@ -450,6 +481,12 @@ DOCTOR: tuple[Scenario, ...] = ()
 
 FAMILIES = (
     Family(
+        name="cli",
+        active=True,
+        note="main()'s dispatch, USAGE and the JSON envelope; task 3.15",
+        scenarios=CLI,
+    ),
+    Family(
         name="smoke",
         active=False,
         note="the harness proving it compares things; not a layer claim",
@@ -457,9 +494,10 @@ FAMILIES = (
     ),
     Family(name="preferences", active=False,
            note="load/validate/save; from test_preferences.py, test_schema.py. "
-                "The load half is ported (task 3.1, garage-prefs) but reaches the "
-                "CLI through render-idle, which is still a stub; the `set` half "
-                "needs main()'s set branch, task 3.15. Activated by task 3.2.",
+                "The load half is ported (task 3.1, garage-prefs) and reaches the "
+                "CLI through render-idle (task 3.15); the `set` half is dispatched "
+                "and writes the file, but its route walk ends in whichever renderer "
+                "or applier is still owed. Activated by task 3.2.",
            scenarios=PREFERENCES),
     Family(name="render", active=False,
            note="fragment generation; from test_bar.py, test_keybinds.py",

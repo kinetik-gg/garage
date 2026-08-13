@@ -3,12 +3,6 @@
 version = 4
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -81,7 +75,7 @@ name = "garage-ai-usage"
 version = "0.1.0"
 dependencies = [
  "garage-core",
- "thiserror",
+ "serde_json",
 ]
 
 [[package]]
@@ -99,13 +93,15 @@ dependencies = [
 name = "garage-cli"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "garage-apply",
  "garage-core",
  "garage-prefs",
  "garage-proc",
  "garage-reconcile",
  "garage-render",
+ "serde_json",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -123,7 +119,10 @@ version = "0.1.0"
 dependencies = [
  "garage-core",
  "rusqlite",
+ "rustix",
+ "signal-hook",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -141,6 +140,7 @@ dependencies = [
  "garage-core",
  "rustix",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -148,6 +148,7 @@ name = "garage-proc"
 version = "0.1.0"
 dependencies = [
  "garage-core",
+ "serde_json",
  "thiserror",
 ]
 
@@ -167,6 +168,7 @@ name = "garage-render"
 version = "0.1.0"
 dependencies = [
  "garage-core",
+ "serde_json",
  "thiserror",
 ]
 
@@ -175,6 +177,7 @@ name = "garage-waybar"
 version = "0.1.0"
 dependencies = [
  "garage-core",
+ "serde_json",
  "thiserror",
 ]
 
@@ -216,6 +219,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+
+[[package]]
 name = "js-sys"
 version = "0.3.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -247,6 +256,12 @@ name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "once_cell"
@@ -353,6 +368,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_json"
+version = "1.0.151"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
+]
+
+[[package]]
 name = "serde_spanned"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -366,6 +395,26 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "signal-hook"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2a0c28ca5908dbdbcd52e6fdaa00358ab88637f8ab33e1f188dd510eb44b53d"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
+name = "signal-hook-registry"
+version = "1.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
+dependencies = [
+ "errno",
+ "libc",
+]
 
 [[package]]
 name = "smallvec"
@@ -543,3 +592,9 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+
+[[package]]
+name = "zmij"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"

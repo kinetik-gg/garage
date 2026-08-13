@@ -1,0 +1,24 @@
+Usage: garage [COMMAND [ARGUMENTS]]
+
+Human commands:
+  doctor [--report]       check this install and report what is wrong (exit 1 if any)
+                          --report prints the same checks as JSON, to paste into a bug
+  repair [--reset]        recover an unparseable preferences.toml; reports unless
+                          given --reset, which backs the file up and writes a fresh one
+  update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload
+  help                    print this
+
+Settings backend (each prints one JSON object: {"ok","data","error"}):
+  snapshot                the whole live state, and the default with no command
+  render                  rewrite every generated fragment (files only, applies nothing)
+  render-idle             rewrite hypridle.conf only (hypridle's ExecStartPre)
+  render-bar              rewrite the bar's fragments only (waybar's ExecStartPre)
+  render-wallpaper        rewrite hyprpaper.conf only (hyprpaper's ExecStartPre)
+  apply                   render, then push everything into the running session
+  set KEY JSON_VALUE      write one preference and apply just that change
+  action NAME [JSON]      run a one-shot action (volume, dnd, keybind.*, defaults.*)
+  display-test JSON       apply a display layout for 15s, pending confirmation
+  display-confirm TOKEN   keep the layout under test
+  display-revert TOKEN    put the previous layout back
+  theme-sync              switch light/dark if the schedule says so (timer)
+  night-shift-sync        re-evaluate the night shift window (timer)
