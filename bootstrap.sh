@@ -495,7 +495,10 @@ if ((dry_run)); then
     # --simulate is stow's own read-only mode. The per-link log is thousands of
     # lines, so count it and pass through only what is not a routine operation --
     # which is where a conflict report would appear.
-    if ! stow_output=$(stow --dir="$repo_dir" --target="$HOME" --restow \
+    if ! command -v stow >/dev/null; then
+        info "[dry-run] stow --dir=$repo_dir --target=$HOME --restow --no-folding desktop"
+        warn "stow is not installed yet; skipping its link-conflict simulation."
+    elif ! stow_output=$(stow --dir="$repo_dir" --target="$HOME" --restow \
         --no-folding --simulate --verbose=1 desktop 2>&1); then
         printf '%s\n' "$stow_output" | sed 's/^/    /' >&2
         if ((${#to_backup[@]} + ${#to_unlink[@]})); then
