@@ -130,6 +130,7 @@ name = "garage-metrics"
 version = "0.1.0"
 dependencies = [
  "garage-core",
+ "rustix",
  "thiserror",
 ]
 
