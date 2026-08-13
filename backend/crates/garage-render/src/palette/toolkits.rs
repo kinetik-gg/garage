@@ -26,14 +26,25 @@
 //! [`crate::palette::waybar`], and is itself reached only from
 //! [`crate::theme::render_theme`].
 //!
+//! # Which of these are templates
+//!
+//! The four writes this module makes on its own that carry real text -- `xsettingsd.conf`,
+//! kitty's theme, btop's theme and the generated `hyprlock-theme.conf` -- are
+//! [`crate::template`] files now, as are all five palette builders it calls. What is left
+//! as a literal here is the short, structural half: the two `settings.ini` files and the
+//! two `gtk.css` entry points, rofi's `config.rasi`, swayosd's `style.css`, micro's
+//! `settings.json` and `qt6ct.conf`. Each of those is one `@import` or a handful of keys
+//! naming a file this same function just wrote, so their text is a statement about this
+//! module's own output layout rather than about how anything looks -- editing one without
+//! editing the write beside it produces a config pointing at a file that is not there.
+//! `waybar/style.css` is left out for its own reasons; see [`crate::palette::waybar`].
+//!
 //! # The twenty-first file
 //!
 //! `waybar/style.css` is the only file here whose contents read a preference rather than only
 //! the palette -- `waybar_style_css()` composes [`crate::bar::style`]'s `bar_background()`
 //! with [`crate::bar::spacing`]'s `waybar_spacing_css()`, so this function takes a
 //! [`Preferences`] purely to hand `[bar]`'s own section on to that one write.
-
-use std::fmt::Write as _;
 
 use garage_core::fs::atomic::atomic_write;
 use garage_core::fs::marker::write_marker;
@@ -48,7 +59,60 @@ use crate::palette::rofi::rofi_palette_rasi;
 use crate::palette::swayosd::swayosd_palette_css;
 use crate::palette::table::role;
 use crate::palette::waybar::waybar_style_css;
+use crate::template::shipped::{
+    BTOP_THEME_HEAD, BTOP_THEME_LINE, HYPRLOCK_THEME, KITTY_THEME, XSETTINGSD,
+};
+use crate::template::vars::template_vars;
+use crate::template::{NoVars, Template};
 use crate::theme::opaque;
+
+template_vars!(
+    /// The two names `XSettings` republishes to X11 clients. Everything else in
+    /// `xsettingsd.tmpl` -- the font, the cursor, the hinting -- is fixed text that no
+    /// preference reaches.
+    XsettingsdVars {
+        gtk_theme: &'static str,
+        icon_theme: &'static str,
+    }
+);
+
+template_vars!(
+    /// kitty's ten roles and its own body opacity.
+    KittyVars {
+        opacity: &'static str,
+        body: &'static str,
+        fg: &'static str,
+        fg_strong: &'static str,
+        accent: &'static str,
+        accent_fg: &'static str,
+        link: &'static str,
+        line: &'static str,
+        bg_lifted: &'static str,
+        fg_muted: &'static str,
+        bg: &'static str,
+    }
+);
+
+template_vars!(
+    /// One `btop` theme key and the colour behind it. Which keys exist, and which role each
+    /// reads, is [`BTOP_KEYS`] -- a table, walked in code.
+    BtopLineVars {
+        key: &'static str,
+        value: &'static str,
+    }
+);
+
+template_vars!(
+    /// The four colours hyprlock is handed, each already reduced to bare hex digits: the
+    /// `rgb()` around the first is hyprlang syntax and lives in the template, and the other
+    /// three are interpolated into Pango markup that wants the digits alone.
+    HyprlockVars {
+        font_color: &'static str,
+        placeholder_hex: &'static str,
+        check_hex: &'static str,
+        fail_hex: &'static str,
+    }
+);
 
 /// What one appearance is called by each toolkit that names a theme rather than reading a
 /// palette (`THEME_TOOLKITS`, garage:284-289).
@@ -108,8 +172,9 @@ const TERM_OPACITY: &str = "0.5";
 /// # Errors
 ///
 /// [`RenderError::Marker`] if any of the in-place writes failed, [`RenderError::Atomic`] if
-/// the generated `hyprlock-theme.conf` could not be replaced, or
-/// [`RenderError::CompositedRole`] if a role Qt or hyprlock reads is not an opaque hex.
+/// the generated `hyprlock-theme.conf` could not be replaced,
+/// [`RenderError::CompositedRole`] if a role Qt or hyprlock reads is not an opaque hex, or
+/// [`RenderError::Template`] if a template on disk names a variable no renderer supplies.
 pub(crate) fn render_toolkits(
     paths: &Paths,
     scheme: Scheme,
@@ -225,25 +290,25 @@ fn write_palettes(paths: &Paths) -> Result<(), RenderError> {
         write(
             paths,
             &format!("gtk-3.0/apple-{appearance}.css"),
-            &gtk3_palette_css(appearance),
+            &gtk3_palette_css(paths, appearance)?,
         )?;
         write(
             paths,
             &format!("rofi/apple-{appearance}.rasi"),
-            &rofi_palette_rasi(appearance),
+            &rofi_palette_rasi(paths, appearance)?,
         )?;
         write(
             paths,
             &format!("swayosd/swayosd-{appearance}.css"),
-            &swayosd_palette_css(appearance),
+            &swayosd_palette_css(paths, appearance)?,
         )?;
     }
-    write(paths, "gtk-4.0/apple.css", &gtk4_palette_css())?;
+    write(paths, "gtk-4.0/apple.css", &gtk4_palette_css(paths)?)?;
     for appearance in SCHEMES {
         write(
             paths,
             &format!("qt6ct/colors/{}", look(appearance).qt_colors),
-            &qt_palette_conf(appearance)?,
+            &qt_palette_conf(paths, appearance)?,
         )?;
     }
     Ok(())
@@ -259,20 +324,10 @@ fn write_xsettingsd_and_rofi(
     write(
         paths,
         "xsettingsd/xsettingsd.conf",
-        &format!(
-            "Net/ThemeName \"{}\"
-Gtk/FontName \"Plus Jakarta Sans 11\"
-Net/IconThemeName \"{}\"
-Gtk/CursorThemeName \"macOS\"
-Net/EnableEventSounds 1
-EnableInputFeedbackSounds 0
-Xft/Antialias 1
-Xft/Hinting 1
-Xft/HintStyle \"hintslight\"
-Xft/RGBA \"rgb\"
-",
-            look.gtk, look.icons
-        ),
+        &Template::load(paths, XSETTINGSD).expand(&XsettingsdVars {
+            gtk_theme: look.gtk,
+            icon_theme: look.icons,
+        })?,
     )?;
     write(
         paths,
@@ -305,8 +360,12 @@ fn write_apps(paths: &Paths, scheme: Scheme) -> Result<(), RenderError> {
         "swayosd/style.css",
         &format!("/* Generated by garage. */\n@import \"swayosd-{scheme}.css\";\n"),
     )?;
-    write(paths, "kitty/theme.conf", &kitty_theme(scheme))?;
-    write(paths, "btop/themes/vanta.theme", &btop_theme(scheme))?;
+    write(paths, "kitty/theme.conf", &kitty_theme(paths, scheme)?)?;
+    write(
+        paths,
+        "btop/themes/vanta.theme",
+        &btop_theme(paths, scheme)?,
+    )?;
     write(
         paths,
         "micro/settings.json",
@@ -328,21 +387,13 @@ fn write_apps(paths: &Paths, scheme: Scheme) -> Result<(), RenderError> {
 /// no-alpha form is used, so `lock_color()`'s `rgba` branch has no call site to port.
 fn write_hyprlock(paths: &Paths, scheme: Scheme) -> Result<(), RenderError> {
     let digits = |name: &str| opaque(scheme, name).map(|hex| hex.trim_start_matches('#'));
-    atomic_write(
-        &paths.generated.join("hyprlock-theme.conf"),
-        &format!(
-            "# Generated by garage.
-$font_color = rgb({})
-$placeholder_hex = {}
-$check_hex = {}
-$fail_hex = {}
-",
-            digits("fg_strong")?,
-            digits("fg_muted")?,
-            digits("accent")?,
-            digits("danger")?
-        ),
-    )?;
+    let theme = Template::load(paths, HYPRLOCK_THEME).expand(&HyprlockVars {
+        font_color: digits("fg_strong")?,
+        placeholder_hex: digits("fg_muted")?,
+        check_hex: digits("accent")?,
+        fail_hex: digits("danger")?,
+    })?;
+    atomic_write(&paths.generated.join("hyprlock-theme.conf"), &theme)?;
     Ok(())
 }
 
@@ -350,37 +401,22 @@ $fail_hex = {}
 /// terminal stays dark until this changes no matter what the compositor does: `body_opaque`
 /// is the one body that is not the window body, the highest-contrast step of the ramp, so
 /// body text has as much of it as the appearance allows.
-fn kitty_theme(scheme: Scheme) -> String {
+fn kitty_theme(paths: &Paths, scheme: Scheme) -> Result<String, RenderError> {
     let hex = |name: &str| colour(scheme, name);
-    format!(
-        "# Generated by garage.
-# Fully transparent: the glass underlay supplies the surface.
-background_opacity          {TERM_OPACITY}
-background                  {body}
-foreground                  {fg}
-cursor                      {fg_strong}
-cursor_text_color           {body}
-selection_background        {accent}
-selection_foreground        {accent_fg}
-url_color                   {link}
-active_border_color         {accent}
-inactive_border_color       {line}
-active_tab_foreground       {fg_strong}
-active_tab_background       {bg_lifted}
-inactive_tab_foreground     {fg_muted}
-inactive_tab_background     {bg}
-",
-        body = hex("body_opaque"),
-        fg = hex("fg"),
-        fg_strong = hex("fg_strong"),
-        accent = hex("accent"),
-        accent_fg = hex("accent_fg"),
-        link = hex("link"),
-        line = hex("line"),
-        bg_lifted = hex("bg_lifted"),
-        fg_muted = hex("fg_muted"),
-        bg = hex("bg"),
-    )
+    let theme = Template::load(paths, KITTY_THEME).expand(&KittyVars {
+        opacity: TERM_OPACITY,
+        body: hex("body_opaque"),
+        fg: hex("fg"),
+        fg_strong: hex("fg_strong"),
+        accent: hex("accent"),
+        accent_fg: hex("accent_fg"),
+        link: hex("link"),
+        line: hex("line"),
+        bg_lifted: hex("bg_lifted"),
+        fg_muted: hex("fg_muted"),
+        bg: hex("bg"),
+    })?;
+    Ok(theme)
 }
 
 /// Which palette role each `btop` theme key reads, in the order the generated file writes
@@ -437,18 +473,16 @@ const BTOP_KEYS: &[(&str, &str)] = &[
 
 /// btop's theme. btop reads a named theme file once at startup, so the file's contents are
 /// swapped rather than the config's `color_theme` -- that keeps `btop.conf` stowed.
-fn btop_theme(scheme: Scheme) -> String {
-    let mut out = String::from(
-        "# Generated by garage.\n\
-         # An empty main_bg keeps the terminal's own background, which is the glass.\n",
-    );
+fn btop_theme(paths: &Paths, scheme: Scheme) -> Result<String, RenderError> {
+    let mut out = Template::load(paths, BTOP_THEME_HEAD).expand(&NoVars)?;
+    let line = Template::load(paths, BTOP_THEME_LINE);
     for &(key, name) in BTOP_KEYS {
         let value = if name.is_empty() {
             ""
         } else {
             colour(scheme, name)
         };
-        let _ = writeln!(out, "theme[{key}]=\"{value}\"");
+        out.push_str(&line.expand(&BtopLineVars { key, value })?);
     }
-    out
+    Ok(out)
 }

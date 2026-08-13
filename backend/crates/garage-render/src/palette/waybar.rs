@@ -21,6 +21,28 @@
 //!
 //! Doc-only: returns a `String`, written both by `render_toolkits()` (every render) and by
 //! `garage-apply`'s narrow `render_bar_style()` (a padding or background change alone).
+//!
+//! # Why this one is not a template
+//!
+//! Every other file `render_toolkits()` writes has had its text moved into
+//! [`crate::template`]'s `templates/` directory. This one keeps its literal, for two
+//! reasons that both come out of the same fact -- it is the only generated file whose
+//! contents read a *preference* rather than only the palette:
+//!
+//! * Most of it is computed. `waybar_spacing_css()` derives every rule below the `@import`
+//!   from `bar.padding_scale`, `bar.height` and the widget list -- there is no fixed prose
+//!   in that half at all, and a template for it would be one placeholder holding a whole
+//!   stylesheet.
+//! * Its entry point is shared. `waybar_style_css()` is public because `garage-apply`'s
+//!   `render_bar_style()` calls it for a single slider notch, and it is handed a `Scheme`
+//!   and a `Preferences` -- no [`Paths`](garage_core::paths::Paths), which is what a
+//!   template is loaded from. Templating the sixteen `@define-color` lines above the
+//!   `@import` would change that signature for every caller, and put a directory read on
+//!   the path a slider drags through.
+//!
+//! The sixteen colour lines are fixed text and would template cleanly on their own. If
+//! this file is ever split so the colour block has an entry point of its own, that block
+//! is the piece to move.
 
 use garage_core::schema::enums::Scheme;
 use garage_core::schema::Preferences;

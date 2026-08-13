@@ -57,6 +57,123 @@ shipped!(
     "hypridle-listener-suspend.tmpl"
 );
 
+shipped!(
+    /// The whole of `hyprpaper.conf`.
+    HYPRPAPER,
+    "hyprpaper.tmpl"
+);
+
+shipped!(
+    /// `locale.env`'s header, which is the whole file when there is no override.
+    LOCALE_ENV,
+    "locale-env.tmpl"
+);
+
+shipped!(
+    /// The `export LANG=` line an override adds.
+    LOCALE_ENV_EXPORT,
+    "locale-env-export.tmpl"
+);
+
+shipped!(
+    /// `waybar-clock.jsonc`, with the locale member spliced in or left out.
+    WAYBAR_CLOCK,
+    "waybar-clock.tmpl"
+);
+
+shipped!(
+    /// The clock's `locale` member, comma and all: a JSON object's separators belong to
+    /// whichever member is not last, so the comma is part of this fragment's text.
+    WAYBAR_CLOCK_LOCALE,
+    "waybar-clock-locale.tmpl"
+);
+
+shipped!(
+    /// The GTK3 palette's header line.
+    GTK3_PALETTE_HEAD,
+    "gtk3-palette-head.tmpl"
+);
+
+shipped!(
+    /// One `@define-color` line of the GTK3 palette.
+    GTK3_PALETTE_TOKEN,
+    "gtk3-palette-token.tmpl"
+);
+
+shipped!(
+    /// The GTK4 sheet the two blocks of custom properties are wrapped in.
+    GTK4_PALETTE,
+    "gtk4-palette.tmpl"
+);
+
+shipped!(
+    /// One custom property of the GTK4 palette's light block.
+    GTK4_PALETTE_LIGHT_TOKEN,
+    "gtk4-palette-light-token.tmpl"
+);
+
+shipped!(
+    /// One custom property of the GTK4 palette's dark block, which the media query
+    /// indents one level further.
+    GTK4_PALETTE_DARK_TOKEN,
+    "gtk4-palette-dark-token.tmpl"
+);
+
+shipped!(
+    /// The whole of rofi's palette.
+    ROFI_PALETTE,
+    "rofi-palette.tmpl"
+);
+
+shipped!(
+    /// The Qt palette's two header lines. Between them and the body sits the wrapped role
+    /// comment, which is computed rather than written -- see [`crate::palette::qt`].
+    QT_PALETTE_HEAD,
+    "qt-palette-head.tmpl"
+);
+
+shipped!(
+    /// The Qt palette's `[ColorScheme]` section and its three positional rows.
+    QT_PALETTE_BODY,
+    "qt-palette-body.tmpl"
+);
+
+shipped!(
+    /// The whole of swayosd's palette.
+    SWAYOSD_PALETTE,
+    "swayosd-palette.tmpl"
+);
+
+shipped!(
+    /// The whole of kitty's theme.
+    KITTY_THEME,
+    "kitty-theme.tmpl"
+);
+
+shipped!(
+    /// btop's theme header.
+    BTOP_THEME_HEAD,
+    "btop-theme-head.tmpl"
+);
+
+shipped!(
+    /// One `theme[key]="colour"` line of btop's theme.
+    BTOP_THEME_LINE,
+    "btop-theme-line.tmpl"
+);
+
+shipped!(
+    /// The whole of the generated `hyprlock-theme.conf`.
+    HYPRLOCK_THEME,
+    "hyprlock-theme.tmpl"
+);
+
+shipped!(
+    /// The whole of `xsettingsd.conf`.
+    XSETTINGSD,
+    "xsettingsd.tmpl"
+);
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -64,7 +181,14 @@ mod tests {
 
     use super::Shipped;
     use crate::idle::IdleListenerVars;
+    use crate::palette::gtk::{Gtk3HeadVars, Gtk4Vars, TokenVars};
+    use crate::palette::qt::{QtBodyVars, QtHeadVars};
+    use crate::palette::rofi::RofiVars;
+    use crate::palette::swayosd::SwayosdVars;
+    use crate::palette::toolkits::{BtopLineVars, HyprlockVars, KittyVars, XsettingsdVars};
+    use crate::region::{ClockLocaleVars, ClockVars, LocaleExportVars};
     use crate::template::TemplateVars;
+    use crate::wallpaper::WallpaperVars;
 
     /// Every template above, for the checks that are about the set rather than about one
     /// renderer's own.
@@ -73,6 +197,25 @@ mod tests {
         super::HYPRIDLE_LISTENER_LOCK,
         super::HYPRIDLE_LISTENER_DPMS,
         super::HYPRIDLE_LISTENER_SUSPEND,
+        super::HYPRPAPER,
+        super::LOCALE_ENV,
+        super::LOCALE_ENV_EXPORT,
+        super::WAYBAR_CLOCK,
+        super::WAYBAR_CLOCK_LOCALE,
+        super::GTK3_PALETTE_HEAD,
+        super::GTK3_PALETTE_TOKEN,
+        super::GTK4_PALETTE,
+        super::GTK4_PALETTE_LIGHT_TOKEN,
+        super::GTK4_PALETTE_DARK_TOKEN,
+        super::ROFI_PALETTE,
+        super::QT_PALETTE_HEAD,
+        super::QT_PALETTE_BODY,
+        super::SWAYOSD_PALETTE,
+        super::KITTY_THEME,
+        super::BTOP_THEME_HEAD,
+        super::BTOP_THEME_LINE,
+        super::HYPRLOCK_THEME,
+        super::XSETTINGSD,
     ];
 
     /// The directory the compiled copies were taken from, resolved from this crate rather
@@ -132,6 +275,52 @@ mod tests {
                 super::HYPRIDLE_LISTENER_SUSPEND,
             ],
         );
+    }
+
+    #[test]
+    fn hyprpaper_placeholders_and_variables_agree() {
+        check::<WallpaperVars>("hyprpaper", &[super::HYPRPAPER]);
+    }
+
+    #[test]
+    fn region_placeholders_and_variables_agree() {
+        check::<LocaleExportVars>("locale.env", &[super::LOCALE_ENV, super::LOCALE_ENV_EXPORT]);
+        check::<ClockVars>("the bar clock", &[super::WAYBAR_CLOCK]);
+        check::<ClockLocaleVars>("the bar clock's locale", &[super::WAYBAR_CLOCK_LOCALE]);
+    }
+
+    #[test]
+    fn gtk_placeholders_and_variables_agree() {
+        check::<Gtk3HeadVars>("the GTK3 palette header", &[super::GTK3_PALETTE_HEAD]);
+        check::<Gtk4Vars>("the GTK4 palette", &[super::GTK4_PALETTE]);
+        check::<TokenVars>(
+            "a palette token",
+            &[
+                super::GTK3_PALETTE_TOKEN,
+                super::GTK4_PALETTE_LIGHT_TOKEN,
+                super::GTK4_PALETTE_DARK_TOKEN,
+            ],
+        );
+    }
+
+    #[test]
+    fn rofi_and_swayosd_placeholders_and_variables_agree() {
+        check::<RofiVars>("the rofi palette", &[super::ROFI_PALETTE]);
+        check::<SwayosdVars>("the swayosd palette", &[super::SWAYOSD_PALETTE]);
+    }
+
+    #[test]
+    fn qt_placeholders_and_variables_agree() {
+        check::<QtHeadVars>("the Qt palette header", &[super::QT_PALETTE_HEAD]);
+        check::<QtBodyVars>("the Qt palette body", &[super::QT_PALETTE_BODY]);
+    }
+
+    #[test]
+    fn toolkit_placeholders_and_variables_agree() {
+        check::<XsettingsdVars>("xsettingsd", &[super::XSETTINGSD]);
+        check::<KittyVars>("kitty", &[super::KITTY_THEME]);
+        check::<BtopLineVars>("btop", &[super::BTOP_THEME_HEAD, super::BTOP_THEME_LINE]);
+        check::<HyprlockVars>("hyprlock", &[super::HYPRLOCK_THEME]);
     }
 
     /// The compiled copy is the shipped file, byte for byte.
