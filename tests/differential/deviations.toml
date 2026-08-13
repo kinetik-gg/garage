@@ -21,3 +21,13 @@
 # and skip, so progress stays visible without anything being forgiven.
 #
 # Empty on purpose: no deviation has been earned yet.
+
+[[deviation]]
+surface  = "trace"
+scenario = "render-all-empty"
+reason   = "render_general() in the Rust port writes the launcher and terminal markers only, never the browser one: resolving a browser association requires role_applications() -> mime_handlers(), which runs `env LC_ALL=C gio mime <type>` as a subprocess, and a RenderCx structurally carries no Runner -- see garage-render's RenderCx docs for why a renderer may never gain one. This is an architectural boundary, not a temporary gap: full three-marker parity is restored on the apply side, which does hold a Runner, once garage-apply grows the equivalent of the Python's apply_terminal() (which already calls render_general() and reaches further). Until then, garage render's trace is missing exactly the three `gio mime` calls role_applications() makes for the browser role's three mimetypes (x-scheme-handler/http, x-scheme-handler/https, text/html)."
+
+[[deviation]]
+surface  = "digest"
+scenario = "render-all-empty"
+reason   = "Same root cause as this scenario's trace deviation: render_general() does not write generated/browser, because computing its contents needs the subprocess-backed browser_command() a renderer cannot run. Every other generated file matches."

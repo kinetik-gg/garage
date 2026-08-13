@@ -7,5 +7,8 @@ pub mod manifest;
 pub mod paths;
 pub mod pyrepr;
 pub mod schema;
+pub mod shlex;
 pub mod toml_emit;
+#[cfg(test)]
+mod toml_emit_tests;
 pub mod traits;

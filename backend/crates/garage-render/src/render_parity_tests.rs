@@ -264,10 +264,10 @@ fn a_marker_rewrite_preserves_its_inode_and_the_lua_install_replaces_it() {
 /// `bar_background()` -- with each case's departures in the `"toml"` field exactly as
 /// `dump_toml()` wrote them.
 ///
-/// `waybar/style.css` is absent from `"toolkits"`, and deliberately: `waybar_style_css()` is
-/// not ported yet (see [`crate::palette::toolkits`]), and
-/// [`the_toolkit_render_writes_exactly_the_files_the_python_writes`] pins that gap as an
-/// equality rather than letting it pass as an unchecked omission.
+/// `waybar/style.css` is now part of `"toolkits"` too, dumped at `bar.padding_scale`'s shipped
+/// default (`FALLBACK_DEFAULTS`) exactly as `render_theme()` calls `render_toolkits()` with
+/// the loaded configuration -- extended into this fixture once task 3.7 ported
+/// `waybar_style_css()` and wired `render_toolkits()` to take a [`Preferences`].
 ///
 /// Absolute paths are spelled against `"home"` rather than against the scratch tree the dump
 /// ran in, so a comparison substitutes the running test's own home first. Two files carry one
@@ -316,17 +316,18 @@ fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
         .and_then(serde_json::Value::as_object)
         .expect("the fixture has a toolkits section");
     assert_eq!(toolkits.len(), 2, "both appearances are dumped");
+    let defaults = Defaults::compiled().expect("shipped defaults parse");
 
     for (name, expected) in toolkits {
         let scheme: Scheme = name.parse().expect("a toolkits key is a scheme name");
         let paths = scratch_paths(&format!("toolkits-{name}"));
         let (fixture_home, home) = homes(&paths, &all);
-        render_toolkits(&paths, scheme)
+        render_toolkits(&paths, scheme, defaults.values())
             .unwrap_or_else(|error| panic!("{name}: render_toolkits failed: {error}"));
 
         let files = expected.as_object().expect("a toolkits entry is an object");
         assert!(
-            files.len() >= 21,
+            files.len() >= 22,
             "{name}: the toolkit set should not shrink"
         );
         for (relative, contents) in files {
@@ -353,9 +354,11 @@ fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
 fn the_toolkit_render_writes_exactly_the_files_the_python_writes() {
     let all = theme_fixtures();
     let paths = scratch_paths("toolkit-set");
-    render_toolkits(&paths, Scheme::Dark).expect("render_toolkits succeeds on a clean scratch");
+    let defaults = Defaults::compiled().expect("shipped defaults parse");
+    render_toolkits(&paths, Scheme::Dark, defaults.values())
+        .expect("render_toolkits succeeds on a clean scratch");
 
-    let expected: Vec<String> = all
+    let mut expected: Vec<String> = all
         .get("toolkits")
         .and_then(|toolkits| toolkits.get("dark"))
         .and_then(serde_json::Value::as_object)
@@ -364,10 +367,11 @@ fn the_toolkit_render_writes_exactly_the_files_the_python_writes() {
         .filter(|name| !name.starts_with("generated/"))
         .cloned()
         .collect();
+    expected.sort();
 
-    // waybar/style.css is the one file the Python writes and this port does not; the fixture
-    // has it removed, so the two sides are equal rather than merely overlapping.
-    assert!(!expected.iter().any(|name| name == "waybar/style.css"));
+    // waybar/style.css is now written like every other toolkit file; the fixture carries it
+    // too, so the two sides are equal rather than merely overlapping.
+    assert!(expected.iter().any(|name| name == "waybar/style.css"));
     assert_eq!(tree(&paths.config_home), expected);
     assert_eq!(
         tree(&paths.generated),

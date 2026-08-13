@@ -60,7 +60,12 @@ use crate::workspaces::WorkspaceGroup;
 
 /// `load_toml()` (garage:1481-1489): an absent file is an empty document, and anything else
 /// that goes wrong is `SettingsError(f"{path.name}: {error}")`.
-fn load_toml(path: &Path) -> Result<toml::Table, RenderError> {
+///
+/// `pub(crate)` rather than private to this module: [`crate::all::render_all`] reads
+/// `displays.toml` through the same function, for the same reason `load_display_config()`
+/// does in the Python -- both are "what does the file on disk say", not the lenient,
+/// error-swallowing read [`load_saved_layout`] wraps it in below.
+pub(crate) fn load_toml(path: &Path) -> Result<toml::Table, RenderError> {
     let name = || {
         path.file_name()
             .unwrap_or_default()

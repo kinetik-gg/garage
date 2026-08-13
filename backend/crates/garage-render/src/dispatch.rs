@@ -17,10 +17,8 @@ use crate::{general, idle, motion, preferences, search};
 ///
 /// # Errors
 ///
-/// Whatever the dispatched renderer returns. [`RenderStep::SearchEngine`],
-/// [`RenderStep::Preferences`], [`RenderStep::Motion`] and [`RenderStep::Idle`] reach a real
-/// implementation; [`RenderStep::General`] is still a stub -- see
-/// [`RenderError::PortPending`] -- and Phase 3 replaces that one body next, not this match.
+/// Whatever the dispatched renderer returns. Every [`RenderStep`] variant reaches a real
+/// implementation.
 pub fn run_render(step: RenderStep, cx: &RenderCx<'_>) -> Result<(), RenderError> {
     match step {
         RenderStep::SearchEngine => search::render_search_engine(cx),

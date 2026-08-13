@@ -72,6 +72,13 @@ pub struct Paths {
     /// Duplicated from that script rather than parsed out of it: it is a published layout
     /// that the pacman hook also hardcodes, not a private detail.
     pub plugin_root: PathBuf,
+    /// The XDG application directories, in lookup order: `$XDG_DATA_HOME/applications`
+    /// first, then each of `$XDG_DATA_DIRS`'s `applications` subdirectories
+    /// (`application_dirs()`, garage:4252-4256). `$XDG_DATA_HOME` defaults to
+    /// `~/.local/share` and `$XDG_DATA_DIRS` to `/usr/local/share:/usr/share`, both read
+    /// here rather than by each caller so a `.desktop` lookup agrees with every other
+    /// XDG-aware tool on the system about where one can live.
+    pub application_dirs: Vec<PathBuf>,
 }
 
 impl Paths {
@@ -107,6 +114,7 @@ impl Paths {
             mimeapps_override: config_home.join(mimeapps_name(env)),
             legacy_root: config_home.join("workstation"),
             plugin_root: PathBuf::from("/usr/lib/kinetik/plugins"),
+            application_dirs: application_dirs(env, &home),
             home,
             config_home,
             state_home,
@@ -331,6 +339,23 @@ fn path_or(env: &HashMap<String, String>, key: &str, fallback: PathBuf) -> PathB
     value(env, key).map_or(fallback, PathBuf::from)
 }
 
+/// `application_dirs()` (garage:4252-4256): `$XDG_DATA_HOME/applications` first, then each
+/// `:`-separated, non-empty entry of `$XDG_DATA_DIRS` with `applications` appended --
+/// `$XDG_DATA_DIRS` itself falling back to `/usr/local/share:/usr/share` when unset or
+/// empty, exactly as `os.environ.get("XDG_DATA_DIRS") or "..."` does.
+fn application_dirs(env: &HashMap<String, String>, home: &Path) -> Vec<PathBuf> {
+    let data_home = path_or(env, "XDG_DATA_HOME", home.join(".local/share"));
+    let data_dirs = value(env, "XDG_DATA_DIRS").unwrap_or("/usr/local/share:/usr/share");
+    let mut dirs = vec![data_home.join("applications")];
+    dirs.extend(
+        data_dirs
+            .split(':')
+            .filter(|item| !item.is_empty())
+            .map(|item| Path::new(item).join("applications")),
+    );
+    dirs
+}
+
 /// The `<desktop>-mimeapps.list` name the spec reads ahead of the plain one: the first
 /// segment of `XDG_CURRENT_DESKTOP`, lowercased, and `hyprland` when there is none.
 fn mimeapps_name(env: &HashMap<String, String>) -> String {
@@ -421,6 +446,36 @@ mod tests {
         assert_eq!(
             paths.defaults_path,
             PathBuf::from("/home/tester/.config/garage/preferences.defaults.toml")
+        );
+    }
+
+    #[test]
+    fn application_dirs_defaults_to_the_xdg_fallback_list() {
+        let paths = Paths::from_env_map(&env_of(&[("HOME", "/home/tester")]));
+        assert_eq!(
+            paths.application_dirs,
+            vec![
+                PathBuf::from("/home/tester/.local/share/applications"),
+                PathBuf::from("/usr/local/share/applications"),
+                PathBuf::from("/usr/share/applications"),
+            ]
+        );
+    }
+
+    #[test]
+    fn application_dirs_honours_the_xdg_overrides_and_drops_empty_segments() {
+        let paths = Paths::from_env_map(&env_of(&[
+            ("HOME", "/home/tester"),
+            ("XDG_DATA_HOME", "/elsewhere/data"),
+            ("XDG_DATA_DIRS", "/a/share::/b/share:"),
+        ]));
+        assert_eq!(
+            paths.application_dirs,
+            vec![
+                PathBuf::from("/elsewhere/data/applications"),
+                PathBuf::from("/a/share/applications"),
+                PathBuf::from("/b/share/applications"),
+            ]
         );
     }
 

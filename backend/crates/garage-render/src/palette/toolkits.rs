@@ -26,15 +26,12 @@
 //! [`crate::palette::waybar`], and is itself reached only from
 //! [`crate::theme::render_theme`].
 //!
-//! # One write is still owed
+//! # The twenty-first file
 //!
-//! `waybar/style.css` is the twenty-first file, and the only one whose contents read a
-//! preference rather than only the palette. It is written from `waybar_style_css()`, which
-//! composes [`crate::bar::style`]'s `bar_background()` with [`crate::bar::spacing`]'s
-//! `waybar_spacing_css()` -- the scaled padding table, which is a port of its own and belongs
-//! to the bar task rather than to this one. Its call sits below in the Python's position,
-//! commented rather than written, so the file the bar task has to fill in is the one line it
-//! reads.
+//! `waybar/style.css` is the only file here whose contents read a preference rather than only
+//! the palette -- `waybar_style_css()` composes [`crate::bar::style`]'s `bar_background()`
+//! with [`crate::bar::spacing`]'s `waybar_spacing_css()`, so this function takes a
+//! [`Preferences`] purely to hand `[bar]`'s own section on to that one write.
 
 use std::fmt::Write as _;
 
@@ -42,6 +39,7 @@ use garage_core::fs::atomic::atomic_write;
 use garage_core::fs::marker::write_marker;
 use garage_core::paths::Paths;
 use garage_core::schema::enums::Scheme;
+use garage_core::schema::Preferences;
 
 use crate::error::RenderError;
 use crate::palette::gtk::{gtk3_palette_css, gtk4_palette_css};
@@ -49,6 +47,7 @@ use crate::palette::qt::qt_palette_conf;
 use crate::palette::rofi::rofi_palette_rasi;
 use crate::palette::swayosd::swayosd_palette_css;
 use crate::palette::table::role;
+use crate::palette::waybar::waybar_style_css;
 use crate::theme::opaque;
 
 /// What one appearance is called by each toolkit that names a theme rather than reading a
@@ -98,14 +97,18 @@ const TERM_OPACITY: &str = "0.5";
 /// [`RenderError::Marker`] if any of the in-place writes failed, [`RenderError::Atomic`] if
 /// the generated `hyprlock-theme.conf` could not be replaced, or
 /// [`RenderError::CompositedRole`] if a role Qt or hyprlock reads is not an opaque hex.
-pub(crate) fn render_toolkits(paths: &Paths, scheme: Scheme) -> Result<(), RenderError> {
+pub(crate) fn render_toolkits(
+    paths: &Paths,
+    scheme: Scheme,
+    prefs: &Preferences,
+) -> Result<(), RenderError> {
     let look = look(scheme);
     write_gtk_settings(paths, scheme, &look)?;
     write_palettes(paths)?;
     write_xsettingsd_and_rofi(paths, scheme, &look)?;
-    // The bar's colours, its spacing and the base sheet it imports; see waybar_style_css(),
-    // which render_bar_style() also writes on its own. Not ported -- see the module docs:
-    //     write(paths, "waybar/style.css", &waybar_style_css(scheme, prefs))?;
+    // The bar's colours, its spacing and the base sheet it imports; render_bar_style() also
+    // writes this one file on its own, for a padding or background change alone.
+    write(paths, "waybar/style.css", &waybar_style_css(scheme, prefs))?;
     write_apps(paths, scheme)?;
     write_hyprlock(paths, scheme)?;
     write(

@@ -13,10 +13,9 @@
 //! per-toolkit palette writers `render_toolkits()` calls, alongside GTK, Qt, rofi and
 //! swayosd's.
 //!
-//! Returns a `String`, not a write outcome, and is reached only from
-//! [`crate::palette::waybar`] and from `garage-apply`'s narrow `render_bar_style()`, neither
-//! of which is this module. `waybar_style_css()` is not ported yet, which is why the function
-//! below carries a `dead_code` expectation rather than a caller.
+//! Returns a `String`, not a write outcome, and is reached from [`crate::palette::waybar`]'s
+//! `waybar_style_css()` and, once `garage-apply`'s bar task lands, from that crate's narrow
+//! `render_bar_style()` too.
 
 use garage_core::schema::enums::BarBackground;
 use garage_core::schema::Preferences;
@@ -28,13 +27,6 @@ use crate::palette::table::role;
 /// `"blurred"` is `PALETTE`'s `bar_bg` unchanged; `"transparent"` is that same colour at zero
 /// alpha, which leaves the blur layer alone behind the bar.
 #[must_use]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "consumed by waybar_style_css(), which task 3.7 ports"
-    )
-)]
 pub(crate) fn bar_background(
     scheme: garage_core::schema::enums::Scheme,
     prefs: &Preferences,

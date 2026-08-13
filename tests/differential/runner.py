@@ -95,10 +95,17 @@ SURFACES = ("exit_code", "stdout", "stderr", "trace", "digest", "inodes")
 CASE_TIMEOUT = 120
 BUILD_TIMEOUT = 600
 
-# tempfile.mkstemp's random component: eight characters from [a-z0-9_]. It shows
-# up in the trace (`luac -p .../.binds.lua.k3f9x_2q`) and would make two runs of
-# the *same* backend disagree, which is not a finding about anything.
-_MKSTEMP = re.compile(r"(?<=/)\.([^/\s]+)\.([a-z0-9_]{8})\b")
+# The staging suffix on a hidden dotfile -- `.preferences.lua.XXXXXXXX` in the
+# trace (`luac -p .../.preferences.lua.k3f9x_2q`). Two unrelated generators
+# produce it, and neither is a difference between the two backends: Python's
+# `tempfile.mkstemp()` is eight characters from `[a-z0-9_]`, and the Rust port's
+# `garage_core::fs::atomic` writer concatenates pid/nanosecond/counter as lower-
+# case hex, which is not fixed-width and commonly runs past eight characters
+# (`2b2fc729773c2600`). {6,32} covers both generators' real output without
+# reaching into an ordinary short extension -- nothing this backend writes ships
+# a *hidden* two-dot filename whose last segment is six to thirty-two lowercase
+# alphanumerics/underscores for any other reason.
+_MKSTEMP = re.compile(r"(?<=/)\.([^/\s]+)\.([a-z0-9_]{6,32})\b")
 
 
 class HarnessError(RuntimeError):

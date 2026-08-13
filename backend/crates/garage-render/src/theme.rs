@@ -77,7 +77,7 @@ pub(crate) fn render_theme(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     // The configuration goes with it: the bar's stylesheet is the one file here that reads a
     // preference rather than only the palette -- [bar]'s background and padding_scale, which
     // have to be generated into the CSS.
-    render_toolkits(cx.paths(), scheme)
+    render_toolkits(cx.paths(), scheme, cx.prefs())
 }
 
 /// Which palette is in effect right now (garage:3693-3711), reading the wall clock through

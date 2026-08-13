@@ -451,10 +451,146 @@ PREFERENCES: tuple[Scenario, ...] = (
     ),
 )
 
-RENDER: tuple[Scenario, ...] = ()
+RENDER: tuple[Scenario, ...] = (
+    Scenario(
+        name="render-all-empty",
+        argv=("render",),
+        # Task 3.7's own claim: a scratch HOME with no displays.toml runs the whole
+        # render_all() chain to completion -- every fragment through render_theme()
+        # and render_wallpaper(), then the empty-layout branch that removes (rather
+        # than writes) the per-monitor fragment. The one subprocess call anywhere
+        # in this path is workspace_outputs()'s `hyprctl monitors -j`, which the
+        # fixture answers with no monitors at all -- consistent with "empty".
+    ),
+)
 # Grown from tests/test_bar.py, tests/test_keybinds.py and
 # tests/test_schema_table.py: render, render-bar, render-wallpaper and the Lua
-# fragments -- the family the luac shim exists for.
+# fragments -- the family the luac shim exists for. `render-all-empty` is the
+# first case; `render-bar`/`render-wallpaper` proper live in their own families
+# below because each is its own CLI command with its own narrow contract.
+
+
+def bar_prefs(body: str) -> dict[str, object]:
+    """A v5-stamped preferences.toml carrying only a `[bar]` departure."""
+    return prefs(f"[schema]\npreferences_version = 5\n\n[bar]\n{body}")
+
+
+RENDER_BAR: tuple[Scenario, ...] = (
+    Scenario(
+        name="render-bar-defaults",
+        argv=("render-bar",),
+        # No preferences.toml: the shipped defaults' three widgets (cpu, memory,
+        # network), ai_usage and media_player, the workspace indicator, height 43.
+    ),
+    Scenario(
+        name="render-bar-every-widget-off",
+        argv=("render-bar",),
+        # The minimal bar: every metric strip, the AI strip and the media control
+        # all switched off -- widgets.jsonc's definitions shrink to the two empty
+        # groups, and workspaces.jsonc carries no "custom/media" entry either.
+        pre_state=bar_prefs(
+            "monitor_cpu = false\nmonitor_memory = false\nmonitor_network = false\n"
+            "ai_usage = false\nmedia_player = false\n"
+        ),
+    ),
+    Scenario(
+        name="render-bar-every-metric-on",
+        argv=("render-bar",),
+        # Every metric strip on at once, in BAR_METRICS' order rather than the
+        # schema's declaration order -- the one thing a naive port is likely to
+        # get backwards.
+        pre_state=bar_prefs(
+            "monitor_cpu = true\nmonitor_memory = true\nmonitor_network = true\n"
+            "monitor_temp = true\nmonitor_disk = true\nmonitor_gpu = true\n"
+        ),
+    ),
+    Scenario(
+        name="render-bar-tall",
+        argv=("render-bar",),
+        # height at its maximum (60): widgets.jsonc's own "height" field, which
+        # config.jsonc no longer names.
+        pre_state=bar_prefs("height = 60\n"),
+    ),
+    Scenario(
+        name="render-bar-short",
+        argv=("render-bar",),
+        # height at its minimum (30).
+        pre_state=bar_prefs("height = 30\n"),
+    ),
+    Scenario(
+        name="render-bar-padding-scale-loose",
+        argv=("render-bar",),
+        # padding_scale is a style.css concern, not a widgets/workspaces one --
+        # render-bar does not write style.css at all, so this is the control case
+        # proving the scale is invisible to the three fragments this command owns.
+        pre_state=bar_prefs("padding_scale = 2.0\n"),
+    ),
+    Scenario(
+        name="render-bar-background-transparent",
+        argv=("render-bar",),
+        # Same control, for bar.background: also a style.css-only key.
+        pre_state=bar_prefs('background = "transparent"\n'),
+    ),
+    Scenario(
+        name="render-bar-no-workspace-indicator",
+        argv=("render-bar",),
+        # workspaces.indicator lives in [workspaces], not [bar], and is the one
+        # switch render_bar_workspaces() itself reads: modules-left drops
+        # "ext/workspaces" and keeps the menu.
+        pre_state=prefs(
+            "[schema]\npreferences_version = 5\n\n[workspaces]\nindicator = false\n"
+        ),
+    ),
+)
+
+
+def wallpaper_prefs(body: str) -> dict[str, object]:
+    """A v5-stamped preferences.toml carrying an `[appearance]` departure."""
+    return prefs(f"[schema]\npreferences_version = 5\n\n[appearance]\n{body}")
+
+
+RENDER_WALLPAPER: tuple[Scenario, ...] = (
+    Scenario(
+        name="render-wallpaper-light-image",
+        argv=("render-wallpaper",),
+        # theme_mode pins the resolved scheme to light without needing the clock.
+        # An image source respects wallpaper_fit -- "contain" here, not the
+        # shipped "cover" -- which is the one thing a color source overrides.
+        pre_state=wallpaper_prefs(
+            'theme_mode = "light"\nwallpaper_fit = "contain"\n'
+            'wallpaper_light_source = "image"\nwallpaper_light = "/pic.png"\n'
+        ),
+    ),
+    Scenario(
+        name="render-wallpaper-dark-image",
+        argv=("render-wallpaper",),
+        # The dark half of the same, with a different fit ("tile") so a
+        # transposition between the two appearances would be visible.
+        pre_state=wallpaper_prefs(
+            'theme_mode = "dark"\nwallpaper_fit = "tile"\n'
+            'wallpaper_dark_source = "image"\nwallpaper_dark = "/pic-dark.png"\n'
+        ),
+    ),
+    Scenario(
+        name="render-wallpaper-light-color",
+        argv=("render-wallpaper",),
+        # wallpaper_fit is still "contain", but a colour source has no composition
+        # to preserve, so render_wallpaper() forces "cover" regardless -- the
+        # override this family exists to pin.
+        pre_state=wallpaper_prefs(
+            'theme_mode = "light"\nwallpaper_fit = "contain"\n'
+            'wallpaper_light_source = "color"\nwallpaper_light_color = "#ff0000"\n'
+        ),
+    ),
+    Scenario(
+        name="render-wallpaper-dark-color",
+        argv=("render-wallpaper",),
+        pre_state=wallpaper_prefs(
+            'theme_mode = "dark"\nwallpaper_fit = "fit"\n'
+            'wallpaper_dark_source = "color"\nwallpaper_dark_color = "#00ff00"\n'
+        ),
+    ),
+)
 
 
 def stamped_lock_prefs(body: str) -> dict[str, object]:
@@ -545,14 +681,23 @@ FAMILIES = (
                 "and writes the file, but its route walk ends in whichever renderer "
                 "or applier is still owed. Activated by task 3.2.",
            scenarios=PREFERENCES),
-    Family(name="render", active=False,
-           note="fragment generation; from test_bar.py, test_keybinds.py",
+    Family(name="render", active=True,
+           note="`garage render`; task 3.7 wired render_all() to completion for a scratch "
+                "tree with no displays.toml. render_displays() itself is still owed, which "
+                "is why the one case here is deliberately the empty-layout branch.",
            scenarios=RENDER),
     Family(name="render_idle", active=True,
            note="hypridle.conf from [lock] alone; task 3.3, garage-render. Active because "
                 "`garage render-idle` now runs the real load -> render_idle chain end to "
                 "end (task 3.15's CLI wiring).",
            scenarios=RENDER_IDLE),
+    Family(name="render_bar", active=True,
+           note="`garage render-bar`; task 3.7 wired render_region() + "
+                "render_bar_workspaces() + render_bar_widgets() to the CLI.",
+           scenarios=RENDER_BAR),
+    Family(name="render_wallpaper", active=True,
+           note="`garage render-wallpaper`; task 3.7 wired render_wallpaper() to the CLI.",
+           scenarios=RENDER_WALLPAPER),
     Family(name="palette", active=False,
            note="theme and wallpaper markers; from test_palette.py",
            scenarios=PALETTE),

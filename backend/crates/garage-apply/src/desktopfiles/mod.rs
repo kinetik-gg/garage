@@ -13,6 +13,14 @@
 //! application change reaches the session through `action defaults.*`, not through
 //! `apply_changed_preference()` -- so every submodule here stays doc-only.
 
+// Every function in this subtree now has a real body, but none is reachable from outside
+// `desktopfiles` yet: wiring `set_default_app()` and its neighbours into `action defaults.*`
+// (dispatch), `crate::terminal` and `crate::snapshot::apps` is a later task's job, the same
+// "a later task's stubs" position `workspaces::reload_bar` was in before its own callers
+// existed. One allow here, rather than one per function, because the whole module is in that
+// position together and each of the three submodules calls into the others.
+#![allow(dead_code)]
+
 mod entry;
 mod mime;
 mod roles;

@@ -26,12 +26,16 @@
 //!
 //! The *structure* below is final; several of the layers it calls into are not. A command
 //! whose layer is still a stub fails through the envelope naming itself, which is the honest
-//! answer and the one the differential harness can read. Three reach real code already --
-//! `help`, `render` (through [`render_all`]) and `render-idle` (through
-//! [`run_render`]) -- and `set` reaches the real load, the real write and the real route
-//! walk, failing only at the first step of the route. `render-bar`, `render-wallpaper` and
-//! `apply` have no entry point in `garage-render`/`garage-apply` to call yet; they are wired
-//! the moment those crates grow one, and nothing here changes when they do.
+//! answer and the one the differential harness can read. `help`, `render` (through
+//! [`render_all`]), `render-idle` (through [`run_render`]), `render-bar` (through
+//! [`garage_render::all::render_bar`]) and `render-wallpaper` (through
+//! [`garage_render::all::render_wallpaper`]) all reach real code now; `set` reaches the real
+//! load, the real write and the real route walk, failing only at the first step of the
+//! route. `render` itself completes end to end whenever `displays.toml` names no enabled
+//! display -- true of a fresh scratch tree -- and reaches `render_displays()`'s own
+//! remaining stub, deep in `garage-render`, only once one is saved. `apply` has no entry
+//! point in `garage-apply` to call yet; it is wired the moment that crate grows one, and
+//! nothing here changes when it does.
 
 use std::thread;
 use std::time::Duration;
@@ -41,7 +45,7 @@ use garage_core::paths::Paths;
 use garage_core::schema::RenderStep;
 use garage_prefs::{load_preferences, migrate_config_root};
 use garage_proc::{Hyprctl, Luac, System};
-use garage_render::all::render_all;
+use garage_render::all::{render_all, render_bar, render_wallpaper};
 use garage_render::cx::RenderCx;
 use garage_render::dispatch::run_render;
 use serde_json::Value;
@@ -129,10 +133,10 @@ fn settings(paths: &Paths, command: &str, argv: &[String]) -> Result<Emitted, Cl
         // PREFERENCES_LOCK.
         "render-idle" => rendered(paths, Some(RenderStep::Idle)),
         // waybar's ExecStartPre: render_region + render_bar_workspaces + render_bar_widgets,
-        // narrow rather than a full render. No public entry point for the three yet.
-        "render-bar" => Err(CliError::PortPending("render-bar")),
-        // hyprpaper's ExecStartPre, deliberately not "render". Same, task 3.5.
-        "render-wallpaper" => Err(CliError::PortPending("render-wallpaper")),
+        // narrow rather than a full render.
+        "render-bar" => rendered_bar(paths),
+        // hyprpaper's ExecStartPre, deliberately not "render".
+        "render-wallpaper" => rendered_wallpaper(paths),
         // apply_preferences(): task 3.7.
         "apply" => Err(CliError::PortPending("apply")),
         "set" => set::set(paths, argv).map(Emitted::Envelope),
@@ -171,6 +175,41 @@ fn rendered(paths: &Paths, step: Option<RenderStep>) -> Result<Emitted, CliError
         None => render_all(&cx, &load_keybindings(paths, None))?,
         Some(step) => run_render(step, &cx)?,
     }
+    Ok(Emitted::Envelope(Value::Bool(true)))
+}
+
+/// `render-bar`: `render_region()` + `render_bar_workspaces()` + `render_bar_widgets()`, the
+/// three fragments waybar's `ExecStartPre` needs and nothing else -- see
+/// [`garage_render::all::render_bar`] for why this is narrower than [`render_all`].
+///
+/// # Errors
+///
+/// Whatever [`garage_render::all::render_bar`] returns.
+fn rendered_bar(paths: &Paths) -> Result<Emitted, CliError> {
+    let config = load_preferences(paths, None)?;
+    let system = System;
+    let monitors = Hyprctl::new(&system);
+    let lua = Luac::new(&system);
+    let cx = RenderCx::new(&config, paths, &monitors, &lua);
+    render_bar(&cx)?;
+    Ok(Emitted::Envelope(Value::Bool(true)))
+}
+
+/// `render-wallpaper`: `render_wallpaper(load_preferences())` alone -- hyprpaper's
+/// `ExecStartPre`. The moved flag [`garage_render::all::render_wallpaper`] reports is not
+/// read here, the same way `render`'s own call drops it: nothing downstream of this command
+/// restarts the service on its say-so, that decision belongs to `garage apply`.
+///
+/// # Errors
+///
+/// Whatever [`garage_render::all::render_wallpaper`] returns.
+fn rendered_wallpaper(paths: &Paths) -> Result<Emitted, CliError> {
+    let config = load_preferences(paths, None)?;
+    let system = System;
+    let monitors = Hyprctl::new(&system);
+    let lua = Luac::new(&system);
+    let cx = RenderCx::new(&config, paths, &monitors, &lua);
+    let _moved = render_wallpaper(&cx)?;
     Ok(Emitted::Envelope(Value::Bool(true)))
 }
 
@@ -295,5 +334,70 @@ mod tests {
     #[test]
     fn the_plain_table_is_the_pythons_three() {
         assert_eq!(PLAIN_COMMANDS, ["doctor", "repair", "update"]);
+    }
+
+    /// A real scratch `HOME`, unlike [`paths`]'s deliberately unwritable one: `render-bar`
+    /// and `render-wallpaper` are exercised for real here, down to the bytes on disk, rather
+    /// than only "not `UnknownCommand`".
+    fn scratch_paths(label: &str) -> Paths {
+        let home = std::env::temp_dir().join(format!(
+            "garage-cli-dispatch-{label}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let env: HashMap<String, String> =
+            [("HOME".to_owned(), home.to_string_lossy().into_owned())]
+                .into_iter()
+                .collect();
+        Paths::from_env_map(&env)
+    }
+
+    #[test]
+    fn render_bar_writes_the_three_bar_fragments_and_nothing_else() {
+        let paths = scratch_paths("render-bar");
+        let outcome = settings(&paths, "render-bar", &argv(&["render-bar"]))
+            .expect("render-bar succeeds against a real scratch HOME");
+        assert!(
+            matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
+        );
+        assert!(paths.fragments.locale_env.exists());
+        assert!(paths.fragments.waybar_clock.exists());
+        assert!(paths.fragments.waybar_workspaces.exists());
+        assert!(paths.fragments.waybar_widgets.exists());
+        // Narrow, unlike `render`: no toolkit config and no theme marker are touched.
+        assert!(!paths.markers.bar_foreground.exists());
+        drop(std::fs::remove_dir_all(&paths.home));
+    }
+
+    /// `garage render` against a scratch tree with no `displays.toml` at all: the whole
+    /// chain now completes, `render_display_fragment()`'s empty-layout branch reached rather
+    /// than `render_displays()`'s own remaining `PortPending` stub -- see
+    /// `garage_render::all::render_all`'s own doc for the same claim one layer down.
+    #[test]
+    fn render_completes_end_to_end_with_no_displays_toml() {
+        let paths = scratch_paths("render-all");
+        let outcome = settings(&paths, "render", &argv(&["render"]))
+            .expect("render completes with no displays.toml in scratch");
+        assert!(
+            matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
+        );
+        assert!(paths.fragments.hyprland.exists());
+        assert!(paths.fragments.waybar_widgets.exists());
+        assert!(!paths.fragments.displays.exists());
+        drop(std::fs::remove_dir_all(&paths.home));
+    }
+
+    #[test]
+    fn render_wallpaper_writes_only_hyprpaper_conf() {
+        let paths = scratch_paths("render-wallpaper");
+        let outcome = settings(&paths, "render-wallpaper", &argv(&["render-wallpaper"]))
+            .expect("render-wallpaper succeeds against a real scratch HOME");
+        assert!(
+            matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
+        );
+        assert!(paths.fragments.hyprpaper.exists());
+        assert!(!paths.fragments.locale_env.exists());
+        assert!(!paths.markers.bar_foreground.exists());
+        drop(std::fs::remove_dir_all(&paths.home));
     }
 }
