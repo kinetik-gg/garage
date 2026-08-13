@@ -29,9 +29,6 @@ pub(crate) struct DoctorCx<'a> {
     pub(crate) proc: &'a dyn Runner,
     /// The dotfiles checkout this binary is part of.
     pub(crate) root: PathBuf,
-    /// `<root>/desktop`, the stow package. Held rather than recomputed because
-    /// [`super::stow`]'s `points_into()` is asked it once per managed path.
-    pub(crate) tree: PathBuf,
     /// Where `packages.list`, `units.list` and `fonts.list` are read from. See [`super`]'s
     /// module doc; resolved by [`manifest_dir`].
     pub(crate) manifest: PathBuf,
@@ -97,7 +94,6 @@ impl<'a> DoctorCx<'a> {
     /// the scratch checkout it just built.
     pub(crate) fn at(paths: &'a Paths, proc: &'a dyn Runner, root: PathBuf) -> Self {
         Self {
-            tree: root.join("desktop"),
             manifest: manifest_dir(paths, &root),
             root,
             paths,
@@ -185,52 +181,8 @@ pub(crate) fn version_parts(text: &str) -> [u64; 3] {
 /// [`ApplyError::Settings`] carrying the Python's own sentence when neither the executable
 /// nor the stowed defaults link identifies something that looks like a Garage checkout.
 pub(crate) fn checkout_root(paths: &Paths) -> Result<PathBuf, ApplyError> {
-    let binary = std::env::current_exe()
-        .and_then(|path| path.canonicalize())
-        .map_err(|error| ApplyError::Settings(error.to_string()))?;
-    checkout_root_from(&binary, &paths.defaults_path)
-}
-
-/// Resolve a checkout from an already-canonical executable, then from the stowed defaults.
-fn checkout_root_from(binary: &Path, defaults_path: &Path) -> Result<PathBuf, ApplyError> {
-    checkout_from_executable(binary)
-        .or_else(|| checkout_from_defaults(defaults_path))
-        .ok_or_else(|| {
-            ApplyError::Settings(format!(
-                "{} is not inside a Garage checkout",
-                binary.display()
-            ))
-        })
-}
-
-/// The original route, kept first so a checkout can bootstrap before it has been stowed.
-fn checkout_from_executable(binary: &Path) -> Option<PathBuf> {
-    let root = binary
-        .ancestors()
-        .nth(4)
-        .filter(|root| !root.as_os_str().is_empty())
-        .unwrap_or(Path::new("/"))
-        .to_path_buf();
-    looks_like_checkout(&root).then_some(root)
-}
-
-/// The installed route: only the stow link to the checkout's shipped defaults is authority.
-fn checkout_from_defaults(defaults_path: &Path) -> Option<PathBuf> {
-    let metadata = std::fs::symlink_metadata(defaults_path).ok()?;
-    if !metadata.file_type().is_symlink() {
-        return None;
-    }
-    let defaults = defaults_path.canonicalize().ok()?;
-    if !defaults.ends_with("desktop/.config/garage/preferences.defaults.toml") {
-        return None;
-    }
-    let root = defaults.ancestors().nth(4)?.to_path_buf();
-    looks_like_checkout(&root).then_some(root)
-}
-
-/// The marker both the Rust and Python discovery paths use.
-fn looks_like_checkout(root: &Path) -> bool {
-    root.join("desktop/.stow-local-ignore").is_file()
+    garage_core::checkout::checkout_root(paths)
+        .map_err(|error| ApplyError::Settings(error.to_string()))
 }
 
 /// Where the three manifests are read from: the checkout's own copy, then the one an install
@@ -240,16 +192,7 @@ fn looks_like_checkout(root: &Path) -> bool {
 /// The fallback exists for the shape an installed-without-a-checkout Garage would have; it is
 /// deliberately second, so a running checkout never reads a stale published copy.
 fn manifest_dir(paths: &Paths, root: &Path) -> PathBuf {
-    let tracked = root.join("system/manifest");
-    if tracked.is_dir() {
-        return tracked;
-    }
-    paths
-        .application_dirs
-        .first()
-        .and_then(|applications| applications.parent())
-        .unwrap_or(&paths.home)
-        .join("garage/manifest")
+    garage_core::checkout::manifest_dir(paths, root)
 }
 
 /// Seconds since the Unix epoch, for the two timestamps that are printed.
@@ -332,91 +275,4 @@ fn which(name: &str) -> Option<PathBuf> {
         let metadata = std::fs::metadata(&candidate).ok()?;
         (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0).then_some(candidate)
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::PathBuf;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    use super::checkout_root_from;
-
-    static SERIAL: AtomicU64 = AtomicU64::new(0);
-
-    fn scratch(label: &str) -> PathBuf {
-        let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "garage-checkout-discovery-{label}-{}-{serial}",
-            std::process::id()
-        ));
-        drop(fs::remove_dir_all(&root));
-        fs::create_dir_all(&root).expect("scratch directory");
-        root
-    }
-
-    fn plant_checkout(checkout: &std::path::Path) -> PathBuf {
-        let shipped = checkout.join("desktop/.config/garage/preferences.defaults.toml");
-        fs::create_dir_all(shipped.parent().expect("defaults parent")).expect("defaults parent");
-        fs::write(&shipped, "[schema]\npreferences_version = 5\n").expect("shipped defaults");
-        fs::write(checkout.join("desktop/.stow-local-ignore"), "").expect("checkout marker");
-        shipped
-    }
-
-    #[test]
-    fn an_installed_binary_finds_the_checkout_through_the_stowed_defaults() {
-        let scratch = scratch("installed");
-        let checkout = scratch.join("checkout");
-        plant_checkout(&checkout);
-
-        let defaults = scratch.join("home/.config/garage/preferences.defaults.toml");
-        fs::create_dir_all(defaults.parent().expect("stow parent")).expect("stow parent");
-        std::os::unix::fs::symlink(
-            "../../../checkout/desktop/.config/garage/preferences.defaults.toml",
-            &defaults,
-        )
-        .expect("relative stow link");
-        let binary = scratch.join("home/.local/lib/garage/bin/garage");
-
-        assert_eq!(
-            checkout_root_from(&binary, &defaults).expect("checkout through defaults"),
-            checkout.canonicalize().expect("canonical checkout")
-        );
-        drop(fs::remove_dir_all(scratch));
-    }
-
-    #[test]
-    fn executable_ancestry_wins_over_a_stowed_link_to_another_checkout() {
-        let scratch = scratch("executable-first");
-        let executable_checkout = scratch.join("executable-checkout");
-        plant_checkout(&executable_checkout);
-        let linked_checkout = scratch.join("linked-checkout");
-        let shipped = plant_checkout(&linked_checkout);
-        let defaults = scratch.join("home/.config/garage/preferences.defaults.toml");
-        fs::create_dir_all(defaults.parent().expect("stow parent")).expect("stow parent");
-        std::os::unix::fs::symlink(shipped, &defaults).expect("defaults link");
-        let binary = executable_checkout.join("backend/target/debug/garage");
-
-        assert_eq!(
-            checkout_root_from(&binary, &defaults).expect("checkout through executable"),
-            executable_checkout
-        );
-        drop(fs::remove_dir_all(scratch));
-    }
-
-    #[test]
-    fn discovery_keeps_the_existing_error_when_neither_route_finds_a_checkout() {
-        let scratch = scratch("missing");
-        let defaults = scratch.join("home/.config/garage/preferences.defaults.toml");
-        fs::create_dir_all(defaults.parent().expect("defaults parent")).expect("defaults parent");
-        fs::write(&defaults, "not a stow link\n").expect("plain defaults");
-        let binary = scratch.join("home/.local/lib/garage/bin/garage");
-
-        let error = checkout_root_from(&binary, &defaults).expect_err("discovery must fail");
-        assert_eq!(
-            error.to_string(),
-            format!("{} is not inside a Garage checkout", binary.display())
-        );
-        drop(fs::remove_dir_all(scratch));
-    }
 }

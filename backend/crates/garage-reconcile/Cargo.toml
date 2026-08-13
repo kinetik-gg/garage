@@ -11,7 +11,6 @@ workspace = true
 
 [dependencies]
 garage-core = { path = "../garage-core" }
-garage-prefs = { path = "../garage-prefs" }
-garage-proc = { path = "../garage-proc" }
-garage-render = { path = "../garage-render" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
 thiserror = "2.0.20"

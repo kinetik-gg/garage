@@ -95,7 +95,6 @@ dependencies = [
  "garage-prefs",
  "garage-proc",
  "garage-render",
- "regex",
  "rustix",
  "serde_json",
  "thiserror",
@@ -122,6 +121,7 @@ dependencies = [
 name = "garage-core"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "serde",
  "thiserror",
  "toml",
@@ -173,9 +173,8 @@ name = "garage-reconcile"
 version = "0.1.0"
 dependencies = [
  "garage-core",
- "garage-prefs",
- "garage-proc",
- "garage-render",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
