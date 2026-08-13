@@ -26,3 +26,6 @@ garage-file-index.service    running
 garage-shell.service         running
 garage-theme.timer           running
 garage-night-shift.timer     running
+garage-reconcile.path        running   # an active path watcher is a running schedule
+garage-reconcile-stamp.path  running   # likewise: inactive would miss pacman stamps
+garage-reconcile.service     oneshot   # exits after each path-triggered convergence

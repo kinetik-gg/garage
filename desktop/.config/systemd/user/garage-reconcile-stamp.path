@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for package transactions that need Garage reconciliation
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Path]
+PathChanged=/run/garage/reconcile-stamp
+Unit=garage-reconcile.service
+
+[Install]
+WantedBy=graphical-session.target

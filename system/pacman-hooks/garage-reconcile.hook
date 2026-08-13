@@ -1,0 +1,22 @@
+# Installed by bootstrap.sh to /etc/pacman.d/hooks/garage-reconcile.hook.
+#
+# Fires after any transaction that installs or upgrades a package. Package
+# ownership in managed-paths.list is Garage's reconciliation concern; duplicating
+# that list as hook targets would drift, and a removed owner must still be seen.
+#
+# The root transaction does no reconciliation. It only changes an mtime under
+# /run, so the work stays fast, cannot inherit root authority, and is picked up
+# by garage-reconcile-stamp.path in the graphical user session. Remove is absent:
+# package removal is an explicit manifest edit followed by `garage reconcile
+# --prune`, not an instruction to delete user data from a pacman transaction.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Scheduling Garage reconciliation in the user session...
+When = PostTransaction
+Exec = /usr/bin/touch /run/garage/reconcile-stamp

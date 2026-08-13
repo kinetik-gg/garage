@@ -1009,6 +1009,18 @@ run sudo install -m 0644 "$repo_dir/system/pacman-hooks/kinetik-plugins.hook" \
     /etc/pacman.d/hooks/kinetik-plugins.hook
 record "installed the pacman hook that watches the Hyprland plugin ABI"
 
+step "Installing the reconciliation stamp hook"
+# The pacman action is deliberately only `touch`, so tmpfiles owns the runtime
+# directory across boots. Create it now as well: the first transaction after a
+# bootstrap must not have to wait for a reboot before its hook is valid.
+run sudo install -d -m 0755 /usr/lib/tmpfiles.d /etc/pacman.d/hooks
+run sudo install -m 0644 "$repo_dir/system/tmpfiles.d/garage.conf" \
+    /usr/lib/tmpfiles.d/garage.conf
+run sudo systemd-tmpfiles --create /usr/lib/tmpfiles.d/garage.conf
+run sudo install -m 0644 "$repo_dir/system/pacman-hooks/garage-reconcile.hook" \
+    /etc/pacman.d/hooks/garage-reconcile.hook
+record "installed the pacman hook that schedules Garage reconciliation"
+
 step "Deploying the optional Hyprland plugins"
 glass_repo=""
 for candidate in "$HOME/repositories/glass" "$HOME/repositories/hyprliquid"; do

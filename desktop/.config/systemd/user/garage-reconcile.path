@@ -1,0 +1,14 @@
+[Unit]
+Description=Watch Garage host preferences for reconciliation
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Path]
+PathChanged=%h/.config/garage/preferences.toml
+PathChanged=%h/.config/garage/displays.toml
+PathChanged=%h/.config/garage/keybindings.toml
+PathChanged=%h/.config/garage/workspace-blocks.toml
+Unit=garage-reconcile.service
+
+[Install]
+WantedBy=graphical-session.target
