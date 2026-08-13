@@ -1,0 +1,23 @@
+# Differences between the Python backend and the Rust port that have been
+# looked at, understood, and decided to be correct. Nothing else is forgiven.
+#
+# An entry excuses exactly one (scenario, surface) pair:
+#
+#   [[deviation]]
+#   surface  = "trace"            # one of: exit_code stdout stderr trace digest inodes
+#   scenario = "set-theme-mode"   # exact scenario name, no globs
+#   reason   = "why this difference is right, in a sentence someone can check"
+#
+# The list is verified in both directions, which is the point of keeping it here
+# rather than in a comment. A difference with no entry fails the run. An entry
+# whose scenario and surface did *not* differ also fails the run -- that is the
+# XPASS discipline from tests/run applied to parity: a written-down difference
+# that has stopped happening is a lie in the repository, and either the port
+# caught up (delete the entry) or the scenario stopped exercising the thing (fix
+# the scenario).
+#
+# "The Rust side is not written yet" is never a reason. That is what an inactive
+# family in scenarios.py is for -- inactive families report their mismatch counts
+# and skip, so progress stays visible without anything being forgiven.
+#
+# Empty on purpose: no deviation has been earned yet.
