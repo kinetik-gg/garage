@@ -24,9 +24,13 @@ where deleting the cache meant deleting the user's settings beside it.
 
 **One-writer rule**: `save_preferences()` is the only writer of `preferences.toml`, and it writes
 departures from layer 1, never the merged whole (see §3, and §8's four-file split and snapshot
-pattern for the read side). `save_workspace_blocks()`, the Displays pane's `display_finish()`, and
-`keybind_action()` are likewise the single writers of `workspace-blocks.toml`, `displays.toml`,
-and `keybindings.toml`. Renderers read generated state and never write back upstream.
+pattern for the read side). `save_workspace_blocks()` and `keybind_action()` are likewise the
+single writers of `workspace-blocks.toml` and `keybindings.toml`. `displays.toml` has two: the
+Displays pane's `display_finish()`, and `initialize_display_config()`, which seeds the file from
+`display_snapshot()` on the first apply so a machine whose owner never opened the pane isn't left
+on the catch-all monitor rule — it never overwrites an existing file. Both serialize on
+`DISPLAY_LOCK` and share `normalize_display_layout()`/`layout_toml()`, so both write the same
+shape. Renderers read generated state and never write back upstream.
 
 ## 2. The apply-mechanism table
 
