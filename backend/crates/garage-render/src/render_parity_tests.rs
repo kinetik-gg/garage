@@ -28,10 +28,16 @@ use garage_core::schema::notes::Notes;
 use garage_core::schema::Preferences;
 use garage_core::traits::{LuaCheckError, LuaSyntaxCheck, Monitor, MonitorError, MonitorSource};
 
+use garage_core::schema::enums::Scheme;
+
 use crate::accent::render_accent;
+use crate::bar::style::bar_background;
 use crate::cx::RenderCx;
 use crate::motion::render_motion;
+use crate::palette::toolkits::render_toolkits;
 use crate::preferences::render_preferences;
+use crate::theme::{render_theme, resolve_theme};
+use crate::wallpaper::render_wallpaper;
 
 const FIXTURES: &str = include_str!("../testdata/render_fixtures.json");
 
@@ -242,4 +248,205 @@ fn a_marker_rewrite_preserves_its_inode_and_the_lua_install_replaces_it() {
     );
 
     drop(std::fs::remove_dir_all(&paths.home));
+}
+
+// ---------------------------------------------------------------------------
+// Task 3.4b: the toolkit emitters, theme resolution and the wallpaper fragment.
+// ---------------------------------------------------------------------------
+
+/// `testdata/theme_fixtures.json` is the second fixture file, dumped the same way from the
+/// same backend and kept apart from the first only because it is keyed differently: the
+/// toolkit files depend on the resolved scheme and on nothing else, so a matrix over accents,
+/// radii and glass modes would carry thirty-four identical copies of twenty-one files. It is
+/// therefore two sections. `"toolkits"` holds every file `render_toolkits()` writes, once per
+/// appearance; `"scenarios"` holds the thirty-four-case matrix for the outputs that *do* vary
+/// -- the resolved scheme, the two markers `render_theme()` publishes, `hyprpaper.conf`, and
+/// `bar_background()` -- with each case's departures in the `"toml"` field exactly as
+/// `dump_toml()` wrote them.
+///
+/// `waybar/style.css` is absent from `"toolkits"`, and deliberately: `waybar_style_css()` is
+/// not ported yet (see [`crate::palette::toolkits`]), and
+/// [`the_toolkit_render_writes_exactly_the_files_the_python_writes`] pins that gap as an
+/// equality rather than letting it pass as an unchecked omission.
+///
+/// Absolute paths are spelled against `"home"` rather than against the scratch tree the dump
+/// ran in, so a comparison substitutes the running test's own home first. Two files carry one
+/// -- `qt6ct.conf`'s `color_scheme_path` and `hyprpaper.conf`'s `path` -- and both are
+/// genuinely absolute in production.
+const THEME_FIXTURES: &str = include_str!("../testdata/theme_fixtures.json");
+
+fn theme_fixtures() -> serde_json::Value {
+    serde_json::from_str(THEME_FIXTURES).expect("testdata/theme_fixtures.json is valid JSON")
+}
+
+/// The fixture's recorded home, and the scratch home this run writes into.
+fn homes(paths: &Paths, all: &serde_json::Value) -> (String, String) {
+    (
+        field(all, "home").to_owned(),
+        paths.home.to_string_lossy().into_owned(),
+    )
+}
+
+/// Every file under a directory, keyed by its path relative to that directory.
+fn tree(root: &Path) -> Vec<String> {
+    fn walk(root: &Path, at: &Path, into: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(at) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(root, &path, into);
+            } else if let Ok(relative) = path.strip_prefix(root) {
+                into.push(relative.to_string_lossy().into_owned());
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(root, root, &mut found);
+    found.sort();
+    found
+}
+
+#[test]
+fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
+    let all = theme_fixtures();
+    let toolkits = all
+        .get("toolkits")
+        .and_then(serde_json::Value::as_object)
+        .expect("the fixture has a toolkits section");
+    assert_eq!(toolkits.len(), 2, "both appearances are dumped");
+
+    for (name, expected) in toolkits {
+        let scheme: Scheme = name.parse().expect("a toolkits key is a scheme name");
+        let paths = scratch_paths(&format!("toolkits-{name}"));
+        let (fixture_home, home) = homes(&paths, &all);
+        render_toolkits(&paths, scheme)
+            .unwrap_or_else(|error| panic!("{name}: render_toolkits failed: {error}"));
+
+        let files = expected.as_object().expect("a toolkits entry is an object");
+        assert!(
+            files.len() >= 21,
+            "{name}: the toolkit set should not shrink"
+        );
+        for (relative, contents) in files {
+            let written = if relative == "generated/hyprlock-theme.conf" {
+                paths.generated.join("hyprlock-theme.conf")
+            } else {
+                paths.config_home.join(relative)
+            };
+            let found = std::fs::read_to_string(&written)
+                .unwrap_or_else(|error| panic!("{name}: reading {relative}: {error}"));
+            let want = contents
+                .as_str()
+                .unwrap_or_else(|| panic!("{name}: {relative} is not a string"))
+                .replace(&fixture_home, &home);
+            assert_eq!(found, want, "{name}: {relative}");
+        }
+        drop(std::fs::remove_dir_all(&paths.home));
+    }
+}
+
+/// The set of files, not just their contents: a write dropped from the port would otherwise
+/// pass every byte comparison above by never being looked for.
+#[test]
+fn the_toolkit_render_writes_exactly_the_files_the_python_writes() {
+    let all = theme_fixtures();
+    let paths = scratch_paths("toolkit-set");
+    render_toolkits(&paths, Scheme::Dark).expect("render_toolkits succeeds on a clean scratch");
+
+    let expected: Vec<String> = all
+        .get("toolkits")
+        .and_then(|toolkits| toolkits.get("dark"))
+        .and_then(serde_json::Value::as_object)
+        .expect("the fixture has a dark toolkit set")
+        .keys()
+        .filter(|name| !name.starts_with("generated/"))
+        .cloned()
+        .collect();
+
+    // waybar/style.css is the one file the Python writes and this port does not; the fixture
+    // has it removed, so the two sides are equal rather than merely overlapping.
+    assert!(!expected.iter().any(|name| name == "waybar/style.css"));
+    assert_eq!(tree(&paths.config_home), expected);
+    assert_eq!(
+        tree(&paths.generated),
+        vec!["hyprlock-theme.conf".to_owned()]
+    );
+    drop(std::fs::remove_dir_all(&paths.home));
+}
+
+/// The wallpaper half of one scenario. The Python renders the fragment twice: the first write
+/// reports the file as moved, the second as unchanged. That flag is the whole reason this
+/// renderer returns anything rather than `()`, so both answers are pinned alongside the bytes.
+fn check_wallpaper(
+    name: &str,
+    cx: &RenderCx<'_>,
+    expected: &serde_json::Value,
+    fixture_home: &str,
+    home: &str,
+) {
+    assert!(
+        render_wallpaper(cx).unwrap_or_else(|error| panic!("{name}: first render: {error}")),
+        "{name}: the first wallpaper render must report a change"
+    );
+    assert!(
+        !render_wallpaper(cx).unwrap_or_else(|error| panic!("{name}: second render: {error}")),
+        "{name}: an unchanged wallpaper fragment must report no change"
+    );
+    let fragment = std::fs::read_to_string(&cx.paths().fragments.hyprpaper)
+        .unwrap_or_else(|error| panic!("{name}: reading hyprpaper.conf: {error}"));
+    assert_eq!(
+        fragment,
+        field(expected, "hyprpaper_conf").replace(fixture_home, home),
+        "{name}: hyprpaper.conf"
+    );
+}
+
+#[test]
+fn every_theme_scenario_matches_the_python_backend_byte_for_byte() {
+    let all = theme_fixtures();
+    let scenarios = all
+        .get("scenarios")
+        .and_then(serde_json::Value::as_object)
+        .expect("the fixture has a scenarios section");
+    assert!(scenarios.len() >= 30, "the matrix should not have shrunk");
+
+    for (name, expected) in scenarios {
+        let prefs = preferences_from_toml(field(expected, "toml"));
+        let paths = scratch_paths(&format!("theme-{name}"));
+        let (fixture_home, home) = homes(&paths, &all);
+        let monitors = NoMonitors;
+        let lua = LuaAccepts;
+        let cx = RenderCx::new(&prefs, &paths, &monitors, &lua);
+
+        let scheme: Scheme = field(expected, "scheme")
+            .parse()
+            .expect("a scenario's scheme is a scheme name");
+        assert_eq!(resolve_theme(&prefs), scheme, "{name}: resolved scheme");
+
+        render_theme(&cx).unwrap_or_else(|error| panic!("{name}: render_theme failed: {error}"));
+        let search = std::fs::read_to_string(&paths.markers.search_engine)
+            .unwrap_or_else(|error| panic!("{name}: reading the search marker: {error}"));
+        assert_eq!(
+            search,
+            field(expected, "search_engine"),
+            "{name}: search-engine marker"
+        );
+        let foreground = std::fs::read_to_string(&paths.markers.bar_foreground)
+            .unwrap_or_else(|error| panic!("{name}: reading the bar marker: {error}"));
+        assert_eq!(
+            foreground,
+            field(expected, "bar_foreground"),
+            "{name}: bar-foreground marker"
+        );
+
+        check_wallpaper(name, &cx, expected, &fixture_home, &home);
+        assert_eq!(
+            bar_background(scheme, &prefs),
+            field(expected, "bar_background"),
+            "{name}: bar background"
+        );
+        drop(std::fs::remove_dir_all(&paths.home));
+    }
 }

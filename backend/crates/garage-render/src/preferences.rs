@@ -22,27 +22,21 @@
 //! render-idle`'s re-entrant restart takes, which is why [`crate::idle`] carries its own
 //! invariant about never taking the preferences lock rather than inheriting one from here.
 //!
-//! # A temporary stand-in for theme resolution, stated plainly
+//! # Theme resolution
 //!
-//! `border_general()`, the group border colours, the glass tint and the decoration shadow
-//! all need a resolved light/dark [`Scheme`]. `crate::palette::table::role()` and
-//! `crate::palette::accents::border_colors()` -- a *concurrent* Phase 3 task -- now carry
-//! the real `PALETTE` and are reused here rather than retranscribed. `crate::theme` is the
-//! one piece still missing: it is still a doc-only stub as of this file, and this task does
-//! not own it, so [`resolve_scheme`] below is a temporary stand-in for its
-//! `resolve_theme()`. One gap, worth flagging in this task's report: `resolve_scheme()`'s
-//! `"auto"` arm cannot read the wall clock the way the Python's `resolve_theme()` does --
-//! that belongs to `crate::theme`, which will own a way to ask for it. It falls back to
-//! `Scheme::Dark`, deterministically, until that lands. The shipped default is
-//! `theme_mode = "dark"`, so no fixture in this task's own matrix exercises the gap. Once
-//! `crate::theme::resolve_theme` lands, [`resolve_scheme`] should be deleted and
-//! [`resolve`] should call it instead; nothing downstream of [`resolve`] needs to change.
+//! `border_general()`, the group border colours, the glass tint and the decoration shadow all
+//! need a resolved light/dark [`Scheme`], which is [`crate::theme::resolve_theme`]'s answer
+//! and is read from it directly. This file carried a stand-in for that while `crate::theme`
+//! was still a stub -- one whose `"auto"` arm could not read the wall clock and fell back to
+//! `Scheme::Dark` -- and the stand-in and its deviation are both gone: an `auto` desktop now
+//! renders the borders, tint and shadow of whichever appearance the schedule actually puts on
+//! screen, the same as every other palette consumer.
 
 use std::fmt::Write as _;
 
 use garage_core::fs::lua::write_lua;
 use garage_core::fs::marker::write_marker;
-use garage_core::schema::enums::{Scheme, ThemeMode};
+use garage_core::schema::enums::Scheme;
 use garage_core::schema::Preferences;
 
 use crate::cx::RenderCx;
@@ -55,6 +49,7 @@ use crate::lua::emit::{
 use crate::lua::escape::lua_string;
 use crate::palette::accents::border_colors;
 use crate::palette::table::role as palette_role;
+use crate::theme::resolve_theme;
 
 /// Write the shared `hyprland.lua` fragment: `[input]`, the theme-resolved decoration, and
 /// the two plugin blocks. Then the material marker, and `hypridle.conf` through
@@ -127,19 +122,6 @@ fn input_block(prefs: &Preferences) -> String {
     out
 }
 
-/// `resolve_theme()`'s `"light"`/`"dark"` arms (garage:3693-3708); see the module docs for
-/// the `"auto"` gap -- `Auto` shares `Dark`'s arm only because of that gap, not because the
-/// two mean the same thing, so the two are kept written out separately rather than merged
-/// into one pattern.
-#[allow(clippy::match_same_arms)]
-const fn resolve_scheme(prefs: &Preferences) -> Scheme {
-    match prefs.appearance.theme_mode {
-        ThemeMode::Light => Scheme::Light,
-        ThemeMode::Dark => Scheme::Dark,
-        ThemeMode::Auto => Scheme::Dark,
-    }
-}
-
 /// A `PALETTE` role that must be present for both schemes, the way `opaque()` reads one.
 /// `border_locked`, `body_opaque` and `shadow_base` are three of `PALETTE`'s fixed roles,
 /// present for both schemes by construction --
@@ -203,7 +185,7 @@ struct ResolvedTheme {
 }
 
 fn resolve(prefs: &Preferences) -> ResolvedTheme {
-    let scheme = resolve_scheme(prefs);
+    let scheme = resolve_theme(prefs);
     let (group_active, group_inactive) = border_colors(scheme);
     let group_locked = rgba(opaque_role(scheme, "border_locked"), "ff");
     ResolvedTheme {

@@ -37,7 +37,7 @@ mod region;
 #[cfg(test)]
 mod render_parity_tests;
 mod search;
-mod theme;
+pub mod theme;
 mod wallpaper;
 mod workspaces;
 

@@ -12,7 +12,16 @@ workspace = true
 [dependencies]
 garage-core = { path = "../garage-core" }
 thiserror = "2.0.20"
+# The local wall clock `resolve_theme()`'s "auto" arm compares against, and nothing
+# else -- see `crate::theme`'s module docs for why a timezone reader is needed at all
+# and why this one. Pure Rust, `#![forbid(unsafe_code)]`, and zero transitive
+# dependencies: one lock entry, which is what keeps it in reach of a crate whose whole
+# point is that it depends on almost nothing.
+tz-rs = "0.7.3"
+# The workspace plan reads two layer-2 TOML files through the Python's `load_toml()`:
+# `displays.toml`, for which displays own a range at all, and `workspace-blocks.toml`,
+# the block allocator's own memory. Both need a parser here rather than a re-export.
+toml = { version = "1.1.4", features = ["preserve_order"] }
 
 [dev-dependencies]
 serde_json = "1.0.145"
-toml = { version = "1.1.4", features = ["preserve_order"] }

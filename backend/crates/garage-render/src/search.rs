@@ -12,14 +12,33 @@
 //! [`RenderStep::SearchEngine`](garage_core::schema::routes::RenderStep::SearchEngine) is the
 //! entire body of `Route::Search`.
 
+use garage_core::fs::marker::write_marker;
+use garage_core::schema::enums::SearchEngine;
+
 use crate::cx::RenderCx;
 use crate::error::RenderError;
 
-/// Write the resolved search URL template for the launcher to read.
+/// Write the resolved search URL template for the launcher to read (garage:4234-4249).
+///
+/// An empty template falls back to Google's rather than being published as nothing: `custom`
+/// with the field not yet filled in is the state the pane sits in for as long as it takes to
+/// type a URL, and a launcher handed an empty template would open nothing at all.
 ///
 /// # Errors
 ///
-/// Always [`RenderError::PortPending`] until Phase 3 replaces this stub.
-pub(crate) fn render_search_engine(_cx: &RenderCx<'_>) -> Result<(), RenderError> {
-    Err(RenderError::PortPending("render_search_engine"))
+/// [`RenderError::Marker`] if the marker could not be written.
+pub(crate) fn render_search_engine(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+    let appearance = &cx.prefs().appearance;
+    let template = if appearance.search_engine == SearchEngine::Custom {
+        appearance.search_custom_url.as_str()
+    } else {
+        appearance.search_engine.url_template()
+    };
+    let resolved = if template.is_empty() {
+        SearchEngine::Google.url_template()
+    } else {
+        template
+    };
+    write_marker(&cx.paths().markers.search_engine, &format!("{resolved}\n"))?;
+    Ok(())
 }

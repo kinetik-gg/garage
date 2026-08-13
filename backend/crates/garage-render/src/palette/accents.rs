@@ -34,7 +34,15 @@ use garage_core::schema::enums::{AccentColor, Scheme};
 /// [`AccentColor::hex()`] draws it as.
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "consumed by the toolkit emitters, task 3.4b")
+    // Not the toolkit emitters after all: the Python reads `ACCENTS` in exactly one place
+    // outside the pane, `PREFERENCE_SCHEMA`'s `"members": set(ACCENTS)` (garage:988-991), so
+    // the swatch list and the hexes drawn for them cannot come apart. `render_toolkits()`
+    // never touches it -- the accent reaches the desktop through `push_accent()` and the
+    // accent marker, both on the apply side.
+    expect(
+        dead_code,
+        reason = "the swatch list PREFERENCE_SCHEMA's members are drawn from"
+    )
 )]
 pub(crate) const ACCENTS: [(&str, &str); 9] = [
     (AccentColor::Blue.as_str(), AccentColor::Blue.hex()),

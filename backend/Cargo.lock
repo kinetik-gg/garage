@@ -172,6 +172,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
+ "tz-rs",
 ]
 
 [[package]]
@@ -516,6 +517,12 @@ name = "toml_writer"
 version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
+
+[[package]]
+name = "tz-rs"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc6c929ffa10fb34f4a3c7e9a73620a83ef2e85e47f9ec3381b8289e6762f42"
 
 [[package]]
 name = "unicode-ident"

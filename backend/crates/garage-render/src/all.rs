@@ -43,9 +43,14 @@ use crate::{
 /// # Errors
 ///
 /// The first renderer's error, in call order below. [`preferences::render_preferences`],
-/// [`motion::render_motion`] and [`accent::render_accent`] are real as of task 3.3; every
-/// other renderer in this chain is still a stub, so a call today fails on
-/// [`keybinds::render_keybinds`], the next one in line.
+/// [`motion::render_motion`], [`accent::render_accent`], [`theme::render_theme`] and
+/// [`wallpaper::render_wallpaper`] are real; every other renderer in this chain is still a
+/// stub, so a call today fails on [`keybinds::render_keybinds`], the next one in line.
+///
+/// [`wallpaper::render_wallpaper`]'s own answer -- whether `hyprpaper.conf` moved, and so
+/// whether the service has to be restarted -- is dropped here exactly as the Python drops
+/// it: `render_all()` is not the caller that restarts anything, and `garage-apply`'s
+/// `apply_preferences()` is the one that asks for the flag.
 pub fn render_all(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     preferences::render_preferences(cx)?;
     keybinds::render_keybinds(cx)?;
@@ -58,7 +63,7 @@ pub fn render_all(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     accent::render_accent(cx)?;
     corner::render_corner_radius(cx)?;
     theme::render_theme(cx)?;
-    wallpaper::render_wallpaper(cx)?;
+    let _moved = wallpaper::render_wallpaper(cx)?;
     displays::render_displays(cx)?;
     Ok(())
 }

@@ -36,4 +36,25 @@ pub enum RenderError {
     /// A whole-file rewrite could not be completed -- `hypridle.conf`.
     #[error(transparent)]
     Atomic(#[from] AtomicWriteError),
+
+    /// A palette role that must be an opaque `#rrggbb` is composited -- [`crate::theme`]'s
+    /// `opaque()` refusing to hand `rgba(...)` to `qt6ct` or to `hyprlock`, neither of whose
+    /// parsers can spell one, and Qt's would fall back to Fusion's own grey without saying
+    /// so. Both fields carry the Python's own `repr()` spelling, because the message is the
+    /// Python's byte for byte.
+    ///
+    /// Unreachable from the shipped tables -- every role `QT_ROLES` and the four lock
+    /// colours name is an opaque hex -- which is the point of it being an error rather than a
+    /// fallback: it fires at the render that repointed a role at a composited one, where the
+    /// mapping table is, rather than on the next login.
+    #[error(
+        "palette role {role} is {value}, which is composited; \
+         this toolkit can only be handed an opaque colour"
+    )]
+    CompositedRole {
+        /// The role name, as `repr()` spells it.
+        role: String,
+        /// What it resolved to, as `repr()` spells it.
+        value: String,
+    },
 }
