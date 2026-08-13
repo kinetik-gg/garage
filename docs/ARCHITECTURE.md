@@ -136,8 +136,9 @@ compositor that doesn't start, worse than one that starts without glass. Absent 
 
 `PREFERENCE_SCHEMA` is the single Python-side source. Its header documents what a new setting used
 to cost — seven touch points across three languages, two of the five Python-side ones failing
-*silently* when forgotten (`night_shift_enabled` and four others shipped with no validation branch
-at all). Adding a setting now costs:
+*silently* when forgotten. Seven keys shipped with no validation branch at all, and the table
+carries them as the `unchecked` kind with the reason each is safe: `night_shift_enabled`, the two
+wallpaper paths, `natural_scroll`, and the three touchpad switches. Adding a setting now costs:
 
 1. **One entry in `PREFERENCE_SCHEMA`** — section/name, default, kind and its constraints (with
    the reason), and the `route` `set` walks.
