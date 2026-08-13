@@ -38,6 +38,15 @@ pub(crate) enum CliError {
     #[error("Usage: garage set KEY JSON_VALUE")]
     SetUsage,
 
+    /// A `display-*` command invoked with no argument at all.
+    ///
+    /// **Deviation, stated plainly:** the Python indexes `argv[2]` without checking, so this
+    /// case is an `IndexError` there -- outside `main()`'s `except` tuple, which means a
+    /// traceback on stderr rather than an envelope. The exit status is 1 either way, and the
+    /// shape here is the one `set`'s own argument-count guard already establishes.
+    #[error("Usage: {0}")]
+    DisplayUsage(&'static str),
+
     /// This command's layer has not been ported yet. The `&'static str` is the command name
     /// as a person would type it, which is the thing a reader of the envelope can act on.
     #[error("{0} has not been ported yet")]

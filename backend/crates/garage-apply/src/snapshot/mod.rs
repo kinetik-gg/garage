@@ -22,7 +22,7 @@
 mod apps;
 mod audio;
 mod datetime;
-mod display;
+pub(crate) mod display;
 mod input;
 mod keybindings;
 mod region;

@@ -138,6 +138,75 @@ fn fixed_form(digits: &str, decpt: i32) -> String {
     }
 }
 
+/// `f"{value:g}"` for a Python `float`, byte for byte.
+///
+/// Two callers, both on the display path and both writing the result into a file a user or
+/// a compositor reads: `render_displays()` spells a monitor's scale with it
+/// (`lua_string(f'{float(item.get("scale", 1)):g}')`), and `display_snapshot()` spells the
+/// refresh rate inside a mode string with it
+/// (`f'{width}x{height}@{float(monitor.get("refreshRate", 60)):g}'`). `%g` rather than
+/// `repr` is what turns a scale of `1.0` into `1` and a refresh rate of `143.998` into
+/// `143.998` instead of `143.99800000000001`, which is the whole reason the Python reaches
+/// for it.
+///
+/// The rules are C's `%g` with `CPython`'s defaults, and they are not [`py_float_repr`]'s:
+///
+///   * precision is 6 **significant** digits, and the value is rounded to that many before
+///     anything decides which form to print. `1234567.0` is `1.23457e+06`, not `1234567`.
+///   * the exponential form is taken when the decimal exponent of the rounded value is
+///     below -4 or at least the precision -- so `0.0001` stays fixed while `1e-05` does
+///     not, and `123456` stays fixed while `1234567` does not.
+///   * trailing zeros in the fraction go, and so does a decimal point left with nothing
+///     after it. `144.0` is `144`, `1.50` is `1.5`, and there is never a `.0` suffix --
+///     which is exactly where this parts company with `repr`.
+///   * the exponent is signed and at least two digits (`1e+20`, `1e-05`), as `repr`'s is.
+///   * `inf`, `-inf` and `nan` are spelled as `CPython` spells them, and negative zero
+///     keeps its sign (`-0`, not `-0.0`, since the fixed form drops the empty fraction).
+#[must_use]
+pub fn py_format_g(value: f64) -> String {
+    /// `%g`'s default precision: six significant digits.
+    const PRECISION: i32 = 6;
+
+    if value.is_nan() {
+        return "nan".to_string();
+    }
+    if value.is_infinite() {
+        return if value < 0.0 { "-inf" } else { "inf" }.to_string();
+    }
+    // Rounded to `PRECISION` significant digits first, and read back off the scientific
+    // form, because rounding is what decides the exponent: 999999.5 rounds to 1e+06 and
+    // takes the exponential branch, while the unrounded value would have taken the fixed
+    // one. Rust renormalizes the mantissa on that carry, exactly as C's `%e` does.
+    let scientific = format!("{:.*e}", usize::try_from(PRECISION - 1).unwrap_or(0), value);
+    let Some((mantissa, exponent)) = scientific.split_once('e') else {
+        // Unreachable: Rust's LowerExp always emits the marker.
+        return scientific;
+    };
+    let exponent: i32 = exponent.parse().unwrap_or(0);
+    if !(-4..PRECISION).contains(&exponent) {
+        return format!(
+            "{}e{}{:02}",
+            trim_fraction(mantissa),
+            exponent_sign(exponent),
+            exponent.abs()
+        );
+    }
+    // Fixed form, to as many decimals as leave `PRECISION` significant digits. Formatted
+    // from the original value rather than assembled from the mantissa above, so the single
+    // rounding is the one the formatter performs.
+    let decimals = usize::try_from(PRECISION - 1 - exponent).unwrap_or(0);
+    trim_fraction(&format!("{value:.decimals$}"))
+}
+
+/// Drop trailing zeros from a fixed-point spelling's fraction, and the point with them when
+/// nothing is left after it. `%g`'s own trailing-zero removal, which `%e` and `%f` do not do.
+fn trim_fraction(text: &str) -> String {
+    if !text.contains('.') {
+        return text.to_owned();
+    }
+    text.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
 /// `repr(text)` for a Python `str`, byte for byte over ASCII and Latin-1.
 ///
 /// `CPython`'s `unicode_repr()` (Objects/unicodeobject.c) picks the quote first
@@ -305,6 +374,50 @@ mod tests {
             .chain(std::iter::once(0xad))
             .collect();
         assert_eq!(escaped, expected);
+    }
+
+    /// Every expectation here is `python3 -c "print(format(float(v), 'g'))"`, pasted in.
+    #[test]
+    fn the_general_format_is_cpythons_g() {
+        // The two shapes the display path actually produces: a scale and a refresh rate.
+        assert_eq!(py_format_g(1.0), "1");
+        assert_eq!(py_format_g(1.5), "1.5");
+        assert_eq!(py_format_g(1.25), "1.25");
+        assert_eq!(py_format_g(59.996), "59.996");
+        assert_eq!(py_format_g(143.998), "143.998");
+        assert_eq!(py_format_g(144.0), "144");
+        assert_eq!(py_format_g(60.0), "60");
+        // Where the form switches, on both sides.
+        assert_eq!(py_format_g(123_456.0), "123456");
+        assert_eq!(py_format_g(1_234_567.0), "1.23457e+06");
+        assert_eq!(py_format_g(1_234_560.0), "1.23456e+06");
+        assert_eq!(py_format_g(0.0001), "0.0001");
+        assert_eq!(py_format_g(1e-5), "1e-05");
+        assert_eq!(py_format_g(1e20), "1e+20");
+        assert_eq!(py_format_g(1e16), "1e+16");
+        // Rounding is what decides the form: 999999.5 rounds up out of the fixed range.
+        assert_eq!(py_format_g(999_999.5), "1e+06");
+        // Six significant digits, and no more.
+        assert_eq!(py_format_g(0.000_123_456_789), "0.000123457");
+        assert_eq!(py_format_g(std::f64::consts::PI), "3.14159");
+        assert_eq!(py_format_g(2.000_000_1), "2");
+        // Zero, negative zero and the non-finite three.
+        assert_eq!(py_format_g(0.0), "0");
+        assert_eq!(py_format_g(-0.0), "-0");
+        assert_eq!(py_format_g(-2.5), "-2.5");
+        assert_eq!(py_format_g(f64::INFINITY), "inf");
+        assert_eq!(py_format_g(f64::NEG_INFINITY), "-inf");
+        assert_eq!(py_format_g(f64::NAN), "nan");
+    }
+
+    /// `%g` is not `repr`, and the display fragment depends on the difference: a scale of
+    /// 1.0 has to reach Hyprland as `"1"`, not as `"1.0"`.
+    #[test]
+    fn the_general_format_drops_what_the_repr_keeps() {
+        assert_eq!(py_float_repr(1.0), "1.0");
+        assert_eq!(py_format_g(1.0), "1");
+        assert_eq!(py_float_repr(0.1 + 0.2), "0.30000000000000004");
+        assert_eq!(py_format_g(0.1 + 0.2), "0.3");
     }
 
     #[test]

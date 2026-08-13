@@ -77,28 +77,27 @@ impl Runner for System {
 
     fn spawn_detached(&self, command: &[&str]) -> Result<(), RunError> {
         let (program, arguments) = split(command)?;
-        // KNOWN GAP, and the reason it is a gap rather than a choice: the Python passes
-        // `start_new_session=True`, which is `setsid()` in the child -- a new session with
-        // no controlling terminal. `std::process` offers no safe hook that runs in the
-        // child (`pre_exec` is `unsafe`, and this workspace forbids `unsafe_code`), so the
-        // closest safe equivalent is `process_group(0)`: `setpgid(0, 0)`, a new process
-        // *group* in the same session. The child still leaves this process's group, so the
-        // signals sent to that group -- the ones that matter for the two `timedatectl`
-        // callers -- no longer reach it. What it does not survive is the controlling
-        // terminal going away: a `SIGHUP` to the session still finds it. That matters for
-        // exactly one caller, `display_test()`'s watchdog, where closing the terminal that
-        // started a `display-test` would take the revert down with it. Task 3.8 owns the
-        // watchdog and owns closing this.
-        builder(program, arguments)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .process_group(0)
-            .spawn()
-            .map(|_child| ())
-            .map_err(|error| RunError {
-                detail: errno_detail(program, &error),
-            })
+        // The Python passes `start_new_session=True`, which is `setsid()` in the child -- a
+        // new session with no controlling terminal. `std::process` offers no safe hook that
+        // runs in the child (`pre_exec` is `unsafe`, and this workspace forbids
+        // `unsafe_code`), so what a *foreign* program gets here is `process_group(0)`:
+        // `setpgid(0, 0)`, a new process group in the same session. The child leaves this
+        // process's group, so a signal sent to that group no longer reaches it -- which is
+        // the whole of what the two `timedatectl` callers need, since neither is ever
+        // attached to a terminal that could hang up on it.
+        //
+        // The one caller that needed the session itself does not come through here: see
+        // [`Runner::spawn_self_detaching`] and [`enter_new_session`].
+        detached(builder(program, arguments).process_group(0), program)
+    }
+
+    fn spawn_self_detaching(&self, command: &[&str]) -> Result<(), RunError> {
+        let (program, arguments) = split(command)?;
+        // Deliberately no `process_group(0)`: the child inherits this process's group and is
+        // therefore *not* a group leader, which is the precondition `setsid()` demands. The
+        // child is this same binary and calls [`enter_new_session`] as its first act, which
+        // is what actually reproduces `start_new_session=True`.
+        detached(&mut builder(program, arguments), program)
     }
 
     fn run_streamed(&self, command: &[&str], cwd: Option<&Path>) -> Result<i32, RunError> {
@@ -120,6 +119,52 @@ impl Runner for System {
         })?;
         Ok(exit_code(status))
     }
+}
+
+/// The half both detached spawns share: stdio to `/dev/null`, started and not waited for.
+///
+/// Detached means unobserved, so nothing here reports the child's exit status -- by
+/// construction there is nobody left to report it to.
+fn detached(command: &mut Command, program: &str) -> Result<(), RunError> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_child| ())
+        .map_err(|error| RunError {
+            detail: errno_detail(program, &error),
+        })
+}
+
+/// `setsid()`: leave the session this process was started in, for good.
+///
+/// The child half of [`Runner::spawn_self_detaching`], and between them they are
+/// `start_new_session=True` with no `unsafe` anywhere. A process that calls this gets a
+/// session of its own, becomes its leader, gets a process group of its own, and -- the part
+/// that matters -- loses the controlling terminal. The `SIGHUP` a closing terminal sends to
+/// its foreground process group can no longer reach it, which is the failure invariant 10
+/// exists to prevent: a `garage display-test` run from a terminal that is then closed inside
+/// the fifteen-second window must still be reverted.
+///
+/// `rustix::process::setsid` is a safe function -- the call has no memory-safety dimension at
+/// all, which is why it needs no `unsafe` block here and why reaching for it is not a way
+/// around the workspace's `forbid(unsafe_code)`.
+///
+/// The one failure it can report is `EPERM`, which means the caller is already a process
+/// group leader; that is `Ok` from this function's point of view, because a leader of its own
+/// group in its own right is already as detached as this can make it, and the caller has
+/// nothing useful to do about it either way. There is no `Result` for the same reason.
+///
+/// # The residual window, named exactly
+///
+/// The child is in this process's session from `fork` until it reaches this call -- a few
+/// milliseconds of `exec`, argument parsing and dispatch. A `SIGHUP` delivered inside that
+/// window would still find it. Closing that would need `posix_spawn`'s `SETSID` flag or a
+/// `pre_exec` hook, and neither is reachable without `unsafe` or a new dependency; the window
+/// is bounded by one `exec` rather than by the fifteen seconds the child then sleeps for.
+pub fn enter_new_session() {
+    let _ = rustix::process::setsid();
 }
 
 /// The one `Command::new` in the workspace. See the module docs.

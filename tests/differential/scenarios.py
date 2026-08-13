@@ -22,6 +22,8 @@ a place to rediscover it, only to pin it across two implementations.
 
 from __future__ import annotations
 
+import json
+
 from .runner import Family, Scenario
 
 
@@ -647,7 +649,128 @@ APPLY: tuple[Scenario, ...] = ()
 # Grown from tests/test_session_surfaces.py: apply, and every gsettings /
 # hyprctl / systemctl call it makes. Almost purely a trace-surface family.
 
-DISPLAYS: tuple[Scenario, ...] = ()
+# The layout displays.toml starts on for the cases that plant one: the same two monitors the
+# fixture reports, side by side, so a revert lands back on exactly what was already there.
+SAVED_DISPLAYS = """\
+primary = "DP-1"
+
+[[display]]
+output = "DP-1"
+description = "Acme Displays 27 (DP-1)"
+enabled = true
+mode = "1920x1080@59.996"
+x = 0
+y = 0
+scale = 1.0
+transform = 0
+vrr = -1
+
+[[display]]
+output = "HDMI-A-1"
+description = "Acme Displays 24 (HDMI-A-1)"
+enabled = true
+mode = "1920x1080@60"
+x = 1920
+y = 0
+scale = 1.0
+transform = 0
+vrr = -1
+"""
+
+# The candidate every display-test below sends: the same two displays stacked rather than side
+# by side, which is a different arrangement, still edge-to-edge, and therefore accepted.
+STACKED_PAYLOAD = json.dumps({
+    "primary": "HDMI-A-1",
+    "displays": [
+        {"output": "DP-1", "description": "Acme Displays 27 (DP-1)", "enabled": True,
+         "mode": "1920x1080@59.996", "x": 0, "y": 0, "scale": 1.0, "transform": 0,
+         "vrr": -1, "width": 1920, "height": 1080, "mirror": ""},
+        {"output": "HDMI-A-1", "description": "Acme Displays 24 (HDMI-A-1)", "enabled": True,
+         "mode": "1920x1080@60", "x": 0, "y": 1080, "scale": 1.0, "transform": 0,
+         "vrr": -1, "width": 1920, "height": 1080, "mirror": ""},
+    ],
+})
+
+# A candidate refused on the way *in*, before display_test() has written anything: `float(x)`
+# raises on it, which happens inside normalize_display_layout() and therefore ahead of the
+# pending record, the apply and the watchdog.
+#
+# Deliberately not the overlapping-layout refusal, which would be the more obvious case: that
+# one is refused by apply_display_layout(), which runs *after* the pending record is written,
+# so it leaves a transaction open -- and an open transaction holds a fresh uuid and a
+# `time.time()` expiry, which two runs of the Python backend cannot agree on. It is a
+# determinism failure rather than a comparison, and it is what the harness's own
+# Python-vs-Python check is for. Every geometry refusal is covered exhaustively instead by
+# garage-apply's display_traces.json corpus, which drives the same code in-process with a fake
+# clock and a fake runner.
+REFUSED_PAYLOAD = json.dumps({
+    "primary": "DP-1",
+    "displays": [
+        {"output": "DP-1", "enabled": True, "x": "left", "y": 0, "scale": 1.0,
+         "width": 1920, "height": 1080},
+    ],
+})
+
+
+def displays(text: str) -> dict[str, object]:
+    """A scenario's starting displays.toml."""
+    return {".config/garage/displays.toml": text}
+
+
+DISPLAYS: tuple[Scenario, ...] = (
+    Scenario(
+        name="display-test-confirm",
+        argv=("display-test", STACKED_PAYLOAD),
+        then=("display-confirm", "$TOKEN"),
+        fixtures="displays-two-monitors",
+        pre_state=displays(SAVED_DISPLAYS),
+        # The whole transaction, committed. Two processes against one world: the first writes
+        # the pending record, applies the candidate and spawns the watchdog; the second writes
+        # displays.toml, renders the fragment twice (once itself, once inside
+        # apply_display_layout) and takes the pending record away. The digest is what says the
+        # saved layout is the candidate's, and the trace is what says the compositor was
+        # reloaded twice and asked for its monitors exactly once.
+    ),
+    Scenario(
+        name="display-test-revert",
+        argv=("display-test", STACKED_PAYLOAD),
+        then=("display-revert", "$TOKEN"),
+        fixtures="displays-two-monitors",
+        pre_state=displays(SAVED_DISPLAYS),
+        # The same transaction, rolled back -- the watchdog's own path, since the watchdog is
+        # display_finish(token, False) and nothing else. displays.toml must come back
+        # untouched (the inode surface says so as well as the digest), and the fragment must be
+        # the one rendered from the *previous* arrangement, which is display_snapshot()'s
+        # records rather than the file's -- so this is also the byte-parity test for the
+        # snapshot's mode string, its %g refresh rate and its saved-vrr fold.
+    ),
+    Scenario(
+        name="display-test-refused",
+        argv=("display-test", REFUSED_PAYLOAD),
+        fixtures="displays-two-monitors",
+        pre_state=displays(SAVED_DISPLAYS),
+        # A candidate refused before display_test() writes anything at all: the error envelope
+        # and exit 1, the compositor never asked, nothing on disk, no watchdog. See
+        # REFUSED_PAYLOAD for why this is the coercion refusal rather than a geometry one.
+    ),
+    Scenario(
+        name="display-confirm-unknown-token",
+        argv=("display-confirm", "0123456789abcdef0123456789abcdef"),
+        fixtures="displays-two-monitors",
+        pre_state=displays(SAVED_DISPLAYS),
+        # No transaction is open at all, which is the watchdog-fires-after-a-confirm case
+        # stated as one process: display_finish() returns without doing anything, prints the
+        # success envelope, and touches nothing but the lock file it took on the way in.
+    ),
+    Scenario(
+        name="display-test-no-saved-layout",
+        argv=("display-test", STACKED_PAYLOAD),
+        then=("display-confirm", "$TOKEN"),
+        fixtures="displays-two-monitors",
+        # No displays.toml at all: the previous arrangement can only come from the compositor,
+        # and the confirm is the first thing that ever writes the file.
+    ),
+)
 # Grown from tests/test_recovery.py: display-test, display-confirm,
 # display-revert and the watchdog, plus displays.toml round-tripping.
 
@@ -704,9 +827,13 @@ FAMILIES = (
     Family(name="apply", active=False,
            note="session signalling; from test_session_surfaces.py",
            scenarios=APPLY),
-    Family(name="displays", active=False,
-           note="display test/confirm/revert; from test_recovery.py",
+    Family(name="displays", active=True,
+           note="display test/confirm/revert and the fifteen-second watchdog; task 3.8 "
+                "ported load_display_config(), mirror_targets() and render_displays() into "
+                "garage-render and the transaction, the geometry check, the snapshot and the "
+                "seeding into garage-apply, and wired all four commands in the CLI.",
            scenarios=DISPLAYS),
+
     Family(name="files", active=False,
            note="default applications and mime; from test_files.py",
            scenarios=FILES),

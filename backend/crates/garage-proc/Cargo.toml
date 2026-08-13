@@ -11,5 +11,10 @@ workspace = true
 
 [dependencies]
 garage-core = { path = "../garage-core" }
+# `setsid()`, which std does not expose and which `unsafe_code = "forbid"` puts out of
+# reach otherwise. The child half of `spawn_self_detaching()` -- see `run::enter_new_session`.
+# Already in the lock file: `garage-prefs`, `garage-metrics` and `garage-file-index` take
+# `flock` from the same crate.
+rustix = { version = "1.1.4", features = ["process"] }
 serde_json = "1.0.145"
 thiserror = "2.0.20"

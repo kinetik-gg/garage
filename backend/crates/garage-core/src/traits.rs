@@ -223,6 +223,38 @@ pub trait Runner {
     /// fate is its own.
     fn spawn_detached(&self, command: &[&str]) -> Result<(), RunError>;
 
+    /// Start a re-exec of *this same binary* detached, for a child that will finish its own
+    /// detachment.
+    ///
+    /// One caller: `display_test()`'s `_display-watchdog`. It exists because
+    /// [`Runner::spawn_detached`] cannot give a foreign program a session of its own without
+    /// `unsafe` -- `setsid()` has to run in the child between fork and exec, and the only
+    /// hook `std::process` offers there is `pre_exec`, which this workspace forbids. The
+    /// closest safe thing it can do is `process_group(0)`, a new process *group* in the same
+    /// session.
+    ///
+    /// The watchdog is not a foreign program, and that is the whole difference: it is this
+    /// binary, and once it is running it can call `setsid()` for itself, which is an ordinary
+    /// safe call. `setsid()` refuses when the caller is already a process-group leader,
+    /// though -- so the child must be started *without* `process_group(0)`, inheriting this
+    /// process's group and therefore not leading it. That is what this method is: the same
+    /// detached spawn with the group left alone, so the child can do the rest.
+    ///
+    /// The contract is on both halves. A caller passes only a command that is this binary,
+    /// and the child's first act is `enter_new_session()` (`garage-proc`'s wrapper around
+    /// `setsid`). Anything else spawned this way stays in the caller's process group, which
+    /// is weaker than [`Runner::spawn_detached`], not stronger.
+    ///
+    /// The default implementation is [`Runner::spawn_detached`], which is what a recording
+    /// fake in a test wants: the argv is the observable, and no test forks a real watchdog.
+    ///
+    /// # Errors
+    ///
+    /// [`RunError`] when the child could not be started at all, as [`Runner::spawn_detached`].
+    fn spawn_self_detaching(&self, command: &[&str]) -> Result<(), RunError> {
+        self.spawn_detached(command)
+    }
+
     /// Run `command` with this process's own stdin, stdout and stderr, and wait for it.
     ///
     /// Not through [`Runner::run`], and the reason is in `update`'s comment on the

@@ -1,0 +1,810 @@
+{
+  "a_coordinate_that_is_not_a_number": {
+    "error": "ValueError: could not convert string to float: 'left'",
+    "layout_toml": null,
+    "normalized": null,
+    "payload": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "x": "left",
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_coordinate_that_is_null": {
+    "error": "TypeError: float() argument must be a string or a real number, not 'NoneType'",
+    "layout_toml": null,
+    "normalized": null,
+    "payload": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "x": null,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_description_that_is_null": {
+    "error": "SettingsError: Unsupported TOML value: None",
+    "layout_toml": null,
+    "normalized": {
+      "displays": [
+        {
+          "description": null,
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "description": null,
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_disabled_display_does_not_anchor": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nenabled = true\nx = 0\ny = 0\n\n[[display]]\noutput = \"DP-2\"\nenabled = false\nx = -5000\ny = -5000\n",
+    "normalized": {
+      "displays": [
+        {
+          "enabled": true,
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "enabled": false,
+          "height": 1080,
+          "output": "DP-2",
+          "width": 1920,
+          "x": -5000,
+          "y": -5000
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "enabled": true,
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "enabled": false,
+          "height": 1080,
+          "output": "DP-2",
+          "width": 1920,
+          "x": -5000,
+          "y": -5000
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_display_with_no_coordinates_at_all": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_mirror_does_not_anchor": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n\n[[display]]\noutput = \"DP-2\"\nx = -5000\ny = -5000\nmirror = \"DP-1\"\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": -5000,
+          "y": -5000
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": -5000,
+          "y": -5000
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_mirror_is_still_shifted": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n\n[[display]]\noutput = \"DP-2\"\nx = 100\ny = 200\nmirror = \"DP-1\"\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": 100,
+          "y": 200
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 100,
+          "y": 100
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": 200,
+          "y": 300
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_mirror_is_written_last": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n\n[[display]]\noutput = \"DP-2\"\nx = 0\ny = 0\nmirror = \"DP-1\"\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_mode_that_is_a_list": {
+    "error": "SettingsError: Unsupported TOML value: ['2560x1440']",
+    "layout_toml": null,
+    "normalized": {
+      "displays": [
+        {
+          "mode": [
+            "2560x1440"
+          ],
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "mode": [
+            "2560x1440"
+          ],
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "a_primary_needing_json_quoting": {
+    "error": "",
+    "layout_toml": "primary = \"DP\\\"1\\\\\"\n\n[[display]]\noutput = \"DP\\\"1\\\\\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "output": "DP\"1\\",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP\"1\\"
+    },
+    "payload": {
+      "displays": [
+        {
+          "output": "DP\"1\\",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP\"1\\"
+    }
+  },
+  "a_primary_that_is_empty": {
+    "error": "",
+    "layout_toml": "primary = \"\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": ""
+    },
+    "payload": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": ""
+    }
+  },
+  "a_scale_that_is_a_float": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\nscale = 1.25\n",
+    "normalized": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "scale": 1.25,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "output": "DP-1",
+          "scale": 1.25,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "an_empty_layout": {
+    "error": "",
+    "layout_toml": "primary = \"\"\n",
+    "normalized": {},
+    "payload": {}
+  },
+  "an_empty_mirror_is_not_written": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "mirror": "",
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "mirror": "",
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "an_impossible_mirror_anchors_after_all": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 800\ny = 40\n\n[[display]]\noutput = \"DP-3\"\nenabled = false\nx = 300\ny = 40\n\n[[display]]\noutput = \"DP-2\"\nx = 0\ny = 0\nmirror = \"DP-3\"\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 800,
+          "y": 40
+        },
+        {
+          "enabled": false,
+          "height": 1080,
+          "output": "DP-3",
+          "width": 1920,
+          "x": 300,
+          "y": 40
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-3",
+          "output": "DP-2",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "enabled": false,
+          "height": 1080,
+          "output": "DP-3",
+          "width": 1920,
+          "x": -500,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "mirror": "DP-3",
+          "output": "DP-2",
+          "width": 1920,
+          "x": -800,
+          "y": -40
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "coordinates_given_as_strings": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": "100",
+          "y": "-50"
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "every_display_disabled_normalizes_nothing": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nenabled = false\nx = -77\ny = -99\n",
+    "normalized": {
+      "displays": [
+        {
+          "enabled": false,
+          "output": "DP-1",
+          "x": -77,
+          "y": -99
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "enabled": false,
+          "output": "DP-1",
+          "x": -77,
+          "y": -99
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "every_written_key_present": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\ndescription = \"Acme 27\"\nenabled = true\nmode = \"2560x1440@144\"\nx = 0\ny = 0\nscale = 1.5\ntransform = 1\nvrr = 2\n",
+    "normalized": {
+      "displays": [
+        {
+          "description": "Acme 27",
+          "enabled": true,
+          "focused": true,
+          "height": 1440,
+          "make": "Acme",
+          "mirror": "",
+          "mode": "2560x1440@144",
+          "model": "27",
+          "modes": [
+            "2560x1440@144"
+          ],
+          "output": "DP-1",
+          "primary": true,
+          "scale": 1.5,
+          "serial": "X1",
+          "transform": 1,
+          "vrr": 2,
+          "width": 2560,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "description": "Acme 27",
+          "enabled": true,
+          "focused": true,
+          "height": 1440,
+          "make": "Acme",
+          "mirror": "",
+          "mode": "2560x1440@144",
+          "model": "27",
+          "modes": [
+            "2560x1440@144"
+          ],
+          "output": "DP-1",
+          "primary": true,
+          "scale": 1.5,
+          "serial": "X1",
+          "transform": 1,
+          "vrr": 2,
+          "width": 2560,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "everything_is_a_mirror": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 10\ny = 10\nmirror = \"DP-2\"\n\n[[display]]\noutput = \"DP-2\"\nx = 0\ny = 0\nmirror = \"DP-1\"\n",
+    "normalized": {
+      "displays": [
+        {
+          "mirror": "DP-2",
+          "output": "DP-1",
+          "x": 10,
+          "y": 10
+        },
+        {
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "mirror": "DP-2",
+          "output": "DP-1",
+          "x": -10,
+          "y": -10
+        },
+        {
+          "mirror": "DP-1",
+          "output": "DP-2",
+          "x": -20,
+          "y": -20
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "float_coordinates_round_to_even": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n\n[[display]]\noutput = \"DP-2\"\nx = 2\ny = 2\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "output": "DP-2",
+          "width": 1920,
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "width": 1920,
+          "x": 0.5,
+          "y": 1.5
+        },
+        {
+          "height": 1080,
+          "output": "DP-2",
+          "width": 1920,
+          "x": 2.5,
+          "y": 3.5
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "keys_the_emitter_does_not_write": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\n",
+    "normalized": {
+      "displays": [
+        {
+          "focused": false,
+          "height": 1080,
+          "modes": [
+            "a",
+            "b"
+          ],
+          "output": "DP-1",
+          "primary": true,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "focused": false,
+          "height": 1080,
+          "modes": [
+            "a",
+            "b"
+          ],
+          "output": "DP-1",
+          "primary": true,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "no_displays_key": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n",
+    "normalized": {
+      "primary": "DP-1"
+    },
+    "payload": {
+      "primary": "DP-1"
+    }
+  },
+  "one_display_at_the_origin": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\nscale = 1\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "one_display_off_the_origin": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\nscale = 1\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": 100,
+          "y": 200
+        }
+      ],
+      "primary": "DP-1"
+    }
+  },
+  "two_displays_shifted_negative": {
+    "error": "",
+    "layout_toml": "primary = \"DP-1\"\n\n[[display]]\noutput = \"DP-1\"\nx = 0\ny = 0\nscale = 1\n\n[[display]]\noutput = \"DP-2\"\nx = 1920\ny = 0\nscale = 1\n",
+    "normalized": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 1080,
+          "output": "DP-2",
+          "scale": 1,
+          "width": 1920,
+          "x": 1920,
+          "y": 0
+        }
+      ],
+      "primary": "DP-1"
+    },
+    "payload": {
+      "displays": [
+        {
+          "height": 1080,
+          "output": "DP-1",
+          "scale": 1,
+          "width": 1920,
+          "x": -1920,
+          "y": -100
+        },
+        {
+          "height": 1080,
+          "output": "DP-2",
+          "scale": 1,
+          "width": 1920,
+          "x": 0,
+          "y": -100
+        }
+      ],
+      "primary": "DP-1"
+    }
+  }
+}

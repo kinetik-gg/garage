@@ -55,6 +55,7 @@ use garage_core::schema::newtypes::{BlockId, ConnectorName, WORKSPACE_BLOCK};
 use garage_core::toml_emit::{toml_value, Value};
 
 use crate::cx::RenderCx;
+use crate::displays::{load_display_config, mirror_targets, DisplayEntry};
 use crate::error::RenderError;
 use crate::workspaces::WorkspaceGroup;
 
@@ -91,12 +92,15 @@ pub(crate) fn load_toml(path: &Path) -> Result<toml::Table, RenderError> {
 
 /// The saved display layout, as much of it as the workspace plan reads.
 ///
-/// `load_display_config()` (garage:2417-2423) plus the lenient half of `mirror_targets()`
-/// (garage:2425-2453), narrowed to the one question asked here: which outputs own a
-/// workspace range. A display that is disabled owns nothing, and neither does one that is a
-/// mirror -- Hyprland pulls a mirrored output out of the monitor layout entirely.
+/// Task 3.5 re-derived a narrowed copy of `load_display_config()` and the lenient half of
+/// `mirror_targets()` here, because at the time the only other reader of them was a stub.
+/// Task 3.8 hoisted the shared reader into [`crate::displays`] -- the lowest crate both the
+/// render and the apply halves can name -- and this is now a call into it. The narrowing that
+/// is left is the *question*, not the parsing: which outputs own a workspace range. A display
+/// that is disabled owns nothing, and neither does one that is a mirror, since Hyprland pulls
+/// a mirrored output out of the monitor layout entirely.
 ///
-/// Every failure the Python raises `SettingsError` for is `None` here, because both of
+/// Every failure [`load_display_config`] reports is `None` here, because both of
 /// `workspace_outputs()`'s reads of this sit inside `try/except SettingsError`: an
 /// unreadable, unparseable, or wrongly-shaped `displays.toml` contributes nothing rather
 /// than taking the plan down.
@@ -106,88 +110,23 @@ struct SavedLayout {
 }
 
 fn load_saved_layout(path: &Path) -> Option<SavedLayout> {
-    let raw = load_toml(path).ok()?;
-    // `raw.get("display", [])` with the "must be an array of tables" refusal: a missing key
-    // is an empty layout, and a key of the wrong shape is the SettingsError both callers
-    // swallow.
-    let displays: &[toml::Value] = match raw.get("display") {
-        None => &[],
-        Some(value) => value.as_array()?.as_slice(),
-    };
-    let entries: Vec<(String, bool, String)> = displays
-        .iter()
-        .map(|item| {
-            (
-                py_str(item.get("output")),
-                // `item.get("enabled", True)`, and Python's truthiness at that: only an
-                // explicit false-y value turns a display off.
-                item.get("enabled").is_none_or(py_truthy),
-                // `str(item.get("mirror") or "")`.
-                py_str_or_empty(item.get("mirror")),
-            )
-        })
-        .collect();
-    // mirror_targets(), lenient: a display may only mirror an enabled display that is not
-    // itself a mirror, and anything else simply mirrors nothing. `enabled` is the Python's
-    // dict comprehension, so a repeated output keeps its first position and its last mirror.
-    let mut enabled: Vec<(String, String)> = Vec::new();
-    for (output, _, source) in entries.iter().filter(|(_, on, _)| *on) {
-        match enabled.iter_mut().find(|(name, _)| name == output) {
-            Some(existing) => existing.1.clone_from(source),
-            None => enabled.push((output.clone(), source.clone())),
-        }
-    }
-    let mirrors: Vec<&str> = enabled
-        .iter()
-        .filter(|(output, source)| {
-            !source.is_empty()
-                && source != output
-                && enabled
-                    .iter()
-                    .any(|(name, theirs)| name == source && theirs.is_empty())
-        })
-        .map(|(output, _)| output.as_str())
-        .collect();
+    let layout = load_display_config(path).ok()?;
+    let mirrors = mirror_targets(&layout.displays);
     Some(SavedLayout {
-        primary: py_str(raw.get("primary")),
+        primary: layout.primary,
         // The Python walks `saved["displays"]` here rather than the mirror map, so a
         // repeated output really does appear twice in the ordering -- and then twice in the
         // plan. Faithful rather than tidied: nothing downstream depends on uniqueness, and
         // inventing a de-duplication would be a behaviour this port added.
-        owners: entries
+        owners: layout
+            .displays
             .iter()
-            .filter(|(output, on, _)| *on && !mirrors.contains(&output.as_str()))
-            .map(|(output, _, _)| output.clone())
+            .filter(|entry| {
+                entry.enabled() && !mirrors.iter().any(|(name, _)| *name == entry.output())
+            })
+            .map(DisplayEntry::output)
             .collect(),
     })
-}
-
-/// `str(value)` for the shapes `displays.toml` can hold here, and `""` for an absent key --
-/// which is `item.get("output", "")` and `raw.get("primary", "")`.
-fn py_str(value: Option<&toml::Value>) -> String {
-    value.map_or_else(String::new, garage_core::schema::notes::py_str_toml)
-}
-
-/// `str(value or "")`: a false-y value is the empty string rather than its spelling.
-fn py_str_or_empty(value: Option<&toml::Value>) -> String {
-    match value {
-        Some(inner) if py_truthy(inner) => py_str(value),
-        _ => String::new(),
-    }
-}
-
-/// Python's truthiness, for the two keys read through it here.
-fn py_truthy(value: &toml::Value) -> bool {
-    match value {
-        toml::Value::Boolean(flag) => *flag,
-        toml::Value::Integer(number) => *number != 0,
-        toml::Value::Float(number) => *number != 0.0,
-        toml::Value::String(text) => !text.is_empty(),
-        toml::Value::Array(items) => !items.is_empty(),
-        toml::Value::Table(table) => !table.is_empty(),
-        // A datetime is an object, and every object is truthy.
-        toml::Value::Datetime(_) => true,
-    }
 }
 
 /// The displays that own a workspace range, in allocation order.

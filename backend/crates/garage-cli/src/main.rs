@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 mod commands;
+mod displays;
 mod error;
 mod pyjson;
 mod response;

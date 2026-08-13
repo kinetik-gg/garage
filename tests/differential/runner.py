@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import json
 import re
 import shutil
 import subprocess
@@ -107,6 +108,14 @@ BUILD_TIMEOUT = 600
 # alphanumerics/underscores for any other reason.
 _MKSTEMP = re.compile(r"(?<=/)\.([^/\s]+)\.([a-z0-9_]{6,32})\b")
 
+# A display transaction's token: `uuid.uuid4().hex` there, sixteen bytes of /dev/urandom
+# spelled the same way here. It is a nonce, so it differs between every run of either
+# backend -- including the two Python runs the determinism check compares -- and it reaches
+# stdout (the envelope's `data.token`), the pending record and the watchdog's argv. Scrubbed
+# rather than seeded: neither backend offers a way to fix it, and pinning it would test a
+# hook that does not exist in production.
+_TOKEN = re.compile(r"\b[0-9a-f]{32}\b")
+
 
 class HarnessError(RuntimeError):
     """The harness itself could not run a case. Never a parity verdict."""
@@ -118,7 +127,20 @@ class NondeterminismError(AssertionError):
 
 @dataclass(frozen=True)
 class Scenario:
-    """One comparable invocation: argv, the world it runs against, the state it starts from."""
+    """One comparable invocation: argv, the world it runs against, the state it starts from.
+
+    `then` makes it two invocations against *one* world, which the display transaction needs
+    and nothing else does: `display-test` applies a layout and returns a token, and only a
+    second process carrying that token can confirm or revert it. Splitting the pair into two
+    scenarios would compare the halves against two different scratch worlds and never
+    exercise the thing the transaction *is*. A lone `display-test` is not an option either --
+    it leaves a pending record holding a fresh uuid and a wall-clock `expires`, which is a
+    determinism failure rather than a comparison.
+
+    The literal `$TOKEN` anywhere in `then` is replaced by the token the first command printed
+    in its envelope's `data.token`, so the second step carries whatever the backend under test
+    generated rather than a value the harness invented.
+    """
 
     name: str
     argv: tuple[str, ...]
@@ -128,10 +150,15 @@ class Scenario:
     env: dict[str, str] = field(default_factory=dict)
     #: Name of the JSON table in fixtures/. Defaults to the scenario name.
     fixtures: str | None = None
+    #: A second argv run in the same world, with `$TOKEN` substituted. See the class doc.
+    then: tuple[str, ...] = ()
 
     @property
     def fixture_path(self) -> Path:
         return FIXTURES_DIR / f"{self.fixtures or self.name}.json"
+
+    def steps(self) -> tuple[tuple[str, ...], ...]:
+        return (self.argv, self.then) if self.then else (self.argv,)
 
 
 @dataclass(frozen=True)
@@ -149,7 +176,9 @@ class Family:
 class Capture:
     """Everything one process did, normalized and ready to compare."""
 
-    returncode: int
+    #: One status per step, in order -- a single-step scenario is a one-tuple, and its
+    #: surface text is what it always was.
+    returncode: tuple[int, ...]
     stdout: bytes
     stderr: bytes
     trace: tuple[str, ...]
@@ -159,7 +188,7 @@ class Capture:
     def surface(self, name: str) -> str:
         """One comparison surface as printable text."""
         if name == "exit_code":
-            return str(self.returncode)
+            return " ".join(str(code) for code in self.returncode)
         if name == "stdout":
             return self.stdout.decode("utf-8", "replace")
         if name == "stderr":
@@ -354,7 +383,7 @@ def normalizer(root: Path, home: Path, shim_dir: Path):
     def normalize(text: str) -> str:
         for needle, placeholder in replacements:
             text = text.replace(needle, placeholder)
-        return _MKSTEMP.sub(r".\1.XXXXXXXX", text)
+        return _TOKEN.sub("$TOKEN", _MKSTEMP.sub(r".\1.XXXXXXXX", text))
 
     return normalize
 
@@ -375,28 +404,54 @@ def execute(command: list[str], scenario: Scenario, shim_dir: Path,
         before = digest_module.snapshot_inodes(home, sorted(scenario.pre_state))
         environment = case_environment(home, shim_dir, trace, fixtures,
                                        scenario, hashseed)
-        try:
-            completed = subprocess.run(
-                command, cwd=str(home), env=environment,
-                capture_output=True, check=False, timeout=CASE_TIMEOUT)
-        except subprocess.TimeoutExpired as error:
-            raise HarnessError(
-                f"{scenario.name}: {command[0]} exceeded {CASE_TIMEOUT}s") from error
-        except OSError as error:
-            raise HarnessError(f"{scenario.name}: cannot run {command[0]}: {error}") from error
+        statuses, out, err = [], b"", b""
+        token = ""
+        for step in scenario.steps():
+            argv = [token if part == "$TOKEN" else part for part in step]
+            try:
+                completed = subprocess.run(
+                    [*command, *argv], cwd=str(home), env=environment,
+                    capture_output=True, check=False, timeout=CASE_TIMEOUT)
+            except subprocess.TimeoutExpired as error:
+                raise HarnessError(
+                    f"{scenario.name}: {command[0]} exceeded {CASE_TIMEOUT}s") from error
+            except OSError as error:
+                raise HarnessError(
+                    f"{scenario.name}: cannot run {command[0]}: {error}") from error
+            statuses.append(completed.returncode)
+            out += completed.stdout
+            err += completed.stderr
+            token = token_of(completed.stdout) or token
         normalize = normalizer(root, home, shim_dir)
         rows = digest_module.digest_tree(home, normalize)
         return Capture(
-            returncode=completed.returncode,
-            stdout=normalize(completed.stdout.decode("utf-8", "surrogateescape")
+            returncode=tuple(statuses),
+            stdout=normalize(out.decode("utf-8", "surrogateescape")
                              ).encode("utf-8", "surrogateescape"),
-            stderr=normalize(completed.stderr.decode("utf-8", "surrogateescape")
+            stderr=normalize(err.decode("utf-8", "surrogateescape")
                              ).encode("utf-8", "surrogateescape"),
             trace=tuple(normalize(line) for line in
                         trace.read_text(encoding="utf-8").splitlines()),
             digest=rows,
             inodes=before.verdicts(home),
         )
+
+
+def token_of(stdout: bytes) -> str:
+    """The envelope's `data.token`, for a `$TOKEN` in the step that follows.
+
+    Read out of the *unnormalized* stdout, because the token the next command has to present
+    is the one the backend generated -- the scrubbed `$TOKEN` placeholder would be refused.
+    Anything that is not an envelope carrying one is no token, which is the right answer for
+    every scenario that does not have a second step.
+    """
+    try:
+        envelope = json.loads(stdout.decode("utf-8", "surrogateescape"))
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    data = envelope.get("data") if isinstance(envelope, dict) else None
+    found = data.get("token") if isinstance(data, dict) else None
+    return found if isinstance(found, str) else ""
 
 
 def python_command(scenario: Scenario) -> list[str]:
@@ -406,11 +461,11 @@ def python_command(scenario: Scenario) -> list[str]:
     and PATH is shims-only by design. argv[0] is still the script path, which is
     what the backend's `argv[1]` dispatch expects.
     """
-    return [sys.executable, str(BACKEND_PATH), *scenario.argv]
+    return [sys.executable, str(BACKEND_PATH)]
 
 
 def rust_command(scenario: Scenario) -> list[str]:
-    return [str(RUST_BINARY), *scenario.argv]
+    return [str(RUST_BINARY)]
 
 
 # ---------------------------------------------------------------------------

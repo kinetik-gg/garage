@@ -24,7 +24,15 @@ mod bar;
 mod corner;
 pub mod cx;
 pub mod dispatch;
-mod displays;
+#[cfg(test)]
+mod display_parity_tests;
+/// Public because `garage-apply` reads and writes the same saved layout: the layout types,
+/// `load_display_config()` and `mirror_targets()` are shared by `render_displays()` here and
+/// by `apply_display_layout()`, `normalize_display_layout()`, `layout_toml()` and
+/// `display_snapshot()` there. The shared half sits at the bottom of the dependency edge --
+/// the lowest crate both can name -- exactly as [`keybinds`]'s `Document` does. Publishing
+/// the shape is not publishing the ability to act on it.
+pub mod displays;
 pub mod error;
 mod general;
 mod idle;

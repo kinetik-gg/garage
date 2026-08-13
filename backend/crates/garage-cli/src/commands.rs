@@ -31,14 +31,12 @@
 //! [`garage_render::all::render_bar`]) and `render-wallpaper` (through
 //! [`garage_render::all::render_wallpaper`]) all reach real code now; `set` reaches the real
 //! load, the real write and the real route walk, failing only at the first step of the
-//! route. `render` itself completes end to end whenever `displays.toml` names no enabled
-//! display -- true of a fresh scratch tree -- and reaches `render_displays()`'s own
-//! remaining stub, deep in `garage-render`, only once one is saved. `apply` has no entry
+//! route. `render` itself completes end to end, with or without a saved layout, since task
+//! 3.8 replaced `render_displays()`'s stub. The four display commands -- `display-test`,
+//! `display-confirm`, `display-revert` and the watchdog -- are real, and live in
+//! [`crate::displays`]. `apply` has no entry
 //! point in `garage-apply` to call yet; it is wired the moment that crate grows one, and
 //! nothing here changes when it does.
-
-use std::thread;
-use std::time::Duration;
 
 use garage_apply::keybind::load_keybindings;
 use garage_core::paths::Paths;
@@ -50,6 +48,7 @@ use garage_render::cx::RenderCx;
 use garage_render::dispatch::run_render;
 use serde_json::Value;
 
+use crate::displays::{display_finish, display_test, watchdog};
 use crate::error::CliError;
 use crate::response::{emit, USAGE};
 use crate::set;
@@ -142,11 +141,13 @@ fn settings(paths: &Paths, command: &str, argv: &[String]) -> Result<Emitted, Cl
         "set" => set::set(paths, argv).map(Emitted::Envelope),
         // action(): task 3.10.
         "action" => Err(CliError::PortPending("action")),
-        // display_test() and display_finish(): task 3.8.
-        "display-test" => Err(CliError::PortPending("display-test")),
-        "display-confirm" => Err(CliError::PortPending("display-confirm")),
-        "display-revert" => Err(CliError::PortPending("display-revert")),
-        "_display-watchdog" => Ok(watchdog()),
+        "display-test" => display_test(paths, argv).map(Emitted::Envelope),
+        "display-confirm" => display_finish(paths, argv, true).map(Emitted::Envelope),
+        "display-revert" => display_finish(paths, argv, false).map(Emitted::Envelope),
+        "_display-watchdog" => {
+            watchdog(paths, argv);
+            Ok(Emitted::Silent)
+        }
         // theme-sync and night-shift-sync: task 3.6.
         "theme-sync" => Err(CliError::PortPending("theme-sync")),
         "night-shift-sync" => Err(CliError::PortPending("night-shift-sync")),
@@ -211,22 +212,6 @@ fn rendered_wallpaper(paths: &Paths) -> Result<Emitted, CliError> {
     let cx = RenderCx::new(&config, paths, &monitors, &lua);
     let _moved = render_wallpaper(&cx)?;
     Ok(Emitted::Envelope(Value::Bool(true)))
-}
-
-/// `_display-watchdog TOKEN`: sleep fifteen seconds, then put the previous layout back.
-///
-/// A tested display layout is applied at once and written to `displays.toml` only once it is
-/// confirmed. Nobody confirming it is the case this exists for -- a layout that left no
-/// working input device would otherwise strand the user in it -- so the revert has to happen
-/// on a process that outlives the one that returned the token.
-///
-/// `display_finish()` is task 3.8's. The Python swallows `(SettingsError, OSError,
-/// JSONDecodeError)` here and prints nothing either way, so the not-yet-ported failure is
-/// swallowed by exactly the same `except` and the observable behaviour -- no stdout, exit 0
-/// -- is already the Python's.
-fn watchdog() -> Emitted {
-    thread::sleep(Duration::from_secs(15));
-    Emitted::Silent
 }
 
 #[cfg(test)]
@@ -369,10 +354,10 @@ mod tests {
         drop(std::fs::remove_dir_all(&paths.home));
     }
 
-    /// `garage render` against a scratch tree with no `displays.toml` at all: the whole
-    /// chain now completes, `render_display_fragment()`'s empty-layout branch reached rather
-    /// than `render_displays()`'s own remaining `PortPending` stub -- see
-    /// `garage_render::all::render_all`'s own doc for the same claim one layer down.
+    /// `garage render` against a scratch tree with no `displays.toml` at all:
+    /// `render_display_fragment()`'s empty-layout branch, which takes the fragment away
+    /// rather than writing one -- see `garage_render::displays::render_saved_displays` for
+    /// the gate, and the `render` differential family for the same claim end to end.
     #[test]
     fn render_completes_end_to_end_with_no_displays_toml() {
         let paths = scratch_paths("render-all");

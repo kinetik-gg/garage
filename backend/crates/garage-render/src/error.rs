@@ -65,6 +65,14 @@ pub enum RenderError {
         source: std::io::Error,
     },
 
+    /// `int()` or `float()` refused a value a hand-edited `displays.toml` -- or a Displays
+    /// pane payload -- put where a coordinate, a scale, a transform or a VRR mode belongs.
+    ///
+    /// Text owned by [`crate::displays::NumberError`], which spells it as `CPython` does;
+    /// see that type for the one place the shape differs from the Python's.
+    #[error(transparent)]
+    Number(#[from] crate::displays::NumberError),
+
     /// A palette role that must be an opaque `#rrggbb` is composited -- [`crate::theme`]'s
     /// `opaque()` refusing to hand `rgba(...)` to `qt6ct` or to `hyprlock`, neither of whose
     /// parsers can spell one, and Qt's would fall back to Fusion's own grey without saying

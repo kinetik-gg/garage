@@ -18,6 +18,20 @@ garage-render = { path = "../garage-render" }
 # need them, through the local `json_command()` equivalent in `crate::workspaces` -- see that
 # module's doc for why the conflate-every-failure-to-empty reading belongs there rather than
 # behind `garage-proc`'s stricter `MonitorSource`.
-serde_json = "1.0.145"
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
+# `doctor`'s managed_paths() applies the path-anchored patterns in
+# desktop/.stow-local-ignore, which are real regular expressions written by hand in a tracked
+# file. A hand-rolled matcher over the subset they use today would silently change what stow
+# places the moment somebody edits that file, so the engine is a dependency rather than an
+# approximation.
+regex = "1.12.3"
+# `DISPLAY_LOCK`: the advisory lock the display transaction is held across, which is `flock`
+# and has no safe wrapper in std. The same crate and the same feature `garage-prefs` takes
+# `PREFERENCES_LOCK` from.
+rustix = { version = "1.1.4", features = ["fs"] }
 thiserror = "2.0.20"
+# `doctor --report`'s `generated_at` and `repair`'s `modified` are local time with a UTC
+# offset, and std has none. The same reader garage-render already uses: TZ first,
+# /etc/localtime after it, exactly as libc does for the Python's time.localtime().
+tz-rs = "0.7.3"
 toml = { version = "1.1.4", features = ["preserve_order"] }

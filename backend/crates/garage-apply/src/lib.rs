@@ -24,7 +24,11 @@ mod corner;
 pub mod cx;
 mod desktopfiles;
 pub mod dispatch;
-mod displays;
+#[cfg(test)]
+mod display_parity_tests;
+#[cfg(test)]
+mod display_trace_tests;
+pub mod displays;
 mod doctor;
 pub mod error;
 mod eval;
