@@ -17,6 +17,32 @@
 //! allowed to run programs, because acting on the session is what it is for.
 #![forbid(unsafe_code)]
 
+mod actions;
+mod bar;
+mod border;
+mod corner;
 pub mod cx;
+mod desktopfiles;
+pub mod dispatch;
+mod displays;
+mod doctor;
+pub mod error;
+mod eval;
+mod file_index;
+mod glass;
+mod keybind;
+mod locale;
+mod motion;
+mod night_shift;
+mod region;
+mod repair;
+pub mod route;
+mod snapshot;
+mod terminal;
+mod theme;
+mod update;
+mod wallpaper;
+mod workspaces;
 
 pub use cx::SessionCx;
+pub use error::ApplyError;

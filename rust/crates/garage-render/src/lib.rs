@@ -18,6 +18,26 @@
 //! [`cx::RenderCx`] for the deadlock that rule exists to prevent.
 #![forbid(unsafe_code)]
 
+mod accent;
+pub mod all;
+mod bar;
+mod corner;
 pub mod cx;
+pub mod dispatch;
+mod displays;
+pub mod error;
+mod general;
+mod idle;
+mod keybinds;
+mod lua;
+mod motion;
+mod palette;
+mod preferences;
+mod region;
+mod search;
+mod theme;
+mod wallpaper;
+mod workspaces;
 
 pub use cx::RenderCx;
+pub use error::RenderError;
