@@ -1,0 +1,20 @@
+[package]
+name = "garage-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "garage"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+garage-core = { path = "../garage-core" }
+garage-prefs = { path = "../garage-prefs" }
+garage-proc = { path = "../garage-proc" }
+garage-render = { path = "../garage-render" }
+garage-apply = { path = "../garage-apply" }
+garage-reconcile = { path = "../garage-reconcile" }
+anyhow = "1.0.104"

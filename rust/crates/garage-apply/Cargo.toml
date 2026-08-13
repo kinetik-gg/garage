@@ -1,0 +1,17 @@
+[package]
+name = "garage-apply"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "garage_apply"
+
+[lints]
+workspace = true
+
+[dependencies]
+garage-core = { path = "../garage-core" }
+garage-prefs = { path = "../garage-prefs" }
+garage-proc = { path = "../garage-proc" }
+garage-render = { path = "../garage-render" }
+thiserror = "2.0.20"

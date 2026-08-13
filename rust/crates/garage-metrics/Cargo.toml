@@ -1,0 +1,15 @@
+[package]
+name = "garage-metrics"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "garage-metrics"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+garage-core = { path = "../garage-core" }
+thiserror = "2.0.20"

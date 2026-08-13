@@ -1,0 +1,15 @@
+[package]
+name = "garage-prefs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "garage_prefs"
+
+[lints]
+workspace = true
+
+[dependencies]
+garage-core = { path = "../garage-core" }
+rustix = { version = "1.1.4", features = ["fs"] }
+thiserror = "2.0.20"

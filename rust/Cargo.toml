@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/garage-core",
+    "crates/garage-prefs",
+    "crates/garage-proc",
+    "crates/garage-render",
+    "crates/garage-apply",
+    "crates/garage-reconcile",
+    "crates/garage-cli",
+    "crates/garage-metrics",
+    "crates/garage-file-index",
+    "crates/garage-ai-usage",
+    "crates/garage-waybar",
+]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+missing_debug_implementations = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+unwrap_in_result = "deny"
+exit = "deny"
+too_many_lines = "deny"
+too_many_arguments = "deny"
+cognitive_complexity = "warn"
+excessive_nesting = "warn"
+wildcard_enum_match_arm = "deny"

@@ -1,0 +1,11 @@
+excessive-nesting-threshold = 4
+too-many-lines-threshold = 50
+too-many-arguments-threshold = 5
+cognitive-complexity-threshold = 25
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = false
+disallowed-methods = [
+  { path = "std::process::Command::new", reason = "spawn through garage_proc::run so the 4s timeout, the capture and the differential trace stay in one place" },
+]

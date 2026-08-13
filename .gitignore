@@ -44,3 +44,6 @@ desktop/.config/garage/displays.toml
 # ignore the path in case anything ever lands one inside the repo checkout.
 .local/state/garage/generated/
 .config/user-dirs.dirs
+
+# Rust build artifacts. Cargo.lock is committed; the target/ output is not.
+rust/target/
