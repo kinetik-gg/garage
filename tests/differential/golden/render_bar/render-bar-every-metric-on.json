@@ -88,7 +88,7 @@
       "kind": "file",
       "mode": "0600",
       "path": ".local/state/garage/generated/waybar-widgets.jsonc",
-      "sha256": "4c86b0bd8a90b1ad3e1215d5a553e37e344b3411ea107fe90da1d7136e165e43",
+      "sha256": "f786eec082e4c30170551b63369f753942b2525d2a240fb92f0863233a83a6a6",
       "target": ""
     },
     {
