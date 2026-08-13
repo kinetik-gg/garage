@@ -131,10 +131,294 @@ SMOKE = (
 # layer families: empty until their Phase 3 task fills them
 # ---------------------------------------------------------------------------
 
-PREFERENCES: tuple[Scenario, ...] = ()
 # Grown from tests/test_preferences.py and tests/test_schema.py: load, merge over
 # defaults, validate, migrate, save. The `set`/`action` argv surface and every
 # rejection message.
+#
+# Two halves, and they become reachable at different times. The load half runs
+# through `render-idle` -- the cheapest command that loads the preferences, spawns
+# nothing and writes exactly one file -- so every case in it is a statement about
+# migrate/merge/validate with no other machinery in the way. What it compares is
+# mostly *stderr* (the coercion and dropped-key notes) and *digest*
+# (preferences.toml as the migration left it, which for several of these is
+# "exactly as it was found"). The `set` half needs main()'s `set` branch, which
+# does not exist in the Rust CLI until task 3.15; the cases are written down now so
+# that task has a corpus rather than a blank file.
+#
+# Deliberately absent: two concurrent `set`s. PREFERENCES_LOCK's whole job is to
+# serialise them, and a Scenario is one process against one world -- there is
+# nowhere to put the second writer. That invariant is held by garage-prefs' own
+# unit tests, which contend for the lock in-process (`flock` is per open file
+# description, so two opens in one process contend exactly as two processes do).
+
+# A v4 file the way every version up to 4 wrote one: the stamp, a copy of shipped
+# defaults, and one real departure. Not the whole ~50-key document -- the property
+# under test is that a stored value equal to today's default is dropped while a
+# departure stays, and four of each says that as well as fifty does.
+V4_FOSSIL = """\
+[schema]
+preferences_version = 4
+
+[appearance]
+accent_color = "red"
+corner_radius = "normal"
+border_size = 0
+theme_mode = "dark"
+
+[bar]
+height = 43
+"""
+
+
+def prefs(text: str) -> dict[str, object]:
+    """A scenario's starting layer 2."""
+    return {".config/garage/preferences.toml": text}
+
+
+PREFERENCES: tuple[Scenario, ...] = (
+    # -- the load path, through the cheapest command that takes it ------------
+    Scenario(
+        name="prefs-load-departures",
+        argv=("render-idle",),
+        # Already departures-only and already stamped: nothing to migrate,
+        # nothing to rewrite. The control case for every rewrite below.
+        pre_state=prefs('[schema]\npreferences_version = 5\n\n'
+                        '[appearance]\naccent_color = "red"\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-v4-shrink",
+        argv=("render-idle",),
+        # v5's whole reason: the fossil shrinks to the one setting ever changed.
+        pre_state=prefs(V4_FOSSIL),
+    ),
+    Scenario(
+        name="prefs-migrate-v1-corner-rename",
+        argv=("render-idle",),
+        # v2's rename and v5's shrink composed: "small" becomes "normal", which
+        # is what this build ships, so it leaves the file entirely.
+        pre_state=prefs('[appearance]\ncorner_radius = "small"\n'
+                        'accent_color = "red"\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-v1-corner-normal",
+        argv=("render-idle",),
+        # The case a port is most likely to get quietly wrong. "normal" migrates
+        # to "large", which is a departure, and the departures the file already
+        # holds are the same set it would be rewritten to -- so the comparison
+        # says "no change", the file is left unstamped, and the rename replays
+        # (idempotently) on every load. The digest surface is what says so.
+        pre_state=prefs('[appearance]\ncorner_radius = "normal"\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-v3-wallpaper-split",
+        argv=("render-idle",),
+        # v3 gave each appearance its own wallpaper. The half that is already
+        # set outranks the value it would be split from.
+        pre_state=prefs('[schema]\npreferences_version = 2\n\n[appearance]\n'
+                        'wallpaper = "/pic.png"\nwallpaper_dark = "/kept.png"\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-unknown-key",
+        argv=("render-idle",),
+        # Dropped at migration time, with a note on stderr. A stamped file keeps
+        # it instead -- see prefs-load-unknown-key-stamped.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n[appearance]\n'
+                        'accent_color = "red"\nnot_a_key = 1\n'),
+    ),
+    Scenario(
+        name="prefs-load-unknown-key-stamped",
+        argv=("render-idle",),
+        # The stamp is what stops the migration, so the unknown key sits in the
+        # file, unreported, until something writes it out again.
+        pre_state=prefs('[schema]\npreferences_version = 5\n\n[appearance]\n'
+                        'accent_color = "red"\nnot_a_key = 1\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-withdrawn-key",
+        argv=("render-idle",),
+        # highlight_color was withdrawn outright; it leaves with the same note
+        # an invented key gets, which is the point of the note's wording.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n'
+                        '[appearance]\nhighlight_color = "#ff0000"\n'),
+    ),
+    Scenario(
+        name="prefs-migrate-unknown-section",
+        argv=("render-idle",),
+        # A whole section the schema does not have is named by the section alone,
+        # not key by key.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n'
+                        '[appearance]\naccent_color = "red"\n\n[bogus]\nfoo = "bar"\n'),
+    ),
+    Scenario(
+        name="prefs-load-invalid-values",
+        argv=("render-idle",),
+        # Every one of these is a *departure*, so the compaction leaves them in
+        # the file: they are corrected in memory, reported once on stderr, and
+        # only reach the file on the next save. Both surfaces carry that.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n[appearance]\n'
+                        'corner_radius = "huge"\nborder_size = 99\n'
+                        'glass_refraction = 2.5\nnight_shift_start = "25:00"\n'
+                        'wallpaper_light_color = "blue"\n\n'
+                        '[input]\nkeyboard_layout = ""\n'),
+    ),
+    Scenario(
+        name="prefs-load-exotic-scalars",
+        argv=("render-idle",),
+        # A hand edit can put a TOML time or a `nan` where a string or a float
+        # belongs. Both are reported with the repr Python's f-string produces --
+        # `datetime.time(7, 0)`, `nan` -- and neither reaches the emitter,
+        # because both are departures and the file is left alone.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n[appearance]\n'
+                        'theme_light_at = 07:00:00\nanimation_speed = nan\n'),
+    ),
+    Scenario(
+        name="prefs-load-int-for-float",
+        argv=("render-idle",),
+        # 1 == 1.0 in Python, and the schema ships pointer_sensitivity as a
+        # float: a UI that sends JSON 0 must not pin a copy of the default into
+        # layer 2 over a decimal point. The key leaves the file.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n'
+                        '[input]\npointer_sensitivity = 0\n'),
+    ),
+    Scenario(
+        name="prefs-load-bool-for-int",
+        argv=("render-idle",),
+        # The other direction: True == 1 too, but a bool is a different *kind* of
+        # value, so it stays a departure and the coercion pass reports it.
+        pre_state=prefs('[schema]\npreferences_version = 4\n\n'
+                        '[appearance]\nborder_size = true\n'),
+    ),
+    Scenario(
+        name="prefs-load-mangled-stamp",
+        argv=("render-idle",),
+        # Older than current rather than fatal: refusing the file here would
+        # leave the whole UI read-only.
+        pre_state=prefs('[schema]\npreferences_version = "5"\n\n'
+                        '[appearance]\naccent_color = "red"\n'),
+    ),
+    Scenario(
+        name="prefs-load-hand-written-comments",
+        argv=("render-idle",),
+        # Already departures-only, so the rewrite would change nothing and the
+        # file keeps its comments -- dump_toml() cannot carry one.
+        pre_state=prefs('# hand written, keep me\n[schema]\npreferences_version = 5\n\n'
+                        '[appearance]\n# why red\naccent_color = "red"\n'),
+    ),
+    Scenario(
+        name="prefs-load-corrupt",
+        argv=("render-idle",),
+        # The error envelope, and the user's file left exactly as it is.
+        pre_state=prefs("this is not toml\n"),
+    ),
+    # -- v4's file move, which runs once per process ahead of the dispatch -----
+    Scenario(
+        name="prefs-migrate-config-root",
+        argv=("render-idle",),
+        # The four user-owned files move out of ~/.config/workstation and the
+        # emptied directory goes with them. The symlink is layer 1 and stays,
+        # which is also what keeps the directory alive.
+        pre_state={
+            ".config/workstation/preferences.toml":
+                '[appearance]\naccent_color = "red"\n',
+            ".config/workstation/displays.toml": "# displays\n",
+            ".config/workstation/keybindings.toml": "# keys\n",
+            ".config/workstation/workspace-blocks.toml": "# blocks\n",
+            ".config/workstation/generated/accent": "#ffffff\n",
+        },
+    ),
+    Scenario(
+        name="prefs-migrate-config-root-stamped",
+        argv=("render-idle",),
+        # Gated on the same stamp as every other step, and read from the *old*
+        # file because the new path is still empty at this point. Nothing moves.
+        pre_state={
+            ".config/workstation/preferences.toml":
+                "[schema]\npreferences_version = 4\n",
+            ".config/workstation/displays.toml": "# displays\n",
+        },
+    ),
+    Scenario(
+        name="prefs-migrate-config-root-occupied",
+        argv=("render-idle",),
+        # Never over a file already at the new location: that one is what the
+        # session has been reading, so the old one is the stale copy.
+        pre_state={
+            ".config/workstation/preferences.toml": "# old\n",
+            ".config/garage/preferences.toml":
+                '[schema]\npreferences_version = 5\n\n'
+                '[appearance]\naccent_color = "red"\n',
+        },
+    ),
+    # -- the `set` argv surface: one refusal per kind -------------------------
+    # Unreachable until task 3.15 wires main()'s `set` branch. Each names the
+    # PREFERENCE_KINDS entry it exercises, because the kind is what decides the
+    # refusal and one case per kind is what makes the set complete.
+    Scenario(name="prefs-set-invalid-bool", argv=("set", "appearance.reduce_motion", '"yes"')),
+    Scenario(name="prefs-set-invalid-int", argv=("set", "appearance.border_size", "99")),
+    Scenario(name="prefs-set-invalid-float", argv=("set", "appearance.glass_refraction", "2.5")),
+    Scenario(name="prefs-set-invalid-enum", argv=("set", "appearance.corner_radius", '"huge"')),
+    Scenario(name="prefs-set-invalid-time", argv=("set", "appearance.night_shift_start", '"25:00"')),
+    Scenario(name="prefs-set-invalid-hex-color",
+             argv=("set", "appearance.wallpaper_light_color", '"blue"')),
+    Scenario(name="prefs-set-invalid-nonempty-string",
+             argv=("set", "input.keyboard_layout", '""')),
+    Scenario(name="prefs-set-invalid-free-string", argv=("set", "general.terminal", "123")),
+    Scenario(
+        name="prefs-set-invalid-locale",
+        argv=("set", "region.locale", '"xx_YY.UTF-8"'),
+        # The `locale` shim answers nothing, so no locale is installed and any
+        # non-empty one is refused -- deterministically, on any machine.
+    ),
+    Scenario(
+        name="prefs-set-unchecked-value",
+        argv=("set", "appearance.night_shift_enabled", '"maybe"'),
+        # The "unchecked" kind refuses nothing: the renderer coerces whatever it
+        # is handed. Here to pin that it is *accepted*, which is the half of the
+        # kind table a port is most likely to get wrong in the safe-looking
+        # direction.
+    ),
+    Scenario(
+        name="prefs-set-normalised-counts",
+        argv=("set", "workspaces.counts", '"DP-1:99,,HDMI-A-1:x"'),
+        # The "normalised" kind restates a value rather than refusing it, so what
+        # lands in the file is neither the input nor the default.
+    ),
+    Scenario(
+        name="prefs-set-renamed-value",
+        argv=("set", "appearance.corner_radius", '"small"'),
+        # A withdrawn spelling is carried across silently -- the same choice under
+        # the name it had when it was made -- so this writes "normal" and says
+        # nothing on stderr.
+    ),
+    Scenario(name="prefs-set-renamed-wallpaper-fit",
+             argv=("set", "appearance.wallpaper_fit", '"stretch"')),
+    Scenario(
+        name="prefs-set-unknown-key",
+        argv=("set", "nonesuch.key", '"x"'),
+        # `set` gates on the schema, so a key the table does not have is refused
+        # rather than written.
+    ),
+    Scenario(
+        name="prefs-set-bookkeeping-key",
+        argv=("set", "schema.preferences_version", "4"),
+        # The version stamp is this program's bookkeeping and is not settable;
+        # letting it through would let a `set` replay every migration.
+    ),
+    Scenario(
+        name="prefs-set-wrong-argument-count",
+        argv=("set", "appearance.accent_color"),
+        # main()'s `len(argv) != 4` guard, which is a usage message rather than a
+        # schema refusal.
+    ),
+    Scenario(
+        name="prefs-set-over-a-fossil",
+        argv=("set", "appearance.accent_color", '"green"'),
+        # The load compacts the file, then the set rewrites it: two writes to
+        # preferences.toml in one process, and the second must not reintroduce
+        # what the first dropped.
+        pre_state=prefs(V4_FOSSIL),
+    ),
+)
 
 RENDER: tuple[Scenario, ...] = ()
 # Grown from tests/test_bar.py, tests/test_keybinds.py and
@@ -172,7 +456,10 @@ FAMILIES = (
         scenarios=SMOKE,
     ),
     Family(name="preferences", active=False,
-           note="load/validate/save; from test_preferences.py, test_schema.py",
+           note="load/validate/save; from test_preferences.py, test_schema.py. "
+                "The load half is ported (task 3.1, garage-prefs) but reaches the "
+                "CLI through render-idle, which is still a stub; the `set` half "
+                "needs main()'s set branch, task 3.15. Activated by task 3.2.",
            scenarios=PREFERENCES),
     Family(name="render", active=False,
            note="fragment generation; from test_bar.py, test_keybinds.py",
