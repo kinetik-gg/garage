@@ -161,6 +161,8 @@ class HyprlockSurface(unittest.TestCase):
         self.assertIn("check_text = Authenticating…", self.conf)
         self.assertIn("fail_text = $FAIL", self.conf)
         self.assertIn("position = 0, 0", self.conf)
+        self.assertIn("inner_color = rgba(00000000)", self.conf)
+        self.assertIn("Enter your password...", self.conf)
 
     def run_script(self, monitors: object) -> tuple[str, list[list[str]]]:
         with tempfile.TemporaryDirectory(prefix="garage-lock-test-") as scratch:

@@ -8,9 +8,9 @@ responsibilities separate:
   switch-user field, session selection, sleep, reboot and shutdown. Reboot and
   shutdown require inline confirmation; sleep is immediate.
 - **Hyprlock** unlocks the already-running session. It follows Garage's current
-  wallpaper and generated light/dark palette. Its only control is the password
-  field, placed by `garage-lock-session` on Hyprland's focused monitor while
-  the wallpaper remains on every connected output.
+  wallpaper and generated light/dark palette. Its only control is a transparent
+  password field, placed by `garage-lock-session` on Hyprland's focused monitor
+  while the wallpaper remains on every connected output.
 
 Both surfaces keep authentication/error feedback inside fixed geometry. A
 failed password therefore changes text and colour without moving the controls.
