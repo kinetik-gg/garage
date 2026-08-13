@@ -22,9 +22,13 @@ Config lives in three layers, in the order they win (`garage`, module header, ar
 reinstall, layer 3 is a cache safe to throw away. Generated output used to sit inside layer 2,
 where deleting the cache meant deleting the user's settings beside it.
 
-**One-writer rule**: `save_preferences()` is the only writer of `preferences.toml`, and it writes
-departures from layer 1, never the merged whole (see §3, and §8's four-file split and snapshot
-pattern for the read side). `save_workspace_blocks()` and `keybind_action()` are likewise the
+**One-writer rule**: `save_preferences()` is the only writer of `preferences.toml` on the settings
+path, and it writes departures from layer 1, never the merged whole (see §3, and §8's four-file
+split and snapshot pattern for the read side). Three writers sit off that path, deliberately and
+each emitting a departures-only or stamp-only document: `compact_preferences_file()` (the v5
+migration rewrite), `repair_reset()` (`garage repair --reset`), and `bootstrap.sh`'s first-boot GPU
+glass gate, which writes only when the file does not exist — its comment block is headed
+"ONE-WRITER VIOLATION, deliberate, narrow, and measured". `save_workspace_blocks()` and `keybind_action()` are likewise the
 single writers of `workspace-blocks.toml` and `keybindings.toml`. `displays.toml` has two: the
 Displays pane's `display_finish()`, and `initialize_display_config()`, which seeds the file from
 `display_snapshot()` on the first apply so a machine whose owner never opened the pane isn't left
