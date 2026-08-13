@@ -1,3 +1,4 @@
+# Historical once golden mode is the only mode; retained to document the port's decisions.
 # Differences between the Python backend and the Rust port that have been
 # looked at, understood, and decided to be correct. Nothing else is forgiven.
 #
@@ -21,10 +22,9 @@
 # and skip, so progress stays visible without anything being forgiven.
 #
 # As of tasks 3.10+3.11 every family in scenarios.py is active, so this file is the
-# whole of what the port is forgiven. It reads as three groups: the typed schema
-# (five entries, one cause), the two argv positions the Python indexes without
-# checking, and the runtime manifest the Rust doctor reads where the Python names
-# constants. Nothing else differs anywhere in the corpus.
+# whole of what the port was forgiven. It reads as two historical groups: the
+# deliberate typed-schema differences and the two argv positions the Python
+# indexes without checking. Nothing else differed anywhere in the corpus.
 #
 # ---------------------------------------------------------------------------
 # The typed schema: five differences, one cause
@@ -106,25 +106,3 @@ reason   = "`garage action` with no name is `argv[2]` on a two-element list: an 
 surface  = "stderr"
 scenario = "action-no-name"
 reason   = "The other half of the same: a CPython traceback there, nothing here. See this scenario's stdout entry."
-
-# ---------------------------------------------------------------------------
-# The runtime manifest, which task 3.12's steering required
-# ---------------------------------------------------------------------------
-# Two entries that used to sit here alongside these -- `render-all-empty`'s trace
-# and digest, for the browser marker `render_general()` could not write -- retired
-# with tasks 3.10+3.11. The marker's *value* is now an argument to
-# render_general() rather than something the renderer has to go and find, so
-# `garage render` publishes all three markers and makes the same three `gio mime`
-# calls the Python does, without garage-render gaining a runner. See
-# garage_render::general for the shape and why it is not a capability.
-
-
-[[deviation]]
-surface  = "stdout"
-scenario = "doctor-healthy"
-reason   = "Task 3.12's steering requirement: the Rust doctor reads system/manifest/{packages,units,fonts}.list at runtime through garage_core::manifest, where the Python names its own DOCTOR_PACKAGES / DOCTOR_UNITS / DOCTOR_FONTS tuples in the source. tests/test_manifest.py pins the two *sets* together for the parity window, so the packages and fonts lines agree; the units line does not, and cannot, because units.list is the full set bootstrap.sh enables (14 today) while DOCTOR_UNITS is the subset the Python happens to name (7). units.list's own header is what settles which is right -- 'bootstrap.sh enables every line here; garage doctor checks them' -- so the Python prints 'all 7 units enabled and running' and the port prints 'all 14'. This entry retires with the DOCTOR_* constants in Phase 4, which is what test_manifest.py says it exists to guard until."
-
-[[deviation]]
-surface  = "trace"
-scenario = "doctor-healthy"
-reason   = "The same runtime-manifest reading, seen from the process boundary, and in two places. (1) `pacman -Q` is passed the critical-flagged names in packages.list order, which groups by function (stow, hypridle, hyprpaper, waybar, quickshell, kitty, fish, adw-gtk-theme), where the Python passes DOCTOR_PACKAGES' own order (quickshell, waybar, hypridle, hyprpaper, kitty, fish, stow, adw-gtk-theme). Same eight names, same one call, same answer parsed out of it -- test_manifest.py's test_critical_flags_match_doctor_packages pins the sets equal -- and pacman does not care about the order of its arguments. (2) check_units asks systemctl about all fourteen units in units.list rather than the seven in DOCTOR_UNITS, which is the same widening the stdout entry above describes. Both retire in Phase 4."

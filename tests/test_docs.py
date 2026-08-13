@@ -1,6 +1,6 @@
 """Documentation citations stay pinned to the code they claim to describe.
 
-docs/*.md cites the backend by function name, by constant name, and by
+docs/*.md cites the Rust backend by function name, by constant name, and by
 `file.lua:N` source line. Nothing enforces any of that as the code moves
 underneath it -- a rename or a deleted constant leaves a citation pointing at
 nothing, and a reader only discovers it by following the citation and finding
@@ -24,16 +24,18 @@ from __future__ import annotations
 
 import re
 import unittest
+from pathlib import Path
 
-from harness import BACKEND_PATH, BINDS_LUA, REPO_ROOT
 
-
+REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
+RUST_DIR = REPO_ROOT / "backend" / "crates"
 HYPR_DIR = REPO_ROOT / "desktop" / ".config" / "hypr"
+BINDS_LUA = HYPR_DIR / "config" / "binds.lua"
 HYPRLAND_LUA = HYPR_DIR / "hyprland.lua"
 
-# `name()` citations that name a real function but not a backend `def` --
-# they live on the Lua side of the Python/Hyprland split. Routed to the file
+# `name()` citations that name a real function but not a backend `fn` --
+# they live on the Lua side of the Rust/Hyprland split. Routed to the file
 # that actually defines them so the assertion checks the right source instead
 # of being silently excused.
 LUA_FUNCTION_HOMES = {
@@ -57,16 +59,6 @@ LUA_CONSTANT_HOMES = {
     "GLASS_AVAILABLE": HYPRLAND_LUA,     # hyprland.lua: `GLASS_AVAILABLE = load_plugin(...)`
     "HYPREXPO_AVAILABLE": HYPRLAND_LUA,  # hyprland.lua: `HYPREXPO_AVAILABLE = load_plugin(...)`
     "RESCUE": BINDS_LUA,                 # config/binds.lua: `local RESCUE = { ... }`
-}
-
-# ALL_CAPS citations that are real symbols but are neither a backend
-# module-level constant nor a Lua one -- each entry explains where the name
-# actually comes from so this stays a short, justified list rather than a
-# place to dump anything the other two checks reject.
-CONSTANT_ALLOWLIST = {
-    "LOCK_NB": "fcntl.LOCK_NB -- a Python stdlib fcntl flag used inline as "
-               "`fcntl.LOCK_EX | fcntl.LOCK_NB`, not assigned as a "
-               "module-level name anywhere in this repo.",
 }
 
 FUNCTION_CITATION = re.compile(r"`([a-z_][a-zA-Z0-9_]*)\(\)`")
@@ -100,6 +92,11 @@ def cited_symbols(pattern):
     return hits
 
 
+def rust_sources():
+    """Every Rust source that can own a cited backend symbol."""
+    return [(path, path.read_text()) for path in sorted(RUST_DIR.rglob("*.rs"))]
+
+
 class DocCitations(unittest.TestCase):
     def test_no_line_number_citations(self) -> None:
         """No doc cites code by raw `garage:N` line number.
@@ -117,14 +114,14 @@ class DocCitations(unittest.TestCase):
     def test_every_cited_backend_symbol_exists(self) -> None:
         """Every `name()` citation resolves to a real function.
 
-        Most resolve as `def name` in the Python backend. A handful of names
+        Most resolve as `fn name` in the Rust backend. A handful of names
         are cited that live on the Lua side of the split (keybind wiring,
         plugin loading) or are language builtins mentioned by name; those are
         routed via LUA_FUNCTION_HOMES / BUILTIN_FUNCTIONS instead of being
-        checked against the backend. A name in neither the backend nor either
+        checked against Rust. A name in neither the Rust sources nor either
         of those maps is a citation of something that does not exist.
         """
-        backend = BACKEND_PATH.read_text()
+        rust = rust_sources()
         lua_text = {home: home.read_text() for home in set(LUA_FUNCTION_HOMES.values())}
 
         missing = []
@@ -139,9 +136,14 @@ class DocCitations(unittest.TestCase):
                     missing.append(f"{name}() (cited in {where}) -- no "
                                     f"`function {name}` in {home}")
                 continue
-            if not re.search(rf"^def {re.escape(name)}\b", backend, re.MULTILINE):
+            declaration = re.compile(
+                rf"^\s*(?:pub(?:\([^)]*\))?\s+)?"
+                rf"(?:(?:async|const|unsafe)\s+)*fn\s+{re.escape(name)}\b",
+                re.MULTILINE,
+            )
+            if not any(declaration.search(source) for _, source in rust):
                 missing.append(f"{name}() (cited in {where}) -- no "
-                                f"`def {name}` in {BACKEND_PATH}")
+                                f"`fn {name}` under {RUST_DIR}")
         self.assertEqual([], missing)
 
     def test_every_cited_constant_exists(self) -> None:
@@ -153,15 +155,12 @@ class DocCitations(unittest.TestCase):
         doc would also catch plain acronyms in prose (ABI, TOML, JSON, GTK,
         QML, ...) that are not code citations at all.
 
-        Most resolve as a module-level assignment (`NAME = ...` or
-        `NAME: ... = ...`) in the Python backend. A few are Lua-side
-        (LUA_CONSTANT_HOMES) or real symbols that are not a module-level
-        assignment anywhere in this repo (CONSTANT_ALLOWLIST, each entry
-        explaining where the name actually comes from).
+        Most resolve as a Rust declaration (`const NAME`). A few are Lua-side
+        (LUA_CONSTANT_HOMES).
         """
         path = DOCS_DIR / "ARCHITECTURE.md"
         text = path.read_text()
-        backend = BACKEND_PATH.read_text()
+        rust = rust_sources()
         lua_text = {home: home.read_text() for home in set(LUA_CONSTANT_HOMES.values())}
 
         names: dict[str, str] = {}
@@ -170,8 +169,6 @@ class DocCitations(unittest.TestCase):
 
         missing = []
         for name in sorted(names):
-            if name in CONSTANT_ALLOWLIST:
-                continue
             if name in LUA_CONSTANT_HOMES:
                 home = LUA_CONSTANT_HOMES[name]
                 if not re.search(rf"^(local )?{re.escape(name)}\s*=",
@@ -179,9 +176,13 @@ class DocCitations(unittest.TestCase):
                     missing.append(f"{name} (cited in {names[name]}) -- not "
                                     f"assigned in {home}")
                 continue
-            if not re.search(rf"^{re.escape(name)}\s*[:=]", backend, re.MULTILINE):
+            declaration = re.compile(
+                rf"^\s*(?:pub(?:\([^)]*\))?\s+)?const\s+{re.escape(name)}\b",
+                re.MULTILINE,
+            )
+            if not any(declaration.search(source) for _, source in rust):
                 missing.append(f"{name} (cited in {names[name]}) -- no "
-                                f"module-level `{name} =` / `{name}:` in {BACKEND_PATH}")
+                                f"`const {name}` under {RUST_DIR}")
         self.assertEqual([], missing)
 
     def test_lua_line_citations_resolve(self) -> None:
