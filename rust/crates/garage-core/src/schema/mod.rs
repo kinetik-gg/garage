@@ -21,4 +21,4 @@ pub mod routes;
 pub use crate::schema::defaults::{Defaults, MissingDefault};
 pub use crate::schema::notes::Notes;
 pub use crate::schema::prefs::{ParseKeyError, PreferenceKey, Preferences, Section, SetError};
-pub use crate::schema::routes::Route;
+pub use crate::schema::routes::{ApplyStep, RenderStep, Route, Step};
