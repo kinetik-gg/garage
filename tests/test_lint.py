@@ -34,9 +34,12 @@ CRATES_DIR = RUST_ROOT / "crates"
 SUBPROCESS_TIMEOUT = 300
 
 # rust/crates/**/src files over 500 lines, and why each is allowed to be.
-# Empty for now: the rule is data so a future exception is a one-line diff
-# here instead of a special case in the test body.
-EXCEPTIONS: dict[str, str] = {}
+# The rule is data so an exception is a one-line diff here instead of a
+# special case in the test body.
+EXCEPTIONS: dict[str, str] = {
+    "rust/crates/garage-core/src/schema/prefs.rs":
+        "the schema table is one table; splitting it would hide drift",
+}
 
 
 def require_cargo() -> str:
