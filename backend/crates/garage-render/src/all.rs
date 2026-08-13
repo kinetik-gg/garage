@@ -28,6 +28,7 @@
 use crate::bar::{widgets as bar_widgets, workspaces as bar_workspaces};
 use crate::cx::RenderCx;
 use crate::error::RenderError;
+use crate::keybinds::Document;
 use crate::workspaces::plan;
 use crate::{
     accent, corner, displays, general, keybinds, motion, preferences, region, theme, wallpaper,
@@ -40,20 +41,28 @@ use crate::{
 /// [`preferences::render_preferences`], and both are also reachable directly through
 /// [`crate::dispatch::run_render`] for the routes that need only one of them.
 ///
+/// The Python calls `render_keybinds(load_keybindings())`, loading the shortcut document
+/// here. That load parses `keybindings.toml` and filters it against the published catalog,
+/// which is `garage-apply`'s `keybind` module and not reachable from this crate, so the
+/// document arrives as an argument instead -- the caller loads it and hands it in. Nothing
+/// else about the call moves: it is still the second thing written, from the same document,
+/// with the same bytes.
+///
 /// # Errors
 ///
 /// The first renderer's error, in call order below. [`preferences::render_preferences`],
-/// [`motion::render_motion`], [`accent::render_accent`], [`theme::render_theme`] and
-/// [`wallpaper::render_wallpaper`] are real; every other renderer in this chain is still a
-/// stub, so a call today fails on [`keybinds::render_keybinds`], the next one in line.
+/// [`keybinds::render_keybinds`], [`motion::render_motion`], [`accent::render_accent`],
+/// [`theme::render_theme`] and [`wallpaper::render_wallpaper`] are real; every other
+/// renderer in this chain is still a stub, so a call today fails on
+/// [`general::render_general`], the next one in line.
 ///
 /// [`wallpaper::render_wallpaper`]'s own answer -- whether `hyprpaper.conf` moved, and so
 /// whether the service has to be restarted -- is dropped here exactly as the Python drops
-/// it: `render_all()` is not the caller that restarts anything, and `garage-apply`'s
-/// `apply_preferences()` is the one that asks for the flag.
-pub fn render_all(cx: &RenderCx<'_>) -> Result<(), RenderError> {
+/// it: `render_all()` is not the caller that restarts anything, and
+/// `garage-apply`'s `apply_preferences()` is the one that asks for the flag.
+pub fn render_all(cx: &RenderCx<'_>, document: &Document) -> Result<(), RenderError> {
     preferences::render_preferences(cx)?;
-    keybinds::render_keybinds(cx)?;
+    keybinds::render_keybinds(cx, document)?;
     general::render_general(cx)?;
     region::render_region(cx)?;
     plan::render_workspaces(cx)?;

@@ -36,6 +36,7 @@
 use std::thread;
 use std::time::Duration;
 
+use garage_apply::keybind::load_keybindings;
 use garage_core::paths::Paths;
 use garage_core::schema::RenderStep;
 use garage_prefs::{load_preferences, migrate_config_root};
@@ -162,7 +163,12 @@ fn rendered(paths: &Paths, step: Option<RenderStep>) -> Result<Emitted, CliError
     let lua = Luac::new(&system);
     let cx = RenderCx::new(&config, paths, &monitors, &lua);
     match step {
-        None => render_all(&cx)?,
+        // `render_all(load_keybindings())` in the Python, where the load happens inside the
+        // renderer. It happens here instead because parsing `keybindings.toml` and filtering
+        // it against the published catalog is `garage-apply`'s, and `garage-render` cannot
+        // reach that crate -- see `render_all`'s own doc. Notes go to stderr, as they do
+        // there.
+        None => render_all(&cx, &load_keybindings(paths, None))?,
         Some(step) => run_render(step, &cx)?,
     }
     Ok(Emitted::Envelope(Value::Bool(true)))
