@@ -253,6 +253,20 @@ fn prune_removes_a_ledgered_path_after_its_owner_leaves_and_logs_it() {
     assert!(log.contains(relative));
     assert!(log.contains("owner btop removed from packages.list"));
     assert!(log.contains("2026-08-14T12:34:56+0700"));
+
+    let ledger_path = world.paths.state_root.join("manifest.json");
+    let ledger = fs::read(&ledger_path).expect("ledger after prune");
+    let log_path = world.paths.state_root.join("reconcile.log");
+    let log = fs::read(&log_path).expect("log after prune");
+    let second = world.run(Options {
+        prune: true,
+        dry_run: false,
+    });
+
+    assert!(second.plan.is_empty());
+    assert_eq!(second.applied, 0);
+    assert_eq!(fs::read(ledger_path).expect("unchanged ledger"), ledger);
+    assert_eq!(fs::read(log_path).expect("unchanged log"), log);
 }
 
 #[test]
@@ -328,6 +342,33 @@ fn a_second_run_has_an_empty_plan_and_empty_log_delta() {
         ledger_before
     );
     assert_eq!(fs::read(log_path).unwrap_or_default(), log_before);
+}
+
+#[test]
+fn deleting_the_hypr_tree_is_repaired_and_the_shared_doctor_model_is_green() {
+    let world = World::new("deleted-hypr-tree");
+    for relative in [
+        ".config/hypr/hyprland.lua",
+        ".config/hypr/config/autostart.lua",
+    ] {
+        world.tracked(relative);
+    }
+    fs::write(world.checkout.join("desktop/.stow-local-ignore"), "").expect("ignore file");
+    world.manifest("", "stow-tree desktop/\n");
+
+    assert_eq!(world.run(Options::default()).applied, 2);
+    fs::remove_dir_all(world.home(".config/hypr")).expect("delete scratch Hypr tree");
+
+    let repaired = world.run(Options::default());
+    assert_eq!(repaired.applied, 2);
+    let state = garage_core::stow::stow_state(&world.checkout, &world.paths.home);
+    assert_eq!(state.total, 2);
+    assert_eq!(state.linked, 2);
+    assert!(state.other.is_empty());
+    assert!(state.broken.is_empty());
+    assert!(state.plain.is_empty());
+    assert!(state.missing.is_empty());
+    assert!(world.run(Options::default()).plan.is_empty());
 }
 
 fn tree_digest(root: &Path) -> u64 {

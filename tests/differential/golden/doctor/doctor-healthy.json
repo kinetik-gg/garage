@@ -62,7 +62,7 @@
   ],
   "inodes": [],
   "stderr": "",
-  "stdout": "Garage doctor\n  checkout  $REPO\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  FAIL  stow links   1/236 paths link here; 235 problem(s): missing ~/.config/btop/btop.conf, missing ~/.config/fish/config.fish, missing ~/.config/garage/templates/btop-theme-head.tmpl, missing ~/.config/garage/templates/btop-theme-line.tmpl, missing ~/.config/garage/templates/gtk3-palette-head.tmpl, missing ~/.config/garage/templates/gtk3-palette-token.tmpl, missing ~/.config/garage/templates/gtk4-palette-dark-token.tmpl, missing ~/.config/garage/templates/gtk4-palette-light-token.tmpl, missing ~/.config/garage/templates/gtk4-palette.tmpl, missing ~/.config/garage/templates/hypridle-base.tmpl, and 225 more\n                     -> garage update  (or ./bootstrap.sh, which backs up anything in the way)\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 14 units enabled and running\n  FAIL  plugins      kinetik-glass, hyprexpo not built for the running build v0.56.2\n                     -> ~/.config/hypr/scripts/garage-rebuild-plugins\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n2 problem(s) found.\n",
+  "stdout": "Garage doctor\n  checkout  $REPO\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  FAIL  stow links   1/239 paths link here; 238 problem(s): missing ~/.config/btop/btop.conf, missing ~/.config/fish/config.fish, missing ~/.config/garage/templates/btop-theme-head.tmpl, missing ~/.config/garage/templates/btop-theme-line.tmpl, missing ~/.config/garage/templates/gtk3-palette-head.tmpl, missing ~/.config/garage/templates/gtk3-palette-token.tmpl, missing ~/.config/garage/templates/gtk4-palette-dark-token.tmpl, missing ~/.config/garage/templates/gtk4-palette-light-token.tmpl, missing ~/.config/garage/templates/gtk4-palette.tmpl, missing ~/.config/garage/templates/hypridle-base.tmpl, and 228 more\n                     -> garage update  (or ./bootstrap.sh, which backs up anything in the way)\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 17 units enabled and running\n  FAIL  plugins      kinetik-glass, hyprexpo not built for the running build v0.56.2\n                     -> ~/.config/hypr/scripts/garage-rebuild-plugins\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n2 problem(s) found.\n",
   "trace": [
     "Hyprland --version",
     "pacman -Q stow hypridle hyprpaper waybar quickshell kitty fish adw-gtk-theme",
@@ -95,6 +95,11 @@
     "systemctl --user is-active garage-theme.timer",
     "systemctl --user is-enabled garage-night-shift.timer",
     "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-reconcile.path",
+    "systemctl --user is-active garage-reconcile.path",
+    "systemctl --user is-enabled garage-reconcile-stamp.path",
+    "systemctl --user is-active garage-reconcile-stamp.path",
+    "systemctl --user is-enabled garage-reconcile.service",
     "Hyprland --version",
     "hyprctl version"
   ]
