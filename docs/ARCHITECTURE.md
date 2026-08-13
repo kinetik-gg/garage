@@ -34,7 +34,12 @@ Displays pane's `display_finish()`, and `initialize_display_config()`, which see
 `display_snapshot()` on the first apply so a machine whose owner never opened the pane isn't left
 on the catch-all monitor rule — it never overwrites an existing file. Both serialize on
 `DISPLAY_LOCK` and share `normalize_display_layout()`/`layout_toml()`, so both write the same
-shape. Renderers read generated state and never write back upstream.
+shape. Renderers read layers 1 and 2 and write layer 3, never the reverse — with one exception, the
+workspace-block allocator: `render_workspaces()` reaches `save_workspace_blocks()` by way of
+`workspace_plan()` and `per_display_groups()`, so a pure `garage render` can write
+`workspace-blocks.toml`. The allocation has to survive the render that produced it — unremembered,
+it would be recomputed from the current display ordering, which is the bug §8's allocator row
+exists to prevent.
 
 ## 2. The apply-mechanism table
 
