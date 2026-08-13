@@ -75,6 +75,26 @@ pub enum ApplyError {
     #[error("{0}")]
     Io(String),
 
+    /// `SettingsError(...)` raised by one of the three plumbing commands -- `doctor`,
+    /// `repair`, `update`.
+    ///
+    /// The text is the whole contract, exactly as it is for the JSON envelope: the Python's
+    /// `main()` catches `(SettingsError, OSError, ValueError)` around those three and prints
+    /// `garage {command}: {error}` on stderr, so what carries is `str(error)` and nothing
+    /// about the type. Every message this variant holds is spelled out at the site that
+    /// raises it, because that is where the Python spells it.
+    #[error("{0}")]
+    Settings(String),
+
+    /// Layer 2 could not be read or written. `repair --reset` is the caller: its confirming
+    /// load and its `PrefLock` acquire both fail this way.
+    #[error(transparent)]
+    Prefs(#[from] garage_prefs::PrefsError),
+
+    /// `PREFERENCES_LOCK` could not be taken -- `repair --reset`'s one blocking acquire.
+    #[error(transparent)]
+    Lock(#[from] garage_prefs::LockError),
+
     /// A command that was supposed to move the session refused to.
     ///
     /// `run_or_raise()`'s `SettingsError(result.stderr.strip() or message)`: the command's own

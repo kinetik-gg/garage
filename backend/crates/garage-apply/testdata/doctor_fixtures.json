@@ -1,0 +1,3766 @@
+{
+ "stow_ignore": "RCS\n.+~\n\\.git\n\\.gitignore\n^/README.*\n^/\\.config/gtk-3\\.0/settings\\.ini$\n^/\\.config/rendered/.*$\n",
+ "managed": [
+  ".config/hypr/hyprland.conf",
+  ".config/kitty/kitty.conf",
+  ".local/bin/garage-helper",
+  "Wallpaper/default.png"
+ ],
+ "scenarios": [
+  {
+   "name": "healthy",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "stow-problems",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/gone-from-the-repo"
+    ],
+    ".local/bin/garage-helper": "a real file where a link belongs\n"
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  FAIL  stow links   1/4 paths link here; 3 problem(s): broken ~/.config/kitty/kitty.conf, not a link ~/.local/bin/garage-helper, missing ~/Wallpaper/default.png\n                     -> garage update  (or ./bootstrap.sh, which backs up anything in the way)\n  FAIL  dead links   1 link(s) point at deleted files: ~/.config/kitty/kitty.conf\n                     -> garage update  (sweeps them; a restow cannot)\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n2 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"FAIL\",\n      \"detail\": \"1/4 paths link here; 3 problem(s): broken ~/.config/kitty/kitty.conf, not a link ~/.local/bin/garage-helper, missing ~/Wallpaper/default.png\",\n      \"hint\": \"garage update  (or ./bootstrap.sh, which backs up anything in the way)\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"FAIL\",\n      \"detail\": \"1 link(s) point at deleted files: ~/.config/kitty/kitty.conf\",\n      \"hint\": \"garage update  (sweeps them; a restow cannot)\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "stow-other",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$OTHER/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$OTHER/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$OTHER/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$OTHER/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": true,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  note  stow links   4/4 paths link into another checkout ($OTHER) rather than this one\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"note\",\n      \"detail\": \"4/4 paths link into another checkout ($OTHER) rather than this one\",\n      \"hint\": \"garage update  (restows from this checkout)\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "dangling",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ],
+    ".config/gone.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/gone.conf"
+    ],
+    ".local/share/also-gone": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/share/also-gone"
+    ],
+    ".cache/not-scanned": [
+     "symlink",
+     "$CHECKOUT/desktop/.cache/nope"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  FAIL  dead links   2 link(s) point at deleted files: ~/.config/gone.conf, ~/.local/share/also-gone\n                     -> garage update  (sweeps them; a restow cannot)\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"FAIL\",\n      \"detail\": \"2 link(s) point at deleted files: ~/.config/gone.conf, ~/.local/share/also-gone\",\n      \"hint\": \"garage update  (sweeps them; a restow cannot)\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "missing-packages",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  FAIL  packages     not installed: kitty, fish\n                     -> sudo pacman -S --needed kitty fish\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"FAIL\",\n      \"detail\": \"not installed: kitty, fish\",\n      \"hint\": \"sudo pacman -S --needed kitty fish\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": null,\n    \"fish\": null,\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "old-hyprland",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.49.0 built from branch main at commit 0000000\nVersion ABI string: v0.49.0_0000000\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  FAIL  hyprland     0.49.0 is below the 0.56.0 support floor\n                     -> sudo pacman -Syu hyprland\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.49.0); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.49.0\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"FAIL\",\n      \"detail\": \"0.49.0 is below the 0.56.0 support floor\",\n      \"hint\": \"sudo pacman -Syu hyprland\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.49.0); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "no-hyprland",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     1,
+     ""
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  FAIL  hyprland     Hyprland is not installed, or does not report a version\n                     -> sudo pacman -S --needed hyprland\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      Hyprland reports no ABI string, so nothing can be compared\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"FAIL\",\n      \"detail\": \"Hyprland is not installed, or does not report a version\",\n      \"hint\": \"sudo pacman -S --needed hyprland\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"Hyprland reports no ABI string, so nothing can be compared\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "missing-fonts",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  FAIL  fonts        fontconfig cannot find: Geist Mono\n                     -> stow -R desktop && fc-cache -f\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"FAIL\",\n      \"detail\": \"fontconfig cannot find: Geist Mono\",\n      \"hint\": \"stow -R desktop && fc-cache -f\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "units-disabled",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "disabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  FAIL  units        not enabled: waybar.service\n                     -> systemctl --user enable waybar.service\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"FAIL\",\n      \"detail\": \"not enabled: waybar.service\",\n      \"hint\": \"systemctl --user enable waybar.service\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "units-stopped",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "inactive\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  FAIL  units        enabled but not running: hypridle.service\n                     -> systemctl --user status hypridle.service\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"FAIL\",\n      \"detail\": \"enabled but not running: hypridle.service\",\n      \"hint\": \"systemctl --user status hypridle.service\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "no-session",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     1,
+     ""
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "inactive\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  note  units        all 7 units enabled; no graphical session here, so nothing is expected to be running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  note  compositor   no compositor answers here (a TTY or SSH shell has no HYPRLAND_INSTANCE_SIGNATURE)\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"note\",\n      \"detail\": \"all 7 units enabled; no graphical session here, so nothing is expected to be running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"note\",\n      \"detail\": \"no compositor answers here (a TTY or SSH shell has no HYPRLAND_INSTANCE_SIGNATURE)\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "plugins-never-deployed",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "plugins-stale",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {
+    "v0.49.0_0000000/kinetik-glass-aaa.so": "",
+    "v0.49.0_0000000/hyprexpo-bbb.so": "",
+    "kinetik-glass.so": [
+     "symlink",
+     "$PLUGINS/v0.49.0_0000000/kinetik-glass-aaa.so"
+    ],
+    "hyprexpo.so": [
+     "symlink",
+     "$PLUGINS/v0.49.0_0000000/hyprexpo-bbb.so"
+    ]
+   },
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  FAIL  plugins      kinetik-glass, hyprexpo not built for the running build v0.56.2\n                     -> ~/.config/hypr/scripts/garage-rebuild-plugins\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"FAIL\",\n      \"detail\": \"kinetik-glass, hyprexpo not built for the running build v0.56.2\",\n      \"hint\": \"~/.config/hypr/scripts/garage-rebuild-plugins\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "plugins-current",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {
+    "v0.56.2_abcdef1/kinetik-glass-aaa.so": "",
+    "v0.56.2_abcdef1/hyprexpo-bbb.so": "",
+    "kinetik-glass.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/kinetik-glass-aaa.so"
+    ],
+    "hyprexpo.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/hyprexpo-bbb.so"
+    ]
+   },
+   "pins": "glass_pin=aaa\nhyprexpo_pin=bbb\n",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  ok    plugins      kinetik-glass, hyprexpo built for the running build v0.56.2\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"ok\",\n      \"detail\": \"kinetik-glass, hyprexpo built for the running build v0.56.2\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "plugins-behind",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {
+    "v0.56.2_abcdef1/kinetik-glass-aaa.so": "",
+    "v0.56.2_abcdef1/hyprexpo-bbb.so": "",
+    "kinetik-glass.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/kinetik-glass-aaa.so"
+    ],
+    "hyprexpo.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/hyprexpo-bbb.so"
+    ]
+   },
+   "pins": "glass_pin=\"zzz\"\nhyprexpo_pin=bbb\n",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  FAIL  plugins      kinetik-glass deployed at a different commit than system/plugin-pins names\n                     -> ~/.config/hypr/scripts/garage-rebuild-plugins\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"FAIL\",\n      \"detail\": \"kinetik-glass deployed at a different commit than system/plugin-pins names\",\n      \"hint\": \"~/.config/hypr/scripts/garage-rebuild-plugins\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "fragments-present",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {
+    "hyprland.lua": "return {}\n",
+    "region.lua": "return {}\n"
+   },
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  ok    fragments    2 Lua fragment(s) parse\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "luac -p $HOME/.local/state/garage/generated/hyprland.lua",
+    "luac -p $HOME/.local/state/garage/generated/region.lua",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"ok\",\n      \"detail\": \"2 Lua fragment(s) parse\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "luac -p $HOME/.local/state/garage/generated/hyprland.lua",
+    "luac -p $HOME/.local/state/garage/generated/region.lua",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "fragments-broken",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {
+    "hyprland.lua": "return {}\n",
+    "broken.lua": "this is not lua\n"
+   },
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [
+    "broken.lua"
+   ],
+   "lines_status": 1,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  FAIL  fragments    will not parse: broken.lua\n                     -> garage render  (rewrites every fragment from your preferences)\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\n1 problem(s) found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "luac -p $HOME/.local/state/garage/generated/broken.lua",
+    "luac -p $HOME/.local/state/garage/generated/hyprland.lua",
+    "hyprctl version"
+   ],
+   "report_status": 1,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"FAIL\",\n      \"detail\": \"will not parse: broken.lua\",\n      \"hint\": \"garage render  (rewrites every fragment from your preferences)\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "luac -p $HOME/.local/state/garage/generated/broken.lua",
+    "luac -p $HOME/.local/state/garage/generated/hyprland.lua",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "fragments-no-luac",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {
+    "hyprland.lua": "return {}\n"
+   },
+   "preferences": "",
+   "binaries": [
+    "fc-list"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    1 fragment(s) present; luac is not installed to check them\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"1 fragment(s) present; luac is not installed to check them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "no-fontconfig",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  note  fonts        fontconfig is not installed, so nothing can be checked\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"note\",\n      \"detail\": \"fontconfig is not installed, so nothing can be checked\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "coerced-preferences",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "[schema]\npreferences_version = 5\n\n[appearance]\ncorner_radius = \"gigantic\"\n",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     0,
+     "c0ffee\n"
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  note  preferences  loads, with 1 note(s): appearance.corner_radius 'gigantic' is not valid, using 'normal'\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"c0ffee\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"note\",\n      \"detail\": \"loads, with 1 note(s): appearance.corner_radius 'gigantic' is not valid, using 'normal'\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [\n    \"appearance.corner_radius 'gigantic' is not valid, using 'normal'\"\n  ],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  },
+  {
+   "name": "no-commit",
+   "manifest": {
+    "packages.list": "quickshell critical\nwaybar critical\nhypridle critical\nhyprpaper critical\nkitty critical\nfish critical\nstow critical\nadw-gtk-theme critical\n",
+    "units.list": "waybar.service running\nhypridle.service running\nhyprpaper.service running\ngarage-shell.service running\ngarage-theme.timer running\ngarage-night-shift.timer running\ngarage-plugins-check.service oneshot\n",
+    "fonts.list": "Plus Jakarta Sans\nGeist Mono\n"
+   },
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".config/kitty/kitty.conf": "# kitty\n",
+    ".config/gtk-3.0/settings.ini": "# excluded by an anchored pattern\n",
+    ".config/rendered/theme.css": "# excluded, whole directory\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n",
+    "Wallpaper/default.png": "not really a png\n",
+    "README.md": "# excluded, anchored\n",
+    "notes.txt~": "# excluded by name\n"
+   },
+   "managed_home": {
+    ".config/hypr/hyprland.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/hypr/hyprland.conf"
+    ],
+    ".config/kitty/kitty.conf": [
+     "symlink",
+     "$CHECKOUT/desktop/.config/kitty/kitty.conf"
+    ],
+    ".local/bin/garage-helper": [
+     "symlink",
+     "$CHECKOUT/desktop/.local/bin/garage-helper"
+    ],
+    "Wallpaper/default.png": [
+     "symlink",
+     "$CHECKOUT/desktop/Wallpaper/default.png"
+    ]
+   },
+   "plugins": {},
+   "pins": "",
+   "fragments": {},
+   "preferences": "",
+   "binaries": [
+    "fc-list",
+    "luac"
+   ],
+   "other_checkout": false,
+   "answers": {
+    "Hyprland --version": [
+     0,
+     "Hyprland 0.56.2 built from branch main at commit abcdef1\nDate: Mon Jan 5 12:00:00 2026\nTag: v0.56.2, commits: 1234\n\nVersion ABI string: v0.56.2_abcdef1\n"
+    ],
+    "fc-list : family": [
+     0,
+     "Plus Jakarta Sans,Plus Jakarta Sans Regular\nGeist Mono,Geist Mono Regular\n"
+    ],
+    "git rev-parse HEAD": [
+     128,
+     ""
+    ],
+    "hyprctl version": [
+     0,
+     "Hyprland\n"
+    ],
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme": [
+     0,
+     "quickshell 1.0.0-1\nwaybar 1.0.0-1\nhypridle 1.0.0-1\nhyprpaper 1.0.0-1\nkitty 1.0.0-1\nfish 1.0.0-1\nstow 1.0.0-1\nadw-gtk-theme 1.0.0-1\n"
+    ],
+    "systemctl --user is-active garage-night-shift.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-plugins-check.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-shell.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active garage-theme.timer": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active graphical-session.target": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hypridle.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active hyprpaper.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-active waybar.service": [
+     0,
+     "active\n"
+    ],
+    "systemctl --user is-enabled garage-night-shift.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-plugins-check.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-shell.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled garage-theme.timer": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hypridle.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled hyprpaper.service": [
+     0,
+     "enabled\n"
+    ],
+    "systemctl --user is-enabled waybar.service": [
+     0,
+     "enabled\n"
+    ]
+   },
+   "luac_bad": [],
+   "lines_status": 0,
+   "lines_stdout": "Garage doctor\n  checkout  $CHECKOUT\n  home      $HOME\n\n  ok    hyprland     0.56.2 (floor 0.56.0)\n  ok    packages     all 8 key packages installed\n  ok    fonts        Plus Jakarta Sans, Geist Mono present\n  ok    stow links   4 managed paths resolve into this checkout\n  ok    dead links   no links point at files this checkout no longer has\n  ok    units        all 7 units enabled and running\n  note  plugins      no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\n  note  fragments    ~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\n  ok    preferences  loads with every value in range\n  ok    compositor   hyprctl reaches the running compositor\n\nNo problems found.\n",
+   "lines_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version"
+   ],
+   "report_status": 0,
+   "report_stdout": "{\n  \"generated_at\": \"$NOW\",\n  \"garage_commit\": \"\",\n  \"hyprland_version\": \"0.56.2\",\n  \"checks\": [\n    {\n      \"name\": \"hyprland\",\n      \"status\": \"ok\",\n      \"detail\": \"0.56.2 (floor 0.56.0)\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"packages\",\n      \"status\": \"ok\",\n      \"detail\": \"all 8 key packages installed\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fonts\",\n      \"status\": \"ok\",\n      \"detail\": \"Plus Jakarta Sans, Geist Mono present\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"stow links\",\n      \"status\": \"ok\",\n      \"detail\": \"4 managed paths resolve into this checkout\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"dead links\",\n      \"status\": \"ok\",\n      \"detail\": \"no links point at files this checkout no longer has\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"units\",\n      \"status\": \"ok\",\n      \"detail\": \"all 7 units enabled and running\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"plugins\",\n      \"status\": \"note\",\n      \"detail\": \"no plugins have ever been deployed here (running build v0.56.2); the desktop runs without them\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"fragments\",\n      \"status\": \"note\",\n      \"detail\": \"~/.local/state/garage/generated does not exist yet; nothing has rendered on this machine\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"preferences\",\n      \"status\": \"ok\",\n      \"detail\": \"loads with every value in range\",\n      \"hint\": \"\"\n    },\n    {\n      \"name\": \"compositor\",\n      \"status\": \"ok\",\n      \"detail\": \"hyprctl reaches the running compositor\",\n      \"hint\": \"\"\n    }\n  ],\n  \"preferences_notes\": [],\n  \"packages\": {\n    \"quickshell\": \"1.0.0-1\",\n    \"waybar\": \"1.0.0-1\",\n    \"hypridle\": \"1.0.0-1\",\n    \"hyprpaper\": \"1.0.0-1\",\n    \"kitty\": \"1.0.0-1\",\n    \"fish\": \"1.0.0-1\",\n    \"stow\": \"1.0.0-1\",\n    \"adw-gtk-theme\": \"1.0.0-1\"\n  }\n}\n",
+   "report_trace": [
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme",
+    "fc-list : family",
+    "systemctl --user is-active graphical-session.target",
+    "systemctl --user is-enabled waybar.service",
+    "systemctl --user is-active waybar.service",
+    "systemctl --user is-enabled hypridle.service",
+    "systemctl --user is-active hypridle.service",
+    "systemctl --user is-enabled hyprpaper.service",
+    "systemctl --user is-active hyprpaper.service",
+    "systemctl --user is-enabled garage-shell.service",
+    "systemctl --user is-active garage-shell.service",
+    "systemctl --user is-enabled garage-theme.timer",
+    "systemctl --user is-active garage-theme.timer",
+    "systemctl --user is-enabled garage-night-shift.timer",
+    "systemctl --user is-active garage-night-shift.timer",
+    "systemctl --user is-enabled garage-plugins-check.service",
+    "Hyprland --version",
+    "hyprctl version",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version",
+    "pacman -Q quickshell waybar hypridle hyprpaper kitty fish stow adw-gtk-theme"
+   ]
+  }
+ ]
+}

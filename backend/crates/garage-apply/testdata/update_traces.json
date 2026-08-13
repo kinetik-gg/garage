@@ -1,0 +1,622 @@
+{
+ "scenarios": [
+  {
+   "name": "dry-run-no-upstream",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-not-a-git-checkout",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": false,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    not a git checkout, so there is nothing to pull.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-up-to-date",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {
+    "log --oneline HEAD..origin/main": [
+     0,
+     ""
+    ],
+    "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": [
+     0,
+     "origin/main\n"
+    ]
+   },
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    upstream  origin/main\n    already up to date with origin/main.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT fetch --quiet",
+    "git -C $CHECKOUT log --oneline HEAD..origin/main",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-would-fast-forward",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {
+    "log --oneline HEAD..origin/main": [
+     0,
+     "aaa1111 first\nbbb2222 second\n"
+    ],
+    "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": [
+     0,
+     "origin/main\n"
+    ]
+   },
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    upstream  origin/main\n    [dry-run] would fast-forward 2 commit(s):\n          aaa1111 first\n          bbb2222 second\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT fetch --quiet",
+    "git -C $CHECKOUT log --oneline HEAD..origin/main",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-fetch-fails",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {
+    "fetch --quiet": [
+     1,
+     ""
+    ],
+    "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": [
+     0,
+     "origin/main\n"
+    ]
+   },
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    upstream  origin/main\n    could not fetch from origin; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT fetch --quiet",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-dangling-links",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {
+    ".config/gone.conf": "$CHECKOUT/desktop/.config/gone.conf",
+    ".local/share/also-gone": "$CHECKOUT/desktop/.local/share/also-gone"
+   },
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    [dry-run] remove ~/.config/gone.conf -> $CHECKOUT/desktop/.config/gone.conf\n    [dry-run] remove ~/.local/share/also-gone -> $CHECKOUT/desktop/.local/share/also-gone\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/gone.conf",
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-other-checkout",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": true,
+   "links": "other",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    this home is linked to another checkout; re-pointing it here.\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    Hyprland reports no ABI string; skipping.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": "1"
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-plugins-stale",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {
+    "v0.49.0_0000000/kinetik-glass-aaa.so": "",
+    "v0.49.0_0000000/hyprexpo-bbb.so": "",
+    "kinetik-glass.so": [
+     "symlink",
+     "$PLUGINS/v0.49.0_0000000/kinetik-glass-aaa.so"
+    ],
+    "hyprexpo.so": [
+     "symlink",
+     "$PLUGINS/v0.49.0_0000000/hyprexpo-bbb.so"
+    ]
+   },
+   "pins": "",
+   "git": {},
+   "hyprland": "Hyprland 0.56.2 built from branch main at commit abcdef1\nVersion ABI string: v0.56.2_abcdef1\n",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    redeploy needed (not built for the running build: kinetik-glass, hyprexpo).\n    [dry-run] run $CHECKOUT/desktop/.config/hypr/scripts/garage-rebuild-plugins\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-plugins-in-step",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {
+    "v0.56.2_abcdef1/kinetik-glass-aaa.so": "",
+    "v0.56.2_abcdef1/hyprexpo-bbb.so": "",
+    "kinetik-glass.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/kinetik-glass-aaa.so"
+    ],
+    "hyprexpo.so": [
+     "symlink",
+     "$PLUGINS/v0.56.2_abcdef1/hyprexpo-bbb.so"
+    ]
+   },
+   "pins": "glass_pin=aaa\nhyprexpo_pin=bbb\n",
+   "git": {},
+   "hyprland": "Hyprland 0.56.2 built from branch main at commit abcdef1\nVersion ABI string: v0.56.2_abcdef1\n",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": 0,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\n==> Rendering the generated state\n    [dry-run] would load the preferences (running any schema migration) and render\n\n==> Checking the Hyprland plugin ABI\n    kinetik-glass, hyprexpo are in step with the running build v0.56.2; skipping the rebuild.\n\n==> Reloading Hyprland\n    [dry-run] would run hyprctl reload\n\nDry run complete. Nothing above was changed.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD",
+    "Hyprland --version"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-bootstrap-fails",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 3,
+   "status": 1,
+   "error": "",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n    running $CHECKOUT/bootstrap.sh --dry-run\n\ngarage update: bootstrap.sh exited 3; stopping here rather than reloading a half-converged desktop.\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD"
+   ],
+   "streamed": [
+    {
+     "command": [
+      "$CHECKOUT/bootstrap.sh",
+      "--dry-run"
+     ],
+     "cwd": "$CHECKOUT",
+     "skip_plugin_deploy": "1",
+     "force": ""
+    }
+   ],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "dry-run-no-bootstrap-script",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": true,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": null,
+   "error": "$CHECKOUT/bootstrap.sh is missing; this checkout cannot converge itself",
+   "stdout": "Garage update (dry run: nothing will be changed)\n    checkout  $CHECKOUT\n    home      $HOME\n\n==> Updating the checkout\n    no upstream configured, skipping pull; continuing with the local tree.\n\n==> Sweeping links to files this checkout no longer ships\n    none found.\n\n==> Converging this machine on the checkout\n",
+   "trace": [
+    "git -C $CHECKOUT rev-parse HEAD",
+    "git -C $CHECKOUT rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git -C $CHECKOUT rev-parse HEAD"
+   ],
+   "streamed": [],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  },
+  {
+   "name": "bad-argument",
+   "argv": [
+    "--dryrun"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": null,
+   "error": "Usage: garage update [--dry-run]  (unexpected: --dryrun)",
+   "stdout": "",
+   "trace": [],
+   "streamed": [],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ]
+  }
+ ]
+}

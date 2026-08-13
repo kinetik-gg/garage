@@ -778,10 +778,80 @@ FILES: tuple[Scenario, ...] = ()
 # Grown from tests/test_files.py, tests/test_file_index.py and
 # tests/test_launcher.py: the default-application roles and the mime writes.
 
-DOCTOR: tuple[Scenario, ...] = ()
-# Grown from tests/test_manifest.py and tests/test_docs.py: doctor, repair and
-# update -- the three commands that print human lines instead of the JSON
-# envelope, so their stdout is compared verbatim.
+# ---------------------------------------------------------------------------
+# doctor: the three commands that print lines for a person
+# ---------------------------------------------------------------------------
+# Grown from tests/test_recovery.py, tests/test_manifest.py and tests/test_docs.py.
+# Their stdout is compared verbatim, which is the whole point of the family: these
+# are the only commands whose output a person reads.
+#
+# WHAT IS DELIBERATELY NOT HERE, and it is three things rather than an oversight:
+#
+#   * `doctor --report`. Its first field is `generated_at`, a wall-clock stamp, so
+#     two runs of the *same* backend disagree and the harness's determinism check
+#     fails before any parity verdict is reached. The JSON surface is pinned
+#     instead by backend/crates/garage-apply/src/doctor/parity.rs, which compares
+#     it byte for byte against the Python's own output with the clock blanked.
+#   * `repair` against a file that exists. The transcript carries that file's
+#     mtime, which is the moment the harness planted it -- the same problem. The
+#     fresh-install cases below have no file and therefore no timestamp, and the
+#     full transcript corpus (broken file, --reset, the backup-collision naming)
+#     lives in garage-apply's repair fixtures.
+#   * `update` in any form that gets past argument parsing. It hands the terminal
+#     to bootstrap.sh even under --dry-run -- bootstrap has its own --dry-run and
+#     its answer is the authoritative one -- and running the real bootstrap.sh
+#     against a scratch $HOME is exactly what a differential harness must not do.
+#     Its traces are pinned by garage-apply's update fixtures, against a fake
+#     runner.
+
+DOCTOR = (
+    Scenario(
+        name="doctor-healthy",
+        argv=("doctor",),
+        fixtures="doctor-healthy",
+        # The aligned transcript, and the exit status that answers "is this
+        # install healthy". The scratch $HOME has none of the checkout's managed
+        # paths in it, so `stow links` and `dead links` are the real work here:
+        # both backends walk the *repository's* desktop/ tree (checkout_root() is
+        # resolved from the running binary, and both binaries sit three levels
+        # inside this checkout), classify every managed path as missing, and have
+        # to agree on which ten of them are shown and how many are counted.
+    ),
+    Scenario(
+        name="doctor-unknown-argument",
+        argv=("doctor", "--repot"),
+        # The catch tier: `garage doctor: {error}` on stderr, exit 1, and nothing
+        # on stdout. The one refusal shape all three plumbing commands share.
+    ),
+    Scenario(
+        name="repair-fresh-install",
+        argv=("repair",),
+        # No preferences.toml at all, which is why this case and not a broken one:
+        # the "does not exist" branch prints no size and no mtime, so the whole
+        # transcript is a function of the build rather than of the clock.
+    ),
+    Scenario(
+        name="repair-reset-fresh-install",
+        argv=("repair", "--reset"),
+        # "backup none needed; there was no file to keep", then the stamp-only
+        # file. The digest surface is what proves the two backends wrote the same
+        # factory state -- under the deltas model that is a file with the schema
+        # stamp and nothing else.
+    ),
+    Scenario(
+        name="repair-unknown-argument",
+        argv=("repair", "--rest"),
+        # Refused before the lock is taken and before anything is backed up,
+        # which is what test_recovery.py's own version of this asserts.
+    ),
+    Scenario(
+        name="update-unknown-argument",
+        argv=("update", "--dryrun"),
+        # The only `update` case that can be run here at all: argument parsing
+        # happens before checkout_root(), before the sweep and long before
+        # bootstrap.sh. See the note above.
+    ),
+)
 
 
 FAMILIES = (
@@ -833,11 +903,15 @@ FAMILIES = (
                 "garage-render and the transaction, the geometry check, the snapshot and the "
                 "seeding into garage-apply, and wired all four commands in the CLI.",
            scenarios=DISPLAYS),
-
     Family(name="files", active=False,
            note="default applications and mime; from test_files.py",
            scenarios=FILES),
-    Family(name="doctor", active=False,
-           note="human-line commands; from test_manifest.py, test_docs.py",
+    Family(name="doctor", active=True,
+           note="`garage doctor`, `garage repair` and `garage update`; tasks 3.12-3.14 "
+                "ported all three and wired them to the CLI's plain-command arms. Active "
+                "with two written-down deviations, both of them the same deliberate "
+                "departure: the Rust doctor reads system/manifest/*.list at runtime where "
+                "the Python names its own DOCTOR_* tuples, and the file is the wider of "
+                "the two. From test_recovery.py, test_manifest.py, test_docs.py.",
            scenarios=DOCTOR),
 )

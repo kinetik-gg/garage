@@ -29,7 +29,7 @@ mod display_parity_tests;
 #[cfg(test)]
 mod display_trace_tests;
 pub mod displays;
-mod doctor;
+pub mod doctor;
 pub mod error;
 mod eval;
 mod file_index;
@@ -39,16 +39,21 @@ mod locale;
 mod motion;
 mod night_shift;
 mod region;
-mod repair;
+pub mod repair;
+#[cfg(test)]
+mod repair_transcripts;
 pub mod route;
 mod snapshot;
 mod terminal;
 mod theme;
-mod update;
+pub mod update;
 mod wallpaper;
 #[cfg(test)]
 mod workspace_trace_tests;
 mod workspaces;
 
 pub use cx::SessionCx;
+pub use doctor::doctor;
 pub use error::ApplyError;
+pub use repair::repair;
+pub use update::update;

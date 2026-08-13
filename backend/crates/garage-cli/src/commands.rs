@@ -39,6 +39,7 @@
 //! nothing here changes when it does.
 
 use garage_apply::keybind::load_keybindings;
+use garage_apply::{doctor, repair, update};
 use garage_core::paths::Paths;
 use garage_core::schema::RenderStep;
 use garage_prefs::{load_preferences, migrate_config_root};
@@ -85,7 +86,7 @@ pub(crate) fn run(argv: &[String]) -> u8 {
     }
     let paths = Paths::from_env();
     if PLAIN_COMMANDS.contains(&command) {
-        return plain(&paths, command);
+        return plain(&paths, command, argv);
     }
     match settings(&paths, command, argv) {
         Ok(Emitted::Envelope(data)) => {
@@ -103,16 +104,32 @@ pub(crate) fn run(argv: &[String]) -> u8 {
 /// `doctor`, `repair`, `update`: lines for a person, failures on stderr, `garage {command}:
 /// {error}`.
 ///
-/// TEMPORARY, and only the message is: the branch, the `migrate_config_root()` that precedes
-/// it and the stderr-and-exit-1 shape are the Python's and stay. `doctor` lands in task
-/// 3.12, `repair` in 3.13 and `update` in 3.14, and each replaces exactly the one line below.
-fn plain(paths: &Paths, command: &str) -> u8 {
-    if let Err(error) = migrate_config_root(paths) {
-        eprintln!("garage {command}: {error}");
-        return 1;
+/// The Python's own branch, down to the catch tier: `migrate_config_root()` runs first and
+/// its failure is reported the same way the command's own is, because both are inside the one
+/// `try` that prints `garage {command}: {error}` and returns 1. Everything these three print
+/// on the way to succeeding has already gone to stdout by then -- they are commands that
+/// print as they go, not commands that assemble an answer -- so a failure late in `update`
+/// leaves the transcript above it on screen, which is the point.
+fn plain(paths: &Paths, command: &str, argv: &[String]) -> u8 {
+    let arguments: &[String] = argv.get(2..).unwrap_or_default();
+    let outcome = migrate_config_root(paths)
+        .map_err(CliError::from)
+        .and_then(|()| match command {
+            "doctor" => Ok(doctor(paths, &System, arguments)?),
+            "repair" => Ok(repair(paths, arguments)?),
+            "update" => Ok(update(paths, &System, arguments)?),
+            // Unreachable: `run()` only calls this for a name in `PLAIN_COMMANDS`, and this
+            // match covers all three. Answered rather than panicked for the same reason the
+            // workspace denies `panic!`.
+            other => Err(CliError::UnknownCommand(other.to_owned())),
+        });
+    match outcome {
+        Ok(status) => u8::try_from(status).unwrap_or(1),
+        Err(error) => {
+            eprintln!("garage {command}: {error}");
+            1
+        }
     }
-    eprintln!("garage {command}: not yet ported");
-    1
 }
 
 /// The settings backend: one JSON object out, or one error in the same envelope.

@@ -31,3 +31,13 @@ reason   = "render_general() in the Rust port writes the launcher and terminal m
 surface  = "digest"
 scenario = "render-all-empty"
 reason   = "Same root cause as this scenario's trace deviation: render_general() does not write generated/browser, because computing its contents needs the subprocess-backed browser_command() a renderer cannot run. Every other generated file matches."
+
+[[deviation]]
+surface  = "stdout"
+scenario = "doctor-healthy"
+reason   = "Task 3.12's steering requirement: the Rust doctor reads system/manifest/{packages,units,fonts}.list at runtime through garage_core::manifest, where the Python names its own DOCTOR_PACKAGES / DOCTOR_UNITS / DOCTOR_FONTS tuples in the source. tests/test_manifest.py pins the two *sets* together for the parity window, so the packages and fonts lines agree; the units line does not, and cannot, because units.list is the full set bootstrap.sh enables (14 today) while DOCTOR_UNITS is the subset the Python happens to name (7). units.list's own header is what settles which is right -- 'bootstrap.sh enables every line here; garage doctor checks them' -- so the Python prints 'all 7 units enabled and running' and the port prints 'all 14'. This entry retires with the DOCTOR_* constants in Phase 4, which is what test_manifest.py says it exists to guard until."
+
+[[deviation]]
+surface  = "trace"
+scenario = "doctor-healthy"
+reason   = "The same runtime-manifest reading, seen from the process boundary, and in two places. (1) `pacman -Q` is passed the critical-flagged names in packages.list order, which groups by function (stow, hypridle, hyprpaper, waybar, quickshell, kitty, fish, adw-gtk-theme), where the Python passes DOCTOR_PACKAGES' own order (quickshell, waybar, hypridle, hyprpaper, kitty, fish, stow, adw-gtk-theme). Same eight names, same one call, same answer parsed out of it -- test_manifest.py's test_critical_flags_match_doctor_packages pins the sets equal -- and pacman does not care about the order of its arguments. (2) check_units asks systemctl about all fourteen units in units.list rather than the seven in DOCTOR_UNITS, which is the same widening the stdout entry above describes. Both retire in Phase 4."
