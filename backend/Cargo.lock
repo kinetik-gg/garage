@@ -96,6 +96,7 @@ dependencies = [
  "garage-proc",
  "garage-render",
  "rustix",
+ "serde",
  "serde_json",
  "thiserror",
  "toml",

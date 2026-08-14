@@ -14,6 +14,7 @@ garage-core = { path = "../garage-core" }
 garage-prefs = { path = "../garage-prefs" }
 garage-proc = { path = "../garage-proc" }
 garage-render = { path = "../garage-render" }
+serde = { version = "1.0.229", features = ["derive"] }
 # `hyprctl clients -j` and `hyprctl monitors -j` are read straight from the appliers that
 # need them, through the local `json_command()` equivalent in `crate::workspaces` -- see that
 # module's doc for why the conflate-every-failure-to-empty reading belongs there rather than

@@ -26,6 +26,10 @@ fn defaults_fall_back_to_the_xdg_base_directories() {
         PathBuf::from("/home/tester/.local/state/garage/generated")
     );
     assert_eq!(
+        paths.migrations,
+        PathBuf::from("/home/tester/.local/state/garage/migrations.json")
+    );
+    assert_eq!(
         paths.host.preferences,
         PathBuf::from("/home/tester/.config/garage/preferences.toml")
     );

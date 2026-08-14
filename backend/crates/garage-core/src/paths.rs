@@ -15,14 +15,15 @@ use std::path::{Path, PathBuf};
 /// 2. Host preferences -- [`Paths::root`], the only user-owned files on the machine: the
 ///    four in [`HostFiles`], each holding the deliberate departures from layer 1 and
 ///    nothing else. Back these up and the desktop comes back.
-/// 3. Generated state -- [`Paths::state_root`], machine-written and deletable. Every
-///    fragment under it is rewritten from layers 1 and 2 by `garage render`, so losing
-///    the whole directory costs one render and no settings.
+/// 3. Machine state -- [`Paths::state_root`], written only by Garage. Its
+///    [`Paths::generated`] subtree is a deletable cache reconstructed from layers 1 and 2;
+///    sibling transaction records, ledgers, and migration stamps carry authority that a
+///    render cannot reconstruct and are deliberately kept outside that subtree.
 ///
 /// Kept apart because they have different lifetimes: layer 1 moves with the checkout,
-/// layer 2 must survive a reinstall, and layer 3 is a cache that has to be safe to throw
-/// away. Generated output used to sit inside layer 2, where deleting the cache meant
-/// deleting the user's settings beside it.
+/// layer 2 must survive a reinstall, and layer 3 belongs to the machine. Generated output
+/// used to sit inside layer 2, where deleting that cache meant deleting the user's settings
+/// beside it; now only its named [`Paths::generated`] subtree promises reconstruction.
 ///
 /// Building one is path arithmetic and nothing else. No directory is created, no file is
 /// opened, and no environment variable is written back, so a process that only wants to
@@ -37,7 +38,8 @@ pub struct Paths {
     pub state_home: PathBuf,
     /// Layer 2's directory.
     pub root: PathBuf,
-    /// Layer 3's directory.
+    /// Layer 3's directory. Only [`Paths::generated`] is a throw-away cache; the sibling
+    /// ledgers and stamps describe machine work that has already happened.
     pub state_root: PathBuf,
     /// Where layer 3's fragments are written, under [`Paths::state_root`].
     pub generated: PathBuf,
@@ -54,6 +56,10 @@ pub struct Paths {
     /// A display layout that has been applied and is waiting to be confirmed or rolled
     /// back, under [`Paths::state_root`].
     pub pending_display: PathBuf,
+    /// The durable record of one-way machine migrations, under [`Paths::state_root`].
+    /// Deleting it would make already-completed transformations eligible to replay, so it
+    /// is not part of the deletable [`Paths::generated`] cache.
+    pub migrations: PathBuf,
     /// The wallpaper directory and the link the compositor reads.
     pub wallpaper: Wallpaper,
     /// The toolkit configs a theme switch has to rewrite in full.
@@ -109,6 +115,7 @@ impl Paths {
             markers: Markers::new(&generated),
             locks: Locks::new(&state_root),
             pending_display: state_root.join("display-pending.json"),
+            migrations: state_root.join("migrations.json"),
             wallpaper: Wallpaper::new(&home),
             toolkit: Toolkit::new(&config_home),
             mimeapps_override: config_home.join(mimeapps_name(env)),

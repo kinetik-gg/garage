@@ -37,6 +37,7 @@ mod file_index;
 mod glass;
 pub mod keybind;
 mod locale;
+pub mod migrations;
 mod motion;
 pub mod night_shift;
 mod region;
