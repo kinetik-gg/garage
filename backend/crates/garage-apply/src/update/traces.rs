@@ -1,10 +1,8 @@
-//! `update`'s six steps, as traces: what it ran, in what order, and what it printed.
+//! `update`'s seven steps, as traces: what it ran, in what order, and what it printed.
 //!
-//! `testdata/update_traces.json` is the output of a throwaway generator (not committed --
-//! the same arrangement `doctor::parity` and `repair::tests::transcripts` use). Trace tests
-//! only, and deliberately: `update` hands the terminal to `bootstrap.sh` even in a dry run
-//! -- bootstrap has its own `--dry-run` and its answer is the authoritative one -- so
-//! nothing here may reach a real git or a real bootstrap. Both are faked on both sides.
+//! `testdata/update_traces.json` comes from a throwaway generator, as do the other trace
+//! fixtures. Git and bootstrap are faked: update streams bootstrap even in a dry run, so a
+//! trace test must never reach either real boundary.
 //!
 //! What is compared: the transcript, the exit status or the refusal message, every
 //! captured command in order, and the streamed call -- its argv, its working directory,
@@ -24,8 +22,9 @@ use serde_json::Value;
 use crate::doctor::DoctorCx;
 
 use super::lock::UpdateLock;
+use super::space::FixedSpace;
 use super::transcript::{binary_build, Report};
-use super::{run_steps, update_at};
+use super::{run_steps, update_at, UpdateRun};
 
 const TRACES: &str = include_str!("../../testdata/update_traces.json");
 static ENVIRONMENT: Mutex<()> = Mutex::new(());
@@ -297,6 +296,10 @@ fn number(scenario: &Value, key: &str) -> i32 {
         .unwrap_or(0)
 }
 
+fn space_for(scenario: &Value) -> FixedSpace {
+    FixedSpace::gib(scenario["space_gib"].as_u64().unwrap_or(6))
+}
+
 /// One at a time, and not in parallel with anything else in this module: the two
 /// environment variables `update` sets around the streamed call are process-global, so two
 /// of these running at once would read each other's.
@@ -330,8 +333,11 @@ fn check(scenario: &Value) {
         &paths,
         &runner,
         &argv,
-        Some(world.checkout.clone()),
-        Some(&mut out),
+        UpdateRun {
+            root: Some(world.checkout.clone()),
+            captured: Some(&mut out),
+            space: &space_for(scenario),
+        },
     );
     if argv.iter().any(|argument| argument == "--dry-run") {
         assert!(
@@ -374,7 +380,7 @@ fn a_real_scratch_run_persists_the_header_and_complete_parent_report() {
     let cx = DoctorCx::at(&paths, &runner, world.checkout.clone());
     let mut report = Report::new(false, true);
 
-    let status = run_steps(&cx, &mut report, false).expect("scratch update");
+    let status = run_steps(&cx, &mut report, false, &space_for(&scenario)).expect("scratch update");
     assert_eq!(status, 0);
     let captured = report.captured().expect("captured report");
     assert_real_transcript(captured, &paths);

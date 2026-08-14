@@ -1,11 +1,12 @@
-//! `garage update`: pull, sweep dead links, then delegate to `bootstrap.sh`.
+//! `garage update`: pull, check upgrade space, sweep dead links, then delegate to
+//! `bootstrap.sh`.
 //!
 //! # The delegate-to-bootstrap banner
 //!
-//! Design: pull, sweep, then delegate. Not a native reimplementation, and the choice is not
-//! close. What an update has to do on rolling Arch is make this machine match the checkout
-//! again: install packages the list has gained, enable units it has gained, write per-user
-//! files that are new, put every link back, and leave the user's own files alone.
+//! Design: pull, check upgrade space, sweep, then delegate. Not a native reimplementation,
+//! and the choice is not close. What an update has to do on rolling Arch is make this machine
+//! match the checkout again: install packages the list has gained, enable units it has gained,
+//! write per-user files that are new, put every link back, and leave the user's own files alone.
 //! `bootstrap.sh` already does all of that, idempotently and by design -- its freshness gate
 //! short-circuits on an install it can already see, packages go in with `--needed`,
 //! `systemctl enable` is bookkeeping, generated files are written only when absent, and every
@@ -42,13 +43,13 @@
 //! refusals it treats as notes rather than failures, and the `git_output()` wrapper
 //! `doctor`'s `checkout_commit()` shares with it.
 //!
-//! Step 4 is the one step that both renders and pushes: the Python loads the preferences
+//! Step 5 is the one step that both renders and pushes: the Python loads the preferences
 //! (which runs any schema migration a pull brought in), renders everything, and then calls
 //! `push_accent()`, `push_corner_radius()` and `push_theme()` -- "the toolkit configs it just
 //! rewrote are half a theme until the portal setting, xsettingsd and the two signalled
 //! clients agree with them". Not `apply_preferences()`, which would additionally seed
 //! `displays.toml`, dress the wallpaper and restart `hypridle`: the compositor's own reload is
-//! step 6, which knows how to skip a TTY, and an update is a convergence rather than a session
+//! step 7, which knows how to skip a TTY, and an update is a convergence rather than a session
 //! start. `--dry-run` reaches none of it.
 
 use std::ffi::OsString;
@@ -74,6 +75,7 @@ use crate::theme::push_theme;
 
 mod lock;
 mod pull;
+mod space;
 #[cfg(test)]
 mod traces;
 mod transcript;
@@ -82,6 +84,7 @@ use lock::UpdateLock;
 pub use lock::UpdateLockError;
 pub(crate) use pull::git_output;
 use pull::pull_checkout;
+use space::{SpaceProbe, SystemSpace};
 use transcript::Report;
 
 /// `garage update [--dry-run]`.
@@ -89,27 +92,32 @@ use transcript::Report;
 /// # Errors
 ///
 /// [`ApplyError::UpdateLock`] if another update is running or the lock cannot be prepared;
-/// [`ApplyError::Io`] if a real run's private transcript cannot be created or flushed;
+/// [`ApplyError::Io`] if free space cannot be inspected or a real run's private transcript
+/// cannot be created or flushed;
 /// [`ApplyError::Settings`] for an argument this command does not take, for a binary that is
 /// not inside a Garage checkout, and for a checkout with no `bootstrap.sh`; whatever the
-/// render raises; and whatever step 4's push half raises.
+/// render raises; and whatever step 5's push half raises.
 pub fn update(paths: &Paths, proc: &dyn Runner, argv: &[String]) -> Result<i32, ApplyError> {
-    update_at(paths, proc, argv, None, None)
+    let run = UpdateRun {
+        root: None,
+        captured: None,
+        space: &SystemSpace,
+    };
+    update_at(paths, proc, argv, run)
 }
 
-/// [`update`] with the checkout named and the transcript optionally collected, which is what
-/// the trace fixtures drive: [`checkout_root`](crate::doctor::checkout_root) reads this
-/// process's own executable, and a test binary is not inside the scratch checkout it built.
-///
-/// # Errors
-///
-/// The same as [`update`].
-pub(crate) fn update_at(
+/// The path/report/probe overrides used by the trace fixtures around one update.
+struct UpdateRun<'a> {
+    root: Option<PathBuf>,
+    captured: Option<&'a mut String>,
+    space: &'a dyn SpaceProbe,
+}
+
+fn update_at(
     paths: &Paths,
     proc: &dyn Runner,
     argv: &[String],
-    root: Option<PathBuf>,
-    captured: Option<&mut String>,
+    run: UpdateRun<'_>,
 ) -> Result<i32, ApplyError> {
     let mut dry_run = false;
     for argument in argv {
@@ -121,20 +129,25 @@ pub(crate) fn update_at(
             )));
         }
     }
-    let cx = match root {
+    let cx = match run.root {
         Some(root) => DoctorCx::at(paths, proc, root),
         None => DoctorCx::new(paths, proc)?,
     };
-    let mut report = Report::new(dry_run, captured.is_some());
-    let outcome = run_steps(&cx, &mut report, dry_run);
-    if let (Some(sink), Some(text)) = (captured, report.captured()) {
+    let mut report = Report::new(dry_run, run.captured.is_some());
+    let outcome = run_steps(&cx, &mut report, dry_run, run.space);
+    if let (Some(sink), Some(text)) = (run.captured, report.captured()) {
         sink.push_str(text);
     }
     outcome
 }
 
-/// The six steps, and the summary that reads their problems back.
-fn run_steps(cx: &DoctorCx<'_>, report: &mut Report, dry_run: bool) -> Result<i32, ApplyError> {
+/// The seven steps, and the summary that reads their problems back.
+fn run_steps(
+    cx: &DoctorCx<'_>,
+    report: &mut Report,
+    dry_run: bool,
+    space_probe: &dyn SpaceProbe,
+) -> Result<i32, ApplyError> {
     let _lock = UpdateLock::acquire(&cx.paths.locks.update)?;
     let paths = cx.paths;
     let transcript = transcript::open_for_run(paths, dry_run)?;
@@ -146,6 +159,9 @@ fn run_steps(cx: &DoctorCx<'_>, report: &mut Report, dry_run: bool) -> Result<i3
     let mut problems = checkout.problems;
     report_checkout(report, &checkout.lines)?;
 
+    if !space::check(paths, &cx.root, report, space_probe)? {
+        return Ok(1);
+    }
     sweep_step(cx, report, &mut problems)?;
     if bootstrap_step(cx, report)? != 0 {
         return Ok(1);
@@ -201,7 +217,7 @@ fn report_checkout(report: &mut Report, lines: &[String]) -> Result<(), ApplyErr
     Ok(())
 }
 
-/// Step 2: links to files the update deleted.
+/// Step 3: links to files the update deleted.
 fn sweep_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,
@@ -232,7 +248,7 @@ fn sweep_step(
     Ok(())
 }
 
-/// Step 3: converge this machine on the checkout, by handing the terminal to `bootstrap.sh`.
+/// Step 4: converge this machine on the checkout, by handing the terminal to `bootstrap.sh`.
 ///
 /// The Python copies `os.environ`, adds its two variables and passes the copy to the child.
 /// [`Runner::run_streamed`] hands the child this process's own environment, so the two
@@ -317,7 +333,7 @@ impl Drop for Environment {
     }
 }
 
-/// Step 4: migrations and the generated state.
+/// Step 5: migrations and the generated state.
 ///
 /// The load *is* the migration: it is version-gated and runs inside `load_preferences()`, so a
 /// pull that bumped the schema is applied here. The corrected file itself is written on the
@@ -348,7 +364,7 @@ fn render_step(paths: &Paths, proc: &dyn Runner, report: &mut Report) -> Result<
     // `render_all()` only writes files now. These three are what it used to push from inside
     // itself, and an update still owes them: the toolkit configs it just rewrote are half a
     // theme until the portal setting, xsettingsd and the two signalled clients agree with
-    // them. The compositor's own reload is step 6, which knows how to skip a TTY.
+    // them. The compositor's own reload is step 7, which knows how to skip a TTY.
     apply_accent_push(&mut cx);
     push_corner_radius(&mut cx);
     push_theme(&mut cx)?;
@@ -359,7 +375,7 @@ fn render_step(paths: &Paths, proc: &dyn Runner, report: &mut Report) -> Result<
     Ok(())
 }
 
-/// Step 5: the plugin ABI, and whether a redeploy is owed.
+/// Step 6: the plugin ABI, and whether a redeploy is owed.
 fn plugin_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,
@@ -450,7 +466,7 @@ fn redeploy(
     Ok(())
 }
 
-/// Step 6: the reload, which knows how to skip a TTY.
+/// Step 7: the reload, which knows how to skip a TTY.
 fn reload_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,
