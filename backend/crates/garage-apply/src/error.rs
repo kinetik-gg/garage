@@ -82,7 +82,7 @@ pub enum ApplyError {
     #[error("{0}")]
     Io(String),
 
-    /// `SettingsError(...)` raised by one of the three plumbing commands -- `doctor`,
+    /// `SettingsError(...)` raised by one of the four plain commands -- `doctor`, `migrate`,
     /// `repair`, `update`.
     ///
     /// The text is the whole contract, exactly as it is for the JSON envelope: the Python's

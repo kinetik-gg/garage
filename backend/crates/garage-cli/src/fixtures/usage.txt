@@ -3,6 +3,7 @@ Usage: garage [COMMAND [ARGUMENTS]]
 Human commands:
   doctor [--report]       check this install and report what is wrong (exit 1 if any)
                           --report prints the same checks as JSON, to paste into a bug
+  migrate [--dry-run]     apply one-shot machine migrations this version introduced
   repair [--reset]        recover an unparseable preferences.toml; reports unless
                           given --reset, which backs the file up and writes a fresh one
   update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload

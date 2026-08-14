@@ -2,7 +2,7 @@
 //! help text `garage help` prints verbatim.
 //!
 //! `response()` is one line of compact JSON -- `{"ok", "data", "error"}` -- printed to
-//! stdout by every settings command. The three legacy plumbing commands (`doctor`, `repair`,
+//! stdout by every settings command. The four plain commands (`doctor`, `migrate`, `repair`,
 //! `update`) always print lines; `reconcile` prints lines unless `--json` asks it to use this
 //! same envelope. The watchdog runs unattended and has nobody to report to. `ok` is simply
 //! `not error`, so a
@@ -20,7 +20,7 @@
 //! `USAGE` is the text `garage help`, `garage -h` and `garage --help` all print unchanged,
 //! and the only place command names and their arguments are written down together for a
 //! person to read. It is split into two groups matching the two kinds of command this binary
-//! has: the human commands (`doctor`, `repair`, `update`, `reconcile`, `help`) and the
+//! has: the human commands (`doctor`, `migrate`, `repair`, `update`, `reconcile`, `help`) and the
 //! settings backend, which always prints exactly one JSON object. Reconcile is the documented
 //! hybrid. `_display-watchdog` is deliberately absent from it -- it is the watchdog's
 //! own re-entry point, not something a person types.
@@ -36,6 +36,7 @@ pub(crate) const USAGE: &str = r#"Usage: garage [COMMAND [ARGUMENTS]]
 Human commands:
   doctor [--report]       check this install and report what is wrong (exit 1 if any)
                           --report prints the same checks as JSON, to paste into a bug
+  migrate [--dry-run]     apply one-shot machine migrations this version introduced
   repair [--reset]        recover an unparseable preferences.toml; reports unless
                           given --reset, which backs the file up and writes a fresh one
   update [--dry-run]      pull, sweep dead links, re-converge on the checkout, reload

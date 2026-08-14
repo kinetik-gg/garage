@@ -30,6 +30,8 @@ use serde::{Deserialize, Serialize};
 use crate::ApplyError;
 use state::State;
 
+pub use steps::REGISTRY;
+
 /// One immutable registry entry.
 #[derive(Debug, Clone, Copy)]
 pub struct Migration {
@@ -163,8 +165,7 @@ mod tests {
 
     use garage_core::paths::Paths;
 
-    use super::steps::REGISTRY;
-    use super::{run_migrations, Migration, Outcome, Status};
+    use super::{run_migrations, Migration, Outcome, Status, REGISTRY};
     use crate::testing::{Script, World};
     use crate::ApplyError;
 

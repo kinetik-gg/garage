@@ -1,4 +1,4 @@
-//! `main()`'s dispatch shape: which command name reaches which call, and the three that skip
+//! `main()`'s dispatch shape: which command name reaches which call, and the four that skip
 //! the JSON envelope entirely.
 //!
 //! Command resolution happens once, ahead of everything else: `argv[1]`, defaulting to
@@ -7,9 +7,10 @@
 //! `help`, `-h` and `--help` are recognised before any preferences file is touched, so
 //! `garage help` never fails even on a machine with no config directory yet.
 //!
-//! The three legacy plumbing commands -- `doctor`, `repair`, `update` -- are dispatched from a
+//! The four plain commands -- `doctor`, `migrate`, `repair`, `update` -- are dispatched from a
 //! separate table checked before the JSON path, and their errors go to stderr as plain text
-//! rather than through [`crate::response`]'s envelope; see [`garage_apply`] for why.
+//! rather than through [`crate::response`]'s envelope; see [`garage_apply`] for why. `migrate`
+//! is the one that bypasses config-root migration too, so its `--dry-run` has no hidden write.
 //! `reconcile` is the hybrid beside them: human by default, one response envelope with
 //! `--json`, and always dispatched before config migration so `--dry-run` has no hidden write.
 //! Every other command runs `migrate_config_root()` once, ahead of its own dispatch rather than
@@ -65,12 +66,12 @@ use crate::response::{emit, USAGE};
 use crate::session::{acted, applied, synced_night_shift, synced_theme};
 use crate::set;
 
-/// The three commands that answer a person rather than the QML client, so their output is
+/// The four commands that answer a person rather than the QML client, so their output is
 /// lines and their failures are stderr -- never the JSON envelope, which nothing at a
 /// terminal would want to read. `doctor --report` prints JSON, but it is still this kind of
 /// command: the blob is for a person to paste, and a failure of it is still a message on
 /// stderr.
-const PLAIN_COMMANDS: [&str; 3] = ["doctor", "repair", "update"];
+const PLAIN_COMMANDS: [&str; 4] = ["doctor", "migrate", "repair", "update"];
 
 /// What a settings-backend command left for [`emit`] to print.
 ///
@@ -116,28 +117,34 @@ pub(crate) fn run(argv: &[String]) -> u8 {
     }
 }
 
-/// `doctor`, `repair`, `update`: lines for a person, failures on stderr, `garage {command}:
-/// {error}`.
+/// `doctor`, `migrate`, `repair`, `update`: lines for a person, failures on stderr, `garage
+/// {command}: {error}`.
 ///
-/// The Python's own branch, down to the catch tier: `migrate_config_root()` runs first and
-/// its failure is reported the same way the command's own is, because both are inside the one
-/// `try` that prints `garage {command}: {error}` and returns 1. Everything these three print
-/// on the way to succeeding has already gone to stdout by then -- they are commands that
-/// print as they go, not commands that assemble an answer -- so a failure late in `update`
-/// leaves the transcript above it on screen, which is the point.
+/// The Python's own branch supplies the catch tier: an error prints `garage {command}:
+/// {error}` and returns 1. For its three legacy commands `migrate_config_root()` runs first
+/// and its failure is reported the same way as the command's own; `migrate` skips that write
+/// path to keep `--dry-run` read-only. Everything these four print on the way to succeeding
+/// has already gone to stdout by then -- they print as they go rather than assembling an
+/// envelope -- so a failure late in `update` leaves the transcript above it on screen.
 fn plain(paths: &Paths, proc: &dyn Runner, command: &str, argv: &[String]) -> u8 {
     let arguments: &[String] = argv.get(2..).unwrap_or_default();
-    let outcome = migrate_config_root(paths)
-        .map_err(CliError::from)
-        .and_then(|()| match command {
-            "doctor" => Ok(doctor(paths, proc, arguments)?),
-            "repair" => Ok(repair(paths, arguments)?),
-            "update" => Ok(update(paths, proc, arguments)?),
-            // Unreachable: `run()` only calls this for a name in `PLAIN_COMMANDS`, and this
-            // match covers all three. Answered rather than panicked for the same reason the
-            // workspace denies `panic!`.
-            other => Err(CliError::UnknownCommand(other.to_owned())),
-        });
+    // The migration runner owns a strict read-only mode. Running preference-root migration
+    // before it would make `garage migrate --dry-run` write for an unrelated reason.
+    let outcome = if command == "migrate" {
+        crate::migrate::migrate(paths, arguments).map_err(CliError::from)
+    } else {
+        migrate_config_root(paths)
+            .map_err(CliError::from)
+            .and_then(|()| match command {
+                "doctor" => Ok(doctor(paths, proc, arguments)?),
+                "repair" => Ok(repair(paths, arguments)?),
+                "update" => Ok(update(paths, proc, arguments)?),
+                // Unreachable: `run()` only calls this for a name in `PLAIN_COMMANDS`,
+                // `migrate` was handled above, and this match covers the other three.
+                // Answered rather than panicked because the workspace denies `panic!`.
+                other => Err(CliError::UnknownCommand(other.to_owned())),
+            })
+    };
     match outcome {
         Ok(status) => u8::try_from(status).unwrap_or(1),
         Err(error) => {
@@ -387,8 +394,8 @@ mod tests {
     }
 
     #[test]
-    fn the_plain_table_is_the_pythons_three() {
-        assert_eq!(PLAIN_COMMANDS, ["doctor", "repair", "update"]);
+    fn the_plain_table_names_all_four_human_commands() {
+        assert_eq!(PLAIN_COMMANDS, ["doctor", "migrate", "repair", "update"]);
     }
 
     /// A real scratch `HOME`, unlike [`paths`]'s deliberately unwritable one: `render-bar`

@@ -10,6 +10,7 @@
 mod commands;
 mod displays;
 mod error;
+mod migrate;
 mod pyjson;
 mod reconcile;
 mod response;
