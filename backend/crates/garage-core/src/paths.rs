@@ -266,13 +266,15 @@ impl Markers {
     }
 }
 
-/// The advisory locks each read-modify-write is held across.
+/// The advisory locks that serialise state transitions spanning more than one operation.
 #[derive(Debug, Clone)]
 pub struct Locks {
     /// Held across a display transaction: apply, then confirm or roll back.
     pub display: PathBuf,
     /// Held by every caller across its own read of layer 2 and the write that follows.
     pub preferences: PathBuf,
+    /// Held across all six steps of `garage update`, including a dry run.
+    pub update: PathBuf,
 }
 
 impl Locks {
@@ -280,6 +282,7 @@ impl Locks {
         Self {
             display: state_root.join("display-transaction.lock"),
             preferences: state_root.join("preferences.lock"),
+            update: state_root.join("update.lock"),
         }
     }
 }

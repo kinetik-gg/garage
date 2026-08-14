@@ -20,6 +20,7 @@ use garage_core::paths::Paths;
 use garage_core::traits::{Output, RunError, Runner};
 use serde_json::Value;
 
+use super::lock::UpdateLock;
 use super::update_at;
 
 const TRACES: &str = include_str!("../../testdata/update_traces.json");
@@ -289,6 +290,10 @@ fn every_scenario_prints_and_runs_what_the_python_did() {
 fn check(scenario: &Value) {
     let name = scenario["name"].as_str().unwrap_or("unnamed");
     let (world, runner, paths) = build(scenario);
+    let _held = scenario["lock_started"].as_str().map(|started| {
+        UpdateLock::acquire_with_started(&paths.locks.update, started)
+            .expect("the scenario's update lock is free")
+    });
     let argv = strings(scenario.get("argv"));
     let mut out = String::new();
     let outcome = update_at(

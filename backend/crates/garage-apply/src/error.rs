@@ -69,6 +69,12 @@ pub enum ApplyError {
     #[error(transparent)]
     DisplayLock(#[from] crate::displays::transaction::DisplayLockError),
 
+    /// The whole-update lock could not be taken. Unlike the display lock, contention is a
+    /// refusal rather than a wait: an update may spend twenty minutes inside pacman, and a
+    /// second invocation must not silently queue behind it.
+    #[error(transparent)]
+    UpdateLock(#[from] crate::update::UpdateLockError),
+
     /// The pending-transaction file could not be read as JSON -- `json.loads()` raising
     /// `JSONDecodeError`, which `main()` catches beside `SettingsError`.
     ///

@@ -617,6 +617,41 @@
    "home_after": [
     "$HOME/.config/hypr/hyprland.conf"
    ]
+  },
+  {
+   "name": "refuses-concurrent-update",
+   "argv": [
+    "--dry-run"
+   ],
+   "tree": {
+    ".config/hypr/hyprland.conf": "# hyprland\n",
+    ".local/bin/garage-helper": "#!/bin/sh\n"
+   },
+   "stow_ignore": "RCS\n.+~\n^/README.*\n",
+   "has_git": true,
+   "no_bootstrap": false,
+   "other_checkout": false,
+   "links": "linked",
+   "managed": [
+    ".config/hypr/hyprland.conf",
+    ".local/bin/garage-helper"
+   ],
+   "dangling": {},
+   "plugins": {},
+   "pins": "",
+   "git": {},
+   "hyprland": "",
+   "compositor": 0,
+   "bootstrap_status": 0,
+   "status": null,
+   "error": "another update is already running (started 09:10:11)",
+   "stdout": "",
+   "trace": [],
+   "streamed": [],
+   "home_after": [
+    "$HOME/.config/hypr/hyprland.conf"
+   ],
+   "lock_started": "2026-08-14T09:10:11+0700"
   }
  ]
 }

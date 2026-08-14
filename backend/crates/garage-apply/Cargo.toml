@@ -20,9 +20,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 # module's doc for why the conflate-every-failure-to-empty reading belongs there rather than
 # behind `garage-proc`'s stricter `MonitorSource`.
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
-# `DISPLAY_LOCK`: the advisory lock the display transaction is held across, which is `flock`
-# and has no safe wrapper in std. The same crate and the same feature `garage-prefs` takes
-# `PREFERENCES_LOCK` from.
+# `DISPLAY_LOCK` and `UPDATE_LOCK`: advisory locks held across a display transaction or a
+# whole update, which are `flock` and have no safe wrapper in std. The same crate and the same
+# feature `garage-prefs` takes `PREFERENCES_LOCK` from.
 rustix = { version = "1.1.4", features = ["fs"] }
 thiserror = "2.0.20"
 toml = { version = "1.1.4", features = ["preserve_order"] }

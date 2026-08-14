@@ -72,10 +72,13 @@ use crate::route::push_accent as apply_accent_push;
 use crate::terminal::resolve_browser;
 use crate::theme::push_theme;
 
+mod lock;
 mod pull;
 #[cfg(test)]
 mod traces;
 
+use lock::UpdateLock;
+pub use lock::UpdateLockError;
 pub(crate) use pull::git_output;
 use pull::pull_checkout;
 
@@ -123,6 +126,7 @@ impl Report {
 ///
 /// # Errors
 ///
+/// [`ApplyError::UpdateLock`] if another update is running or the lock cannot be prepared;
 /// [`ApplyError::Settings`] for an argument this command does not take, for a binary that is
 /// not inside a Garage checkout, and for a checkout with no `bootstrap.sh`; whatever the
 /// render raises; and whatever step 4's push half raises.
@@ -172,6 +176,7 @@ pub(crate) fn update_at(
 
 /// The six steps, and the summary that reads their problems back.
 fn run_steps(cx: &DoctorCx<'_>, report: &mut Report, dry_run: bool) -> Result<i32, ApplyError> {
+    let _lock = UpdateLock::acquire(&cx.paths.locks.update)?;
     let paths = cx.paths;
     let mut problems: Vec<String> = Vec::new();
     report.say(&format!(
