@@ -2,8 +2,8 @@
 //!
 //! `rust/clippy.toml` disallows `Command::new` workspace-wide with a reason that
 //! points at `garage_proc::run`: every other crate spawns through the settings
-//! backend's single process boundary, which owns the 4-second timeout, the capture and
-//! the differential trace. `garage-waybar` cannot use it -- these binaries run once per
+//! backend's single process boundary, which owns the 4-second timeout, capture, and
+//! scripted test seam. `garage-waybar` cannot use it -- these binaries run once per
 //! Waybar tick, independent of the settings backend, exactly as the Python scripts
 //! they replace shelled out to `playerctl`/`hyprctl`/`pactl`/... on their own. [`run`]
 //! is the single function that carries the `#[expect]` for that lint, so the exception

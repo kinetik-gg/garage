@@ -1,7 +1,7 @@
 //! Tests for [`Paths`] and its environment-derived filesystem layout.
 //!
 //! They live beside rather than inside `paths.rs` to keep that production module below the
-//! 500-line cap enforced by `tests/test_lint.py::FileShape`.
+//! 500-line cap enforced by the `workspace_shape` cargo integration test.
 
 use super::{HashMap, PathBuf, Paths};
 use crate::fs::scratch::Scratch;

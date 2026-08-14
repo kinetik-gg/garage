@@ -1,9 +1,8 @@
 //! Byte-parity tests for [`crate::displays`]: the saved-layout reader, the mirror rules and
 //! the generated `displays.lua`, against the real Python backend.
 //!
-//! `testdata/display_fixtures.json` is the output of a throwaway generator (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` with `SourceFileLoader`
-//! through `tests/harness.py`, plants a `displays.toml` (and sometimes an already-installed
+//! `testdata/display_fixtures.json` was captured during the Rust port by loading the former
+//! backend with `SourceFileLoader`, planting a `displays.toml` (and sometimes an installed
 //! `displays.lua`) into a scratch `HOME`, runs the exact four lines `render_all()` ends with
 //! -- `layout = load_display_config()`, then `render_displays(layout)` or
 //! `DISPLAY_FRAGMENT.unlink(missing_ok=True)` -- and reads back the fragment or the refusal.

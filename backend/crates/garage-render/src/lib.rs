@@ -14,7 +14,8 @@
 //! nothing else of Garage's -- in particular not on `garage-prefs`, which owns
 //! `PrefLock`, nor on `garage-proc`, which owns process execution. A renderer here cannot
 //! take `PREFERENCES_LOCK` because the code that takes it does not resolve from this
-//! crate, and `tests/test_lint.py` fails the build if that edge ever appears. See
+//! crate, and the `workspace_shape` cargo integration test fails the build if that edge
+//! ever appears. See
 //! [`cx::RenderCx`] for the deadlock that rule exists to prevent.
 #![forbid(unsafe_code)]
 

@@ -198,8 +198,8 @@ mod tests {
         Paths::from_env_map(&env)
     }
 
-    /// `desktop/.local/bin/garage`'s own `render_region(FALLBACK_DEFAULTS)`, captured with
-    /// `tests/harness.py` -- the shipped defaults carry no locale override.
+    /// The former backend's `render_region(FALLBACK_DEFAULTS)` output, captured during the
+    /// Rust port -- the shipped defaults carry no locale override.
     #[test]
     fn matches_the_python_backend_with_no_locale_override() {
         let prefs = prefs_from("");

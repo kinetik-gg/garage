@@ -1,13 +1,11 @@
 //! Layer 1: `preferences.defaults.toml`, the shipped source of truth for
 //! values.
 //!
-//! The Python derives `FALLBACK_DEFAULTS` from the table and keeps the file as
-//! a second, hand-editable copy that `tests/test_schema.py` pins against it --
-//! "a checked-in, commented, hand-editable file is worth more than a build
-//! step". This port keeps the same split, with the arrow reversed: the table
-//! declares the keys and their kinds, the *file* carries the values, and
-//! [`Defaults::compiled`] is the file read at build time so a Rust build cannot
-//! ship a default the file does not have.
+//! The original implementation derived its fallback values from the table and
+//! kept the file as a second, hand-editable copy. This port keeps the useful
+//! split, with the arrow reversed: the table declares the keys and their kinds,
+//! the *file* carries the values, and [`Defaults::compiled`] reads the file at
+//! build time so a Rust build cannot ship a default the file does not have.
 //!
 //! That is why a missing key is [`MissingDefault`] rather than a coercion.
 //! Every other failure in this module puts a value back and writes a note,

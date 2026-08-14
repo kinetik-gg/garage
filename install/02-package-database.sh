@@ -8,8 +8,8 @@
 
 # The package set is data, not an array here: system/manifest/packages.list. The
 # Rust port reads the same file, `garage doctor` reads the `critical` flag out of
-# it, and tests/test_manifest.py checks the two agree -- none of which is
-# possible while the only copy is a bash array.
+# it, and bootstrap consumes that same inventory -- none of which is possible
+# while the only copy is a bash array.
 #
 # The three lines inside the loop are the whole format: strip a trailing `#`
 # comment, split the rest into fields, skip what is left of a blank or

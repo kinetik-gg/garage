@@ -10,8 +10,7 @@
 //! Answers nothing to everything: exit 0, empty stdout, empty stderr. That is the "command
 //! exists and had nothing to say" shape, and it is enough for these tests, which are about
 //! *which* command a name reaches rather than about what the command then does. The
-//! behaviour of each layer is pinned by that layer's own tests and by the differential
-//! corpus, both of which script real answers.
+//! behaviour of each layer is pinned by that layer's own tests, which script real answers.
 
 use std::cell::RefCell;
 use std::path::Path;

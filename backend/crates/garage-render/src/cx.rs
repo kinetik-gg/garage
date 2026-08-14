@@ -22,7 +22,7 @@ use garage_core::traits::{LuaSyntaxCheck, MonitorSource};
 /// no lock field here, which is the visible half. The half that makes it structural is
 /// that `garage-render`'s `Cargo.toml` does not list `garage-prefs`, so `PrefLock::acquire`
 /// does not resolve from this crate -- a renderer that wanted the lock could not write the
-/// line. `tests/test_lint.py`'s crate-graph test reads `cargo metadata` and fails the
+/// line. The `workspace_shape` cargo integration test reads `cargo metadata` and fails the
 /// build if that edge ever appears, transitively included.
 ///
 /// The deadlock it prevents is real and was reachable: `set lock.*` holds

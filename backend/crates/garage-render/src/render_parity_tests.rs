@@ -2,9 +2,8 @@
 //! [`crate::idle::render_idle`], [`crate::motion::render_motion`] and
 //! [`crate::accent::render_accent`] against the real Python backend.
 //!
-//! `testdata/render_fixtures.json` is the output of a throwaway script (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` with `SourceFileLoader`,
-//! the same way `tests/harness.py` does, and for each scenario in the matrix below merges a
+//! `testdata/render_fixtures.json` was captured during the Rust port by loading the former
+//! backend with `SourceFileLoader`; for each scenario in the matrix below it merges a
 //! handful of departures onto `shipped_defaults()`, runs them through `validate_preferences()`
 //! exactly as `load_preferences()` would, then calls `render_preferences()` (which also
 //! calls `render_idle()`), `render_motion()` and `render_accent()` and reads every file

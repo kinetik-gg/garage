@@ -21,7 +21,7 @@
 //! AI usage strip, the media control -- now exec the Rust binaries in `$HOME/.local/bin`; the
 //! old waybar Python paths died with the Python backend. This is also the one place a metric
 //! strip's declared `size` has to agree with `garage-metrics`' own layout table;
-//! `tests/test_bar.py` parses this script and fails on drift between the two.
+//! the fixtures below pin the emitted widths while `garage-metrics` pins its layout widths.
 
 use garage_core::fs::atomic::atomic_write;
 use garage_core::schema::Preferences;
@@ -34,7 +34,7 @@ use crate::error::RenderError;
 /// LARGEST dimension: a 112x22 strip at size 22 renders 22px wide, so natural 1:1 rendering
 /// needs `size` to equal the SVG's own width. The widths differ per widget because each strip
 /// is drawn just wide enough for its worst-case value. These mirror `LAYOUTS[...]["width"]`
-/// in `garage-metrics`; `tests/test_bar.py` parses that script and fails on drift.
+/// in `garage-metrics`; both crates pin their copy in cargo tests.
 const METRIC_STRIP_WIDTHS: &[(&str, i64)] = &[
     ("cpu", 82),
     ("memory", 82),
@@ -297,9 +297,9 @@ mod tests {
     use super::{bar_widget_modules, render_bar_widgets};
     use crate::cx::RenderCx;
 
-    /// `desktop/.local/bin/garage`'s own `render_bar_widgets(FALLBACK_DEFAULTS)` output,
-    /// captured with `tests/harness.py`'s `load_backend()` -- see this task's report for the
-    /// throwaway script. Pinned as a file rather than inlined so the exact `CPython`
+    /// `desktop/.local/bin/garage`'s former `render_bar_widgets(FALLBACK_DEFAULTS)` output,
+    /// captured during the Rust port. Pinned as a file rather than inlined so the exact
+    /// `CPython`
     /// `json.dumps(indent=2)` bytes -- key order, the trailing newline, the two-space
     /// indent -- are checked, not just the logical structure `bar_widget_modules()`'s own
     /// tests already cover.

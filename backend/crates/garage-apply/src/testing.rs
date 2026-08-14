@@ -47,8 +47,7 @@ enum Answer {
 /// The scripted answers, keyed by the joined argv.
 ///
 /// Exact match first, then the longest key the joined argv starts with -- the same two-step
-/// lookup the differential harness's shim uses, so a fixture written for one can be pasted
-/// into the other without being rewritten.
+/// lookup used by the recorded trace fixtures.
 #[derive(Default)]
 pub(crate) struct Script {
     answers: Vec<(String, Answer)>,
@@ -118,7 +117,7 @@ impl Runner for Recorder {
                 stderr: stderr.clone(),
             }),
             // "The command exists and had nothing to say", which is what most signalling
-            // calls get -- and the differential shim's own default.
+            // calls get and the scripted runner's own default.
             None => Ok(Output {
                 status: 0,
                 stdout: String::new(),

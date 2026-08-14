@@ -49,9 +49,9 @@ pub enum PrefsError {
     /// then coerces it onto `FALLBACK_DEFAULTS` with a note. Here layer 1 is a typed
     /// [`Defaults`](garage_core::schema::Defaults), which cannot be built with a key
     /// missing, so the load fails instead. That is task 2.4's decision, taken deliberately
-    /// and documented there: the shipped file is a stow symlink into the checkout that
-    /// `tests/test_schema.py` pins, so a key missing from it is a broken build rather than
-    /// a session to be rescued.
+    /// and documented there: the shipped file is compiled into the crate and its completeness
+    /// is covered by cargo tests, so a missing key is a broken build rather than a session to
+    /// be rescued.
     #[error(transparent)]
     Defaults(#[from] DefaultsError),
 

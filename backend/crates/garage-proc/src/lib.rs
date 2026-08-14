@@ -12,7 +12,7 @@
 //!   that wants to see what a render asked can hand all three the same one.
 //!
 //! Nothing here is reachable from `garage-render`: that crate does not depend on this one,
-//! and `tests/test_lint.py`'s crate-graph check fails the build if the edge ever appears.
+//! and the `workspace_shape` cargo integration test fails the build if the edge ever appears.
 #![forbid(unsafe_code)]
 
 pub mod lua;

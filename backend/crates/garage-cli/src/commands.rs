@@ -439,7 +439,7 @@ mod tests {
     /// `garage render` against a scratch tree with no `displays.toml` at all:
     /// `render_display_fragment()`'s empty-layout branch, which takes the fragment away
     /// rather than writing one -- see `garage_render::displays::render_saved_displays` for
-    /// the gate, and the `render` differential family for the same claim end to end.
+    /// the gate. This test makes the same claim end to end.
     #[test]
     fn render_completes_end_to_end_with_no_displays_toml() {
         let paths = scratch_paths("render-all");

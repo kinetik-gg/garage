@@ -1,9 +1,8 @@
 //! Byte-parity tests for the whole keybind layer against the real Python backend.
 //!
-//! `testdata/keybind_fixtures.json` is the output of a throwaway script (not committed -- see
-//! this task's report) that loads `desktop/.local/bin/garage` with `SourceFileLoader`, the
-//! same way `tests/harness.py` does, and records what the Python produced for every case
-//! below. Six families:
+//! `testdata/keybind_fixtures.json` was captured during the Rust port by loading the former
+//! backend with `SourceFileLoader` and recording what it produced for every case below. Six
+//! families:
 //!
 //! * `parse` -- one entry per combination string, carrying `combination_id`,
 //!   `canonical_combination`, `combination_signature` and `require_bindable`, each as the

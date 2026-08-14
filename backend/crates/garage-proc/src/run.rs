@@ -25,8 +25,9 @@
 //! # The one place `Command::new` is allowed
 //!
 //! `clippy.toml` bans `std::process::Command::new` across the workspace so that every spawn
-//! is timed, captured and visible to the differential trace. This module is the exception
-//! it is banned *in favour of*, and each builder below carries the narrow allow that says so.
+//! is timed, captured and replaceable by a scripted [`Runner`] in tests. This module is the
+//! exception it is banned *in favour of*, and each builder below carries the narrow allow
+//! that says so.
 
 use std::io::{self, Read, Write as _};
 use std::os::unix::fs::PermissionsExt as _;
@@ -49,8 +50,8 @@ const POLL: Duration = Duration::from_millis(5);
 /// The real machine: this is what actually forks.
 ///
 /// A unit struct because there is nothing to configure. The environment a child inherits is
-/// this process's own, exactly as `subprocess.run()` leaves it -- the Python never passes
-/// `env=`, and the differential harness clamps `PATH` from the outside for both backends.
+/// this process's own, matching the command boundary this replaced: callers do not pass a
+/// separate environment.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct System;
 

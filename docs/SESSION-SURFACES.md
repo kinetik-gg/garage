@@ -57,11 +57,9 @@ inhibition and release still wrap the whole lock lifetime.
 Run:
 
 ```sh
-python3 tests/run
+cargo test --manifest-path backend/Cargo.toml --workspace --all-targets
 ```
 
-The tests load the actual SDDM QML with Qt 6's `sddm-greeter-qt6 --test-mode`
-using the offscreen backend. Power methods do nothing in test mode. Hyprlock's
-monitor selection is exercised with a mocked compositor and mocked lock binary.
-These checks do not restart SDDM, lock the current session, or invoke a power
-action.
+This exercises the Rust backend without restarting SDDM, locking the current
+session, or invoking a power action. GitHub Actions also checks the repository's
+shell syntax and documentation/install inventories on every push and pull request.

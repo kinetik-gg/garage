@@ -2,9 +2,8 @@
 //! behind it, and [`crate::bar::workspaces::render_bar_workspaces`], against the real Python
 //! backend.
 //!
-//! `testdata/workspace_fixtures.json` is the output of a throwaway generator (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` with `SourceFileLoader`
-//! through `tests/harness.py`, plants a `displays.toml`, a `workspace-blocks.toml`, a
+//! `testdata/workspace_fixtures.json` was captured during the Rust port by loading the former
+//! backend with `SourceFileLoader`, planting a `displays.toml`, a `workspace-blocks.toml`, a
 //! `preferences.toml` and sometimes an already-installed `workspaces.lua` into a scratch
 //! `HOME`, monkeypatches `json_command()` so `hyprctl monitors -j` answers a scripted list,
 //! then calls `render_workspaces()` and `render_bar_workspaces()` and reads back every byte

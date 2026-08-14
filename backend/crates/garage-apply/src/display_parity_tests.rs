@@ -1,9 +1,9 @@
 //! Byte-parity tests for [`crate::displays::config`]: `normalize_display_layout()` and
 //! `layout_toml()`, against the real Python backend.
 //!
-//! `testdata/display_fixtures.json` is the output of a throwaway generator (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` through `tests/harness.py`,
-//! hands each layout to `normalize_display_layout()` and then to `layout_toml()`, and records
+//! `testdata/display_fixtures.json` was captured during the Rust port by loading the former
+//! backend, handing each layout to `normalize_display_layout()` and then to `layout_toml()`,
+//! and recording
 //! the normalized value, the emitted text, and the refusal when there was one.
 //!
 //! The matrix, 25 layouts: an empty layout and one with no `displays` key; one display at the

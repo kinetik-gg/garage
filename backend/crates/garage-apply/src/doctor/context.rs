@@ -113,8 +113,7 @@ impl<'a> DoctorCx<'a> {
         manifest::load_units(&self.manifest)
     }
 
-    /// The fontconfig family names, in file order -- which is `DOCTOR_FONTS`' order, pinned
-    /// by `tests/test_manifest.py`.
+    /// The fontconfig family names, in manifest file order.
     pub(crate) fn fonts(&self) -> Result<Vec<String>, ManifestError> {
         manifest::load_fonts(&self.manifest)
     }

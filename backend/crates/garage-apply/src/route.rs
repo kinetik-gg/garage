@@ -109,8 +109,7 @@ pub fn route_for(key: PreferenceKey) -> Result<Route, ApplyError> {
 /// what `binds.lua` reads must publish all of it.
 ///
 /// `garage render` is the one caller that still cannot -- it builds no session context by
-/// design -- and that difference is written down in `tests/differential/deviations.toml`
-/// against the `render-all-empty` scenario.
+/// design, so it renders files without signalling the running desktop.
 ///
 /// # Errors
 ///

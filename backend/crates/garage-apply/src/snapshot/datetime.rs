@@ -72,8 +72,7 @@ fn zone_from_localtime() -> Option<String> {
 /// so `$TZ` is read where it is set and `UTC` stands in otherwise. This is the third fallback
 /// of three: it is reached only on a machine where `timedatectl` cannot be run at all *and*
 /// `/etc/localtime` is not a symlink into a `zoneinfo` tree -- neither of which is true of any
-/// machine this ships to, and neither of which any scenario in the differential corpus
-/// produces.
+/// machine this ships to or any supported test fixture.
 fn local_abbreviation() -> String {
     std::env::var("TZ").unwrap_or_else(|_| "UTC".to_owned())
 }

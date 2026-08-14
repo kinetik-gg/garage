@@ -84,8 +84,8 @@ Every subsystem splits into a **render** half (pure, writes files, signals nothi
 `render_accent()`/`push_accent()`/`apply_accent()` are the clearest pairs.
 
 The split is now structural: `garage-render`'s crate graph cannot name the preferences lock or
-the process runner in `garage-proc`, and `tests/test_lint.py` pins both forbidden dependency
-edges.
+the process runner in `garage-proc`, and the `workspace_shape` cargo integration test rejects
+either forbidden dependency edge, including a transitive one.
 
 **The deadlock this prevents**: `set lock.*` holds `PrefLock::acquire()` across a *synchronous*
 `systemctl restart hypridle.service`. hypridle's `ExecStartPre` starts the installed

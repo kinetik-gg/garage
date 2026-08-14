@@ -43,11 +43,8 @@
 //! `garage doctor` checks by name", and `units.list` is checked whole, because that file
 //! says "bootstrap.sh enables every line here; `garage doctor` checks them".
 //!
-//! `tests/test_manifest.py` pins the Python constants against the same files for the length
-//! of the parity window, so the *sets* agree; what does not agree is order (the file groups
-//! packages by function, the tuple does not) and breadth (`units.list` is the full set the
-//! Python's `DOCTOR_UNITS` is a subset of, and `doctor --report` lists every package rather
-//! than the critical eight). Those are written down in `tests/differential/deviations.toml`.
+//! The manifests are now the sole inventories. `doctor --report` deliberately lists every
+//! package while the interactive doctor checks only the entries marked `critical`.
 
 mod checks;
 mod context;

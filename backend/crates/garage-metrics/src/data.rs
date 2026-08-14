@@ -18,9 +18,8 @@
 //! x=0, every column starts 6px after the one before it ends, and each width is the last
 //! column's x plus the widest string that column can hold, rounded up, plus 1px so the
 //! final glyph is not clipped at the viewBox edge. The x values are spelled out below
-//! rather than computed because [`LAYOUTS`] has to stay a literal: `tests/test_bar.py`
-//! reads this table out of the source to pin the bar's own copy of the widths, and a
-//! table built from arithmetic is a table it cannot read. Measured in the strip's own
+//! rather than computed because [`LAYOUTS`] has to stay a reviewable literal alongside
+//! the bar renderer's matching width table. Measured in the strip's own
 //! face, Plus Jakarta Sans 600 at 11.5px: "100%" 33px, "100°" 27px, "999.9M" 42px,
 //! "24.0G" 36px, "↓999.9M" 50px. The one string that runs a character past that is a
 //! rate in the 1000-1023 MiB/s band, "1023.9M", which was over the old widths too; 7px of
@@ -35,8 +34,8 @@
 /// difference shows: `{graph_x}` interpolates as `20`, and a float would put `20.0` in
 /// the `d` attribute.
 ///
-/// `None` means the column is absent rather than zero -- the Python tests `"icon" in
-/// layout` and `"graph_width" in layout`, and a network strip has neither.
+/// `None` means the column is absent rather than zero, preserving the source data model's
+/// distinction between a missing column and a zero value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Layout {
     /// The viewBox width, and the width Waybar reserves for the strip.
@@ -256,8 +255,7 @@ mod tests {
 
     #[test]
     fn the_widths_are_the_ones_the_bars_own_config_is_pinned_against() {
-        // tests/test_bar.py reads these out of the Python source; if either table moves
-        // the two stop agreeing and the strips overlap in the bar.
+        // The bar renderer carries these widths too; a mismatch makes strips overlap.
         let widths: Vec<(&str, i32)> = LAYOUTS
             .iter()
             .map(|(name, layout)| (*name, layout.width))

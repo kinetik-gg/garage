@@ -2,7 +2,7 @@
 //!
 //! `rust/clippy.toml` disallows `Command::new` workspace-wide with a reason that points
 //! at `garage_proc::run`: every other crate spawns through the settings backend's single
-//! process boundary, which owns the timeout, the capture and the differential trace.
+//! process boundary, which owns the timeout, capture, and scripted test seam.
 //! `garage-metrics` cannot use it, for the same reason `garage-waybar` cannot -- this
 //! binary runs once per Waybar tick, independent of the settings backend, exactly as the
 //! Python script it replaces shelled out on its own. [`spawn`] is the single function

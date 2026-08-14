@@ -1,9 +1,8 @@
 //! Trace-parity tests for the display transaction: `display_test()`, `display_finish()` and
 //! `initialize_display_config()`, against the real Python backend.
 //!
-//! `testdata/display_traces.json` is the output of a throwaway generator (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` through `tests/harness.py`,
-//! plants a `displays.toml` into a scratch `HOME`, replaces the backend's own `run()` with a
+//! `testdata/display_traces.json` was captured during the Rust port by loading the former
+//! backend, planting a `displays.toml` into a scratch `HOME`, and replacing its `run()` with a
 //! recorder that answers `hyprctl monitors all -j` with scripted JSON and `hyprctl reload`
 //! with a scripted status, replaces `subprocess.Popen` with one that records the watchdog's
 //! argv instead of forking it, and then drives the whole choreography.

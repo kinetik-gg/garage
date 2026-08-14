@@ -131,9 +131,9 @@ mod tests {
     static SERIAL: AtomicU64 = AtomicU64::new(0);
 
     /// The shipped defaults where a stowed machine keeps them: a *symlink into the
-    /// checkout*, not a copy. Same shape the differential harness plants, and for the same
-    /// reason -- a writer that followed and truncated the link would look correct against a
-    /// copy while editing the developer's tree in the field.
+    /// checkout*, not a copy. The regression test uses that real shape because a writer that
+    /// followed and truncated the link would look correct against a copy while editing the
+    /// developer's tree in the field.
     fn scratch(label: &str) -> (PathBuf, Paths) {
         let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
         let home = std::env::temp_dir().join(format!(

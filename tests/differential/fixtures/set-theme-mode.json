@@ -1,8 +1,0 @@
-{
-  "hyprctl reload": {
-    "stdout": "ok\n"
-  },
-  "gsettings set org.gnome.desktop.interface color-scheme prefer-dark": {},
-  "systemctl --user reload-or-restart xsettingsd.service": {},
-  "systemctl --user try-restart swayosd.service": {}
-}

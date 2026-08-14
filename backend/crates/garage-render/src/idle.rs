@@ -252,8 +252,7 @@ mod tests {
     }
 
     // The all-zero (no listener) case, and every other lock timeout combination, is covered
-    // by this task's byte-parity fixtures against the real Python backend (see
-    // testdata/render_fixtures.json and the differential `render_idle` family), which is a
+    // by the byte-parity cases in testdata/render_fixtures.json, which is a
     // stronger check than a hand-built `Preferences` here -- and building one without a
     // `toml` dev-dependency this crate does not otherwise need is more machinery than a
     // second in-process case is worth.

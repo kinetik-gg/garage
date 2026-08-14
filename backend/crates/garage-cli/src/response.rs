@@ -176,10 +176,9 @@ mod tests {
         assert_eq!(data.get("applied"), Some(&Value::from(0)));
     }
 
-    /// The help text against the Python's own, extracted from the backend at the time this
-    /// task landed and checked in beside this file. Byte-for-byte: `garage help` is a
-    /// differential scenario in the active `cli` family, and this is the same claim made
-    /// where a developer sees it fail first.
+    /// The help text against the former backend's output, extracted during the Rust port and
+    /// checked in beside this file. Byte-for-byte, close to the code that serves it so a
+    /// developer sees drift fail here first.
     #[test]
     fn the_help_text_is_the_pythons_verbatim() {
         assert_eq!(USAGE, include_str!("fixtures/usage.txt"));

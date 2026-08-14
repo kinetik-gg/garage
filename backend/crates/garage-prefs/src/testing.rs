@@ -1,9 +1,8 @@
 //! A scratch `$HOME` per test, and the shipped defaults planted in it.
 //!
 //! Every test in this crate touches the filesystem, because every function in it does. The
-//! world is built the way the differential harness builds one -- a `HOME` of its own, with
-//! `preferences.defaults.toml` at the path a stowed machine keeps it -- so that a test and a
-//! parity run are asking the same question of the same layout.
+//! world uses a `HOME` of its own, with `preferences.defaults.toml` at the path a stowed
+//! machine keeps it, so every test asks its question of the real installed layout.
 
 use std::collections::HashMap;
 use std::fs;

@@ -1,4 +1,4 @@
-//! `tests/test_recovery.py`'s `Repair` class, replayed byte for byte.
+//! Repair behavior captured during the Rust port, replayed byte for byte.
 //!
 //! `testdata/repair_transcripts.json` is the output of a throwaway generator (not
 //! committed -- the same arrangement `doctor::parity` uses) which drives the Python's own

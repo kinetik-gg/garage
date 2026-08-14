@@ -127,8 +127,8 @@ mod tests {
         assert_eq!(rgb_parts("#000000"), "0, 0, 0");
     }
 
-    /// `desktop/.local/bin/garage`'s own `waybar_style_css("dark"|"light", FALLBACK_DEFAULTS)`,
-    /// captured with `tests/harness.py`. See this task's report for the throwaway script; the
+    /// The former backend's `waybar_style_css("dark"|"light", FALLBACK_DEFAULTS)` output,
+    /// captured during the Rust port. The
     /// same fixture also lives in `testdata/theme_fixtures.json`'s `"toolkits"` section, which
     /// `render_toolkits()`'s own byte-parity test reads.
     const DARK_FIXTURE: &str = include_str!("../../testdata/waybar_style_dark.css");

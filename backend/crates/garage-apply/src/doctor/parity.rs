@@ -169,7 +169,7 @@ impl World {
 }
 
 /// The shipped defaults, reached the way a stowed machine reaches them: a symlink into the
-/// repository, which is also what `prepare_home()` plants for the differential harness.
+/// repository, which is also what this module's scratch homes plant.
 fn link_defaults(home: &Path) {
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../desktop/.config/garage/preferences.defaults.toml");
@@ -357,7 +357,7 @@ fn blank_the_clock(text: &str) -> String {
         + "\n"
 }
 
-/// The regex `tests/test_recovery.py` asserts `generated_at` against, applied here:
+/// The `generated_at` timestamp contract, applied here:
 /// `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$`.
 #[test]
 fn the_clock_field_is_iso_8601_with_an_offset() {

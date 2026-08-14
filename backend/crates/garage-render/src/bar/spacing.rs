@@ -338,8 +338,8 @@ mod tests {
         Preferences::coerce_from(&table, &defaults, &mut notes)
     }
 
-    /// `desktop/.local/bin/garage`'s `waybar_spacing_css(FALLBACK_DEFAULTS)`, captured with
-    /// `tests/harness.py`. `bar.padding_scale` defaults to `1.2`, which lands several of the
+    /// The former backend's `waybar_spacing_css(FALLBACK_DEFAULTS)` output, captured during
+    /// the Rust port. `bar.padding_scale` defaults to `1.2`, which lands several of the
     /// shipped bases on a non-integer product (`13 * 1.2 == 15.6`), so this alone already
     /// exercises rounding.
     const DEFAULTS_FIXTURE: &str = include_str!("../../testdata/bar_spacing_defaults.css");

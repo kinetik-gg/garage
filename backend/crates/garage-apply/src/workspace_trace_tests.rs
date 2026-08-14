@@ -1,9 +1,8 @@
 //! Trace-parity tests for [`crate::workspaces::apply_workspace_plan`]: the exact commands it
 //! issues, in the exact order, against the Python's own.
 //!
-//! `testdata/workspace_traces.json` is the output of a throwaway generator (not committed --
-//! see this task's report) that loads `desktop/.local/bin/garage` through `tests/harness.py`,
-//! plants a `displays.toml`, a `workspace-blocks.toml`, a `preferences.toml` and an already
+//! `testdata/workspace_traces.json` was captured during the Rust port by loading the former
+//! backend, planting a `displays.toml`, a `workspace-blocks.toml`, a `preferences.toml` and an
 //! installed `workspaces.lua` into a scratch `HOME`, replaces the backend's own `run()` with
 //! a shim that records every argv and answers `hyprctl monitors -j` / `hyprctl clients -j`
 //! with scripted JSON, and then calls `apply_workspace_plan()`.
