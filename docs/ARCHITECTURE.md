@@ -21,6 +21,13 @@ Config lives in three layers, in the order `Paths::from_env()` constructs them:
 reinstall, layer 3 is a cache safe to throw away. Generated output used to sit inside layer 2,
 where deleting the cache meant deleting the user's settings beside it.
 
+Wallpaper assets have their own source/production boundary. `artwork/wallpapers/` owns the
+originals, credits, and provenance manifest; `artwork/wallpapers/build` produces the 4K JPEGs in
+`desktop/Wallpaper/` that Stow publishes under `~/Wallpaper`. Source and production basenames stay
+identical because preferences and `~/.local/share/wallpaper/current` persist those production
+paths. Only the 4K set belongs in the stow tree: hyprpaper decodes image dimensions, independent of
+the compressed file size.
+
 **One-writer rule**: `save_preferences()` is the only writer of `preferences.toml` on the settings
 path, and it writes departures from layer 1, never the merged whole (see §3, and §8's four-file
 split and snapshot pattern for the read side). Three writers sit off that path, deliberately and

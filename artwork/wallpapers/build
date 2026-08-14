@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Regenerate the stowed wallpaper set from the original JPEG sources.
+# Contract: preserve every source basename, copy sources at or below a 3840px
+# long edge byte-for-byte, and resize larger sources to 4K JPEG quality 90 with
+# metadata stripped.
+
+set -euo pipefail
+
+source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$source_root/../.." && pwd)"
+production_root="$repo_root/desktop/Wallpaper"
+
+command -v magick >/dev/null || {
+    printf 'ImageMagick is required (missing: magick).\n' >&2
+    exit 1
+}
+
+for appearance in Dark Light; do
+    source_dir="$source_root/$appearance"
+    production_dir="$production_root/$appearance"
+
+    mkdir -p -- "$production_dir"
+    find "$production_dir" -mindepth 1 -maxdepth 1 -type f -delete
+
+    while IFS= read -r -d '' source; do
+        dimensions=$(magick identify -format '%w %h' "$source")
+        read -r width height <<<"$dimensions"
+        destination="$production_dir/${source##*/}"
+
+        if ((width > 3840 || height > 3840)); then
+            magick "$source" -resize 3840x3840 -quality 90 -strip "$destination"
+        else
+            cp -- "$source" "$destination"
+        fi
+    done < <(find "$source_dir" -mindepth 1 -maxdepth 1 -type f -print0 | sort -z)
+done
