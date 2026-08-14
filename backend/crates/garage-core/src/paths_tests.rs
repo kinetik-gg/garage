@@ -18,6 +18,10 @@ fn defaults_fall_back_to_the_xdg_base_directories() {
     let paths = Paths::from_env_map(&env_of(&[("HOME", "/home/tester")]));
     assert_eq!(paths.root, PathBuf::from("/home/tester/.config/garage"));
     assert_eq!(
+        paths.themes,
+        PathBuf::from("/home/tester/.config/garage/themes")
+    );
+    assert_eq!(
         paths.state_root,
         PathBuf::from("/home/tester/.local/state/garage")
     );
@@ -123,6 +127,7 @@ fn constructing_paths_creates_nothing() {
     let home = scratch.path().to_string_lossy().into_owned();
     let paths = Paths::from_env_map(&env_of(&[("HOME", &home)]));
     assert!(!paths.root.exists());
+    assert!(!paths.themes.exists());
     assert!(!paths.state_root.exists());
     assert!(!paths.wallpaper.directory.exists());
     let left = std::fs::read_dir(scratch.path())

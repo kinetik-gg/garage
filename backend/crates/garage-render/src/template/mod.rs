@@ -29,6 +29,7 @@
 //! but broken one does not.
 
 use std::borrow::Cow;
+use std::path::PathBuf;
 
 use garage_core::paths::Paths;
 
@@ -36,6 +37,18 @@ use crate::error::TemplateError;
 
 pub(crate) mod shipped;
 pub(crate) mod vars;
+
+/// Runtime template directories, in precedence order.
+///
+/// Today this is exactly the session's `templates/` directory. A future theme directory
+/// would splice in at the front, preserving per-file override semantics: a theme that names
+/// three templates inherits every other template from the session directory, then the
+/// compiled fallback. That must wait for all three prerequisites: an `appearance.theme`
+/// schema key (a rebuild-class change under the project's values-are-data doctrine), a
+/// doctor row reporting the resolved theme, and re-validation of every rendered surface.
+fn template_search_path(paths: &Paths) -> Vec<PathBuf> {
+    vec![paths.root.join("templates")]
+}
 
 /// The values one expansion is given, by name.
 ///
@@ -100,9 +113,10 @@ impl Template {
     /// someone made, and silently rendering the old text instead would hide it until the
     /// next login.
     pub(crate) fn load(paths: &Paths, shipped: Shipped) -> Self {
-        let path = paths.root.join("templates").join(shipped.file);
-        let text =
-            std::fs::read_to_string(&path).map_or(Cow::Borrowed(shipped.compiled), Cow::Owned);
+        let text = template_search_path(paths)
+            .into_iter()
+            .find_map(|directory| std::fs::read_to_string(directory.join(shipped.file)).ok())
+            .map_or(Cow::Borrowed(shipped.compiled), Cow::Owned);
         Self {
             file: shipped.file,
             text,
@@ -153,5 +167,24 @@ impl Template {
             text.pop();
         }
         Ok(text)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::template_search_path;
+    use garage_core::paths::Paths;
+
+    #[test]
+    fn template_search_path_is_only_the_session_directory() {
+        let env = HashMap::from([("HOME".to_owned(), "/home/tester".to_owned())]);
+        let paths = Paths::from_env_map(&env);
+
+        assert_eq!(
+            template_search_path(&paths),
+            vec![paths.root.join("templates")]
+        );
     }
 }

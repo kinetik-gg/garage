@@ -175,6 +175,11 @@ pub(crate) const PALETTE: &[(&str, &str, &str)] = &[
 /// `PALETTE` role. The general-purpose lookup every per-toolkit writer built from
 /// [`GTK3_TOKENS`], [`GTK4_TOKENS`] and [`QT_ROLES`] is expected to read `PALETTE` through,
 /// so a role rename is one row here rather than an edit in every writer.
+///
+/// A disk-loaded palette would make the ownership cost explicit here: `role()` would return
+/// `Cow<'_, str>` and take a `&Palette` threaded down from `RenderCx`. The static return type
+/// records that the palette is compiled data today; changing that is an architectural cost,
+/// not a signature simplification.
 #[must_use]
 pub(crate) fn role(scheme: Scheme, name: &str) -> Option<&'static str> {
     PALETTE

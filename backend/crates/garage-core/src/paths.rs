@@ -38,6 +38,8 @@ pub struct Paths {
     pub state_home: PathBuf,
     /// Layer 2's directory.
     pub root: PathBuf,
+    /// A theme resolution root under [`Paths::root`]. Nothing writes here today.
+    pub themes: PathBuf,
     /// Layer 3's directory. Only [`Paths::generated`] is a throw-away cache; the sibling
     /// ledgers and stamps describe machine work that has already happened.
     pub state_root: PathBuf,
@@ -106,6 +108,7 @@ impl Paths {
         let config_home = path_or(env, "XDG_CONFIG_HOME", home.join(".config"));
         let state_home = path_or(env, "XDG_STATE_HOME", home.join(".local/state"));
         let root = config_home.join("garage");
+        let themes = root.join("themes");
         let state_root = state_home.join("garage");
         let generated = state_root.join("generated");
         Self {
@@ -126,6 +129,7 @@ impl Paths {
             config_home,
             state_home,
             root,
+            themes,
             state_root,
             generated,
         }
