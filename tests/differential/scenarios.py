@@ -370,7 +370,15 @@ PREFERENCES: tuple[Scenario, ...] = (
     Scenario(name="prefs-set-invalid-int", argv=("set", "appearance.border_size", "99")),
     Scenario(name="prefs-set-invalid-float", argv=("set", "appearance.glass_refraction", "2.5")),
     Scenario(name="prefs-set-invalid-enum", argv=("set", "appearance.corner_radius", '"huge"')),
-    Scenario(name="prefs-set-invalid-time", argv=("set", "appearance.night_shift_start", '"25:00"')),
+    Scenario(
+        name="prefs-set-invalid-time",
+        argv=("set", "appearance.night_shift_start", '"25:00"'),
+        # The invalid value falls back to the shipped schedule before walking
+        # the night-shift route. Disable it explicitly so that refusal always
+        # reaches the identity arm, independent of the local wall clock.
+        pre_state=prefs('[schema]\npreferences_version = 5\n\n'
+                        '[appearance]\nnight_shift_enabled = false\n'),
+    ),
     Scenario(name="prefs-set-invalid-hex-color",
              argv=("set", "appearance.wallpaper_light_color", '"blue"')),
     Scenario(name="prefs-set-invalid-nonempty-string",
@@ -388,7 +396,12 @@ PREFERENCES: tuple[Scenario, ...] = (
         # The "unchecked" kind refuses nothing: the renderer coerces whatever it
         # is handed. Here to pin that it is *accepted*, which is the half of the
         # kind table a port is most likely to get wrong in the safe-looking
-        # direction.
+        # direction. Equal endpoints take the wrapping schedule branch, whose
+        # `now >= start or now < end` condition is true at every minute, so the
+        # accepted truthy value always reaches the temperature arm.
+        pre_state=prefs('[schema]\npreferences_version = 5\n\n'
+                        '[appearance]\nnight_shift_start = "00:00"\n'
+                        'night_shift_end = "00:00"\n'),
     ),
     Scenario(
         name="prefs-set-normalised-counts",

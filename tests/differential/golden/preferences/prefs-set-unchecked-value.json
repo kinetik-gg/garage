@@ -32,7 +32,7 @@
       "kind": "file",
       "mode": "0600",
       "path": ".config/garage/preferences.toml",
-      "sha256": "30828c06796a23f73207f95f954c068a995ec36190300a97879aaf61b67c043e",
+      "sha256": "8a606288cc65cd162cdc82edb46680be52bde5b97e604cc7517d9f581de682af",
       "target": ""
     },
     {
@@ -74,9 +74,11 @@
   "exit_code": [
     0
   ],
-  "inodes": [],
+  "inodes": [
+    "CHANGED .config/garage/preferences.toml"
+  ],
   "stderr": "",
-  "stdout": "{\"ok\":true,\"data\":{\"schema\":{\"preferences_version\":5},\"appearance\":{\"wallpaper_light\":\"\",\"wallpaper_dark\":\"\",\"wallpaper_light_source\":\"image\",\"wallpaper_dark_source\":\"image\",\"wallpaper_light_color\":\"#f5f5f7\",\"wallpaper_dark_color\":\"#1c1c1e\",\"wallpaper_fit\":\"cover\",\"accent_color\":\"blue\",\"night_shift_enabled\":true,\"night_shift_start\":\"18:00\",\"night_shift_end\":\"06:00\",\"night_shift_temperature\":4500,\"theme_mode\":\"dark\",\"corner_radius\":\"normal\",\"border_size\":0,\"reduce_motion\":false,\"animation_speed\":1.0,\"theme_light_at\":\"07:00\",\"theme_dark_at\":\"19:00\",\"search_engine\":\"google\",\"search_custom_url\":\"\",\"glass_mode\":\"liquid\",\"glass_blur\":\"normal\",\"glass_transparency\":0.04,\"glass_edge_width\":24,\"glass_refraction\":0.7,\"glass_clarity\":0.75,\"glass_highlight\":0.12},\"bar\":{\"height\":43,\"padding_scale\":1.2,\"background\":\"transparent\",\"monitor_cpu\":true,\"monitor_memory\":true,\"monitor_network\":true,\"monitor_temp\":false,\"monitor_disk\":false,\"monitor_gpu\":false,\"ai_usage\":true,\"media_player\":true},\"general\":{\"terminal\":\"\",\"builtin_launcher\":true},\"indexing\":{\"enabled\":true,\"frequency_minutes\":5,\"max_depth\":8,\"directories\":\"~/Desktop\\n~/Documents\\n~/Downloads\\n~/Music\\n~/Pictures\\n~/Projects\\n~/repositories\\n~/Videos\"},\"input\":{\"pointer_sensitivity\":0.0,\"accel_profile\":\"flat\",\"natural_scroll\":false,\"keyboard_layout\":\"us\",\"repeat_rate\":25,\"repeat_delay\":600,\"touchpad_tap_to_click\":true,\"touchpad_natural_scroll\":true,\"touchpad_disable_while_typing\":true},\"lock\":{\"lock_timeout\":600,\"display_off_timeout\":900,\"suspend_timeout\":0},\"workspaces\":{\"mode\":\"per-display\",\"default_count\":4,\"counts\":\"\",\"shared_count\":8,\"indicator\":true},\"region\":{\"locale\":\"\",\"time_format\":\"24\",\"date_format\":\"dmy\",\"first_day_of_week\":\"sunday\"}},\"error\":\"\"}\n",
+  "stdout": "{\"ok\":true,\"data\":{\"schema\":{\"preferences_version\":5},\"appearance\":{\"wallpaper_light\":\"\",\"wallpaper_dark\":\"\",\"wallpaper_light_source\":\"image\",\"wallpaper_dark_source\":\"image\",\"wallpaper_light_color\":\"#f5f5f7\",\"wallpaper_dark_color\":\"#1c1c1e\",\"wallpaper_fit\":\"cover\",\"accent_color\":\"blue\",\"night_shift_enabled\":true,\"night_shift_start\":\"00:00\",\"night_shift_end\":\"00:00\",\"night_shift_temperature\":4500,\"theme_mode\":\"dark\",\"corner_radius\":\"normal\",\"border_size\":0,\"reduce_motion\":false,\"animation_speed\":1.0,\"theme_light_at\":\"07:00\",\"theme_dark_at\":\"19:00\",\"search_engine\":\"google\",\"search_custom_url\":\"\",\"glass_mode\":\"liquid\",\"glass_blur\":\"normal\",\"glass_transparency\":0.04,\"glass_edge_width\":24,\"glass_refraction\":0.7,\"glass_clarity\":0.75,\"glass_highlight\":0.12},\"bar\":{\"height\":43,\"padding_scale\":1.2,\"background\":\"transparent\",\"monitor_cpu\":true,\"monitor_memory\":true,\"monitor_network\":true,\"monitor_temp\":false,\"monitor_disk\":false,\"monitor_gpu\":false,\"ai_usage\":true,\"media_player\":true},\"general\":{\"terminal\":\"\",\"builtin_launcher\":true},\"indexing\":{\"enabled\":true,\"frequency_minutes\":5,\"max_depth\":8,\"directories\":\"~/Desktop\\n~/Documents\\n~/Downloads\\n~/Music\\n~/Pictures\\n~/Projects\\n~/repositories\\n~/Videos\"},\"input\":{\"pointer_sensitivity\":0.0,\"accel_profile\":\"flat\",\"natural_scroll\":false,\"keyboard_layout\":\"us\",\"repeat_rate\":25,\"repeat_delay\":600,\"touchpad_tap_to_click\":true,\"touchpad_natural_scroll\":true,\"touchpad_disable_while_typing\":true},\"lock\":{\"lock_timeout\":600,\"display_off_timeout\":900,\"suspend_timeout\":0},\"workspaces\":{\"mode\":\"per-display\",\"default_count\":4,\"counts\":\"\",\"shared_count\":8,\"indicator\":true},\"region\":{\"locale\":\"\",\"time_format\":\"24\",\"date_format\":\"dmy\",\"first_day_of_week\":\"sunday\"}},\"error\":\"\"}\n",
   "trace": [
     "hyprctl hyprsunset temperature 4500"
   ]
