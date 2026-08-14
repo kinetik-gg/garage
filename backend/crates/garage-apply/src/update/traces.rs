@@ -12,18 +12,23 @@
 //! delegation `bootstrap.sh` actually reads.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use garage_core::paths::Paths;
 use garage_core::traits::{Output, RunError, Runner};
 use serde_json::Value;
 
+use crate::doctor::DoctorCx;
+
 use super::lock::UpdateLock;
-use super::update_at;
+use super::transcript::{binary_build, Report};
+use super::{run_steps, update_at};
 
 const TRACES: &str = include_str!("../../testdata/update_traces.json");
+static ENVIRONMENT: Mutex<()> = Mutex::new(());
 
 /// One streamed invocation, recorded rather than run.
 #[derive(Debug, PartialEq, Eq)]
@@ -36,6 +41,7 @@ struct Streamed {
 
 struct FakeRunner {
     git: HashMap<String, (i32, String)>,
+    heads: RefCell<VecDeque<(i32, String)>>,
     hyprland: String,
     compositor: i32,
     bootstrap_status: i32,
@@ -47,6 +53,12 @@ impl Runner for FakeRunner {
     fn run(&self, command: &[&str], _timeout: Duration) -> Result<Output, RunError> {
         self.trace.borrow_mut().push(command.join(" "));
         let (status, stdout) = match command {
+            ["git", "-C", _, "rev-parse", "HEAD"] => self
+                .heads
+                .borrow_mut()
+                .pop_front()
+                .or_else(|| self.git.get("rev-parse HEAD").cloned())
+                .unwrap_or((0, String::new())),
             ["git", "-C", _, rest @ ..] => self
                 .git
                 .get(&rest.join(" "))
@@ -116,6 +128,7 @@ impl World {
             )
             .replace(&self.home.to_string_lossy().into_owned(), "$HOME")
             .replace(&self.plugins.to_string_lossy().into_owned(), "$PLUGINS")
+            .replace(&binary_build(), "$GARAGE_BINARY")
     }
 
     fn plant(&self, base: &Path, spec: &Value) {
@@ -252,12 +265,28 @@ fn runner_for(scenario: &Value) -> FakeRunner {
     }
     FakeRunner {
         git,
+        heads: RefCell::new(
+            scenario["heads"]
+                .as_array()
+                .map(|heads| heads.iter().map(output_pair).collect())
+                .unwrap_or_default(),
+        ),
         hyprland: scenario["hyprland"].as_str().unwrap_or("").to_owned(),
         compositor: number(scenario, "compositor"),
         bootstrap_status: number(scenario, "bootstrap_status"),
         trace: RefCell::new(Vec::new()),
         streamed: RefCell::new(Vec::new()),
     }
+}
+
+fn output_pair(pair: &Value) -> (i32, String) {
+    let status = pair
+        .get(0)
+        .and_then(Value::as_i64)
+        .and_then(|status| i32::try_from(status).ok())
+        .unwrap_or(0);
+    let stdout = pair.get(1).and_then(Value::as_str).unwrap_or("").to_owned();
+    (status, stdout)
 }
 
 /// One `i32` out of the scenario, defaulting to zero.
@@ -273,6 +302,7 @@ fn number(scenario: &Value, key: &str) -> i32 {
 /// of these running at once would read each other's.
 #[test]
 fn every_scenario_prints_and_runs_what_the_python_did() {
+    let _environment = ENVIRONMENT.lock().expect("update test environment");
     let document: Value =
         serde_json::from_str(TRACES).expect("testdata/update_traces.json is valid JSON");
     let scenarios = document
@@ -303,6 +333,12 @@ fn check(scenario: &Value) {
         Some(world.checkout.clone()),
         Some(&mut out),
     );
+    if argv.iter().any(|argument| argument == "--dry-run") {
+        assert!(
+            !paths.state_root.join("updates").exists(),
+            "{name}: a dry run created the transcript directory"
+        );
+    }
     assert_eq!(
         world.normalize(&out),
         scenario["stdout"].as_str().unwrap_or(""),
@@ -325,6 +361,76 @@ fn check(scenario: &Value) {
     }
     check_calls(&runner, &world, scenario, name);
     drop(std::fs::remove_dir_all(&world.root));
+}
+
+/// The cheap live-path substitute: a real (non-dry) `run_steps` over a scratch home, with
+/// every process boundary faked. It proves the parent report and the private file are the
+/// same bytes while the fake pull moves between two distinct commits.
+#[test]
+fn a_real_scratch_run_persists_the_header_and_complete_parent_report() {
+    let _environment = ENVIRONMENT.lock().expect("update test environment");
+    let scenario = real_transcript_scenario();
+    let (world, runner, paths) = build(&scenario);
+    let cx = DoctorCx::at(&paths, &runner, world.checkout.clone());
+    let mut report = Report::new(false, true);
+
+    let status = run_steps(&cx, &mut report, false).expect("scratch update");
+    assert_eq!(status, 0);
+    let captured = report.captured().expect("captured report");
+    assert_real_transcript(captured, &paths);
+    drop(report);
+    drop(std::fs::remove_dir_all(&world.root));
+}
+
+fn real_transcript_scenario() -> Value {
+    serde_json::json!({
+        "name": "real-transcript",
+        "tree": {},
+        "has_git": true,
+        "git": {
+            "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": [0, "origin/main"],
+            "fetch --quiet": [0, ""],
+            "log --oneline HEAD..origin/main": [0, "2222222 transcript feature"],
+            "status --porcelain": [0, ""],
+            "merge --ff-only origin/main": [0, ""],
+            "rev-parse --short HEAD": [0, "2222222"]
+        },
+        "heads": [[0, "1111111111111111111111111111111111111111"],
+                  [0, "2222222222222222222222222222222222222222"]],
+        "hyprland": "",
+        "compositor": 1,
+        "bootstrap_status": 0
+    })
+}
+
+fn assert_real_transcript(captured: &str, paths: &Paths) {
+    let expected_header = format!(
+        concat!(
+            "Garage update\n",
+            "    checkout commit before pull  1111111111111111111111111111111111111111\n",
+            "    checkout commit after pull   2222222222222222222222222222222222222222\n",
+            "    binary                       {}\n"
+        ),
+        binary_build()
+    );
+    assert!(captured.starts_with(&expected_header), "{captured}");
+    assert!(captured.contains("bootstrap argv    "));
+    assert!(captured.contains("bootstrap cwd     "));
+    assert!(captured.contains("bootstrap env     GARAGE_SKIP_PLUGIN_DEPLOY=1"));
+    assert!(captured.contains("bootstrap env     GARAGE_FORCE=<unset>"));
+    assert!(captured.contains("bootstrap output  terminal (not included in this transcript)"));
+    assert!(captured.contains("bootstrap exit    0"));
+
+    let updates = paths.state_root.join("updates");
+    let transcripts: Vec<PathBuf> = std::fs::read_dir(updates)
+        .expect("updates directory")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .collect();
+    assert_eq!(transcripts.len(), 1);
+    let on_disk = std::fs::read_to_string(transcripts.first().expect("one transcript"))
+        .expect("transcript text");
+    assert_eq!(on_disk, captured);
 }
 
 /// The two process-boundary surfaces: what was captured, and what was streamed.
