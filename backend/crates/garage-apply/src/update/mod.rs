@@ -1,12 +1,13 @@
-//! `garage update`: pull, check upgrade space, sweep dead links, then delegate to
-//! `bootstrap.sh`.
+//! `garage update`: pull, check upgrade space, preserve the host preferences, sweep dead
+//! links, then delegate to `bootstrap.sh`.
 //!
 //! # The delegate-to-bootstrap banner
 //!
-//! Design: pull, check upgrade space, sweep, then delegate. Not a native reimplementation,
-//! and the choice is not close. What an update has to do on rolling Arch is make this machine
-//! match the checkout again: install packages the list has gained, enable units it has gained,
-//! write per-user files that are new, put every link back, and leave the user's own files alone.
+//! Design: pull, check upgrade space, preserve layer 2, sweep, then delegate. Not a native
+//! reimplementation, and the choice is not close. What an update has to do on rolling Arch is
+//! make this machine match the checkout again: install packages the list has gained, enable
+//! units it has gained, write per-user files that are new, put every link back, and leave the
+//! user's own files alone.
 //! `bootstrap.sh` already does all of that, idempotently and by design -- its freshness gate
 //! short-circuits on an install it can already see, packages go in with `--needed`,
 //! `systemctl enable` is bookkeeping, generated files are written only when absent, and every
@@ -27,29 +28,22 @@
 //! newly listed packages without a full upgrade first is an unsupported partial upgrade on
 //! Arch.
 //!
-//! Two things `update` keeps for itself, because `bootstrap.sh` cannot answer them: the
-//! dead-link sweep ([`crate::doctor`]'s `dangling_repo_links()`), which needs to know what the
-//! checkout no longer ships -- the one thing a scan of the *current* manifest cannot see --
-//! and the plugin decision, since `bootstrap.sh` deploys unconditionally (right for an
-//! install, wasteful for an update that rebuilds an unmoved ABI), so `update` compares the
-//! running ABI against what is deployed itself and passes
-//! `GARAGE_SKIP_PLUGIN_DEPLOY=1` so `bootstrap.sh` does not do it twice.
+//! The lifecycle guards, dead-link sweep and plugin decision stay here because bootstrap
+//! cannot answer them. The sweep needs to see what the checkout no longer ships; bootstrap
+//! deploys plugins unconditionally, while update compares the running ABI first and passes
+//! `GARAGE_SKIP_PLUGIN_DEPLOY=1` so bootstrap does not do that work twice.
 //!
 //! Takes `argv` and returns an exit code, prints lines rather than the JSON response
 //! envelope, and streams `bootstrap.sh`'s own output to the terminal rather than capturing it
 //! -- the same reason [`Runner::run_streamed`] exists rather than [`Runner::run`].
 //!
-//! [`pull`] is the git half, kept apart so it can be read on its own: the fast-forward, the
-//! refusals it treats as notes rather than failures, and the `git_output()` wrapper
-//! `doctor`'s `checkout_commit()` shares with it.
-//!
-//! Step 5 is the one step that both renders and pushes: the Python loads the preferences
+//! Step 6 is the one step that both renders and pushes: the Python loads the preferences
 //! (which runs any schema migration a pull brought in), renders everything, and then calls
 //! `push_accent()`, `push_corner_radius()` and `push_theme()` -- "the toolkit configs it just
 //! rewrote are half a theme until the portal setting, xsettingsd and the two signalled
 //! clients agree with them". Not `apply_preferences()`, which would additionally seed
 //! `displays.toml`, dress the wallpaper and restart `hypridle`: the compositor's own reload is
-//! step 7, which knows how to skip a TTY, and an update is a convergence rather than a session
+//! step 8, which knows how to skip a TTY, and an update is a convergence rather than a session
 //! start. `--dry-run` reaches none of it.
 
 use std::ffi::OsString;
@@ -75,6 +69,7 @@ use crate::theme::push_theme;
 
 mod lock;
 mod pull;
+mod snapshot;
 mod space;
 #[cfg(test)]
 mod traces;
@@ -96,7 +91,7 @@ use transcript::Report;
 /// cannot be created or flushed;
 /// [`ApplyError::Settings`] for an argument this command does not take, for a binary that is
 /// not inside a Garage checkout, and for a checkout with no `bootstrap.sh`; whatever the
-/// render raises; and whatever step 5's push half raises.
+/// render raises; and whatever step 6's push half raises.
 pub fn update(paths: &Paths, proc: &dyn Runner, argv: &[String]) -> Result<i32, ApplyError> {
     let run = UpdateRun {
         root: None,
@@ -141,7 +136,7 @@ fn update_at(
     outcome
 }
 
-/// The seven steps, and the summary that reads their problems back.
+/// The eight steps, and the summary that reads their problems back.
 fn run_steps(
     cx: &DoctorCx<'_>,
     report: &mut Report,
@@ -160,6 +155,9 @@ fn run_steps(
     report_checkout(report, &checkout.lines)?;
 
     if !space::check(paths, &cx.root, report, space_probe)? {
+        return Ok(1);
+    }
+    if !snapshot::save(paths, cx.proc, report, &checkout.before)? {
         return Ok(1);
     }
     sweep_step(cx, report, &mut problems)?;
@@ -217,7 +215,7 @@ fn report_checkout(report: &mut Report, lines: &[String]) -> Result<(), ApplyErr
     Ok(())
 }
 
-/// Step 3: links to files the update deleted.
+/// Step 4: links to files the update deleted.
 fn sweep_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,
@@ -248,7 +246,7 @@ fn sweep_step(
     Ok(())
 }
 
-/// Step 4: converge this machine on the checkout, by handing the terminal to `bootstrap.sh`.
+/// Step 5: converge this machine on the checkout, by handing the terminal to `bootstrap.sh`.
 ///
 /// The Python copies `os.environ`, adds its two variables and passes the copy to the child.
 /// [`Runner::run_streamed`] hands the child this process's own environment, so the two
@@ -333,7 +331,7 @@ impl Drop for Environment {
     }
 }
 
-/// Step 5: migrations and the generated state.
+/// Step 6: migrations and the generated state.
 ///
 /// The load *is* the migration: it is version-gated and runs inside `load_preferences()`, so a
 /// pull that bumped the schema is applied here. The corrected file itself is written on the
@@ -364,7 +362,7 @@ fn render_step(paths: &Paths, proc: &dyn Runner, report: &mut Report) -> Result<
     // `render_all()` only writes files now. These three are what it used to push from inside
     // itself, and an update still owes them: the toolkit configs it just rewrote are half a
     // theme until the portal setting, xsettingsd and the two signalled clients agree with
-    // them. The compositor's own reload is step 7, which knows how to skip a TTY.
+    // them. The compositor's own reload is step 8, which knows how to skip a TTY.
     apply_accent_push(&mut cx);
     push_corner_radius(&mut cx);
     push_theme(&mut cx)?;
@@ -375,7 +373,7 @@ fn render_step(paths: &Paths, proc: &dyn Runner, report: &mut Report) -> Result<
     Ok(())
 }
 
-/// Step 6: the plugin ABI, and whether a redeploy is owed.
+/// Step 7: the plugin ABI, and whether a redeploy is owed.
 fn plugin_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,
@@ -466,7 +464,7 @@ fn redeploy(
     Ok(())
 }
 
-/// Step 7: the reload, which knows how to skip a TTY.
+/// Step 8: the reload, which knows how to skip a TTY.
 fn reload_step(
     cx: &DoctorCx<'_>,
     report: &mut Report,

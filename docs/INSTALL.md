@@ -178,14 +178,34 @@ garage update            # pull, relink, converge, reload
 garage update --dry-run  # print all of that and do none of it
 ```
 
-The whole lifecycle in one command, deliberately **bootstrap plus two things
-bootstrap cannot do**:
+After checking free space, a real update copies Garage's four user-owned files
+(`preferences.toml`, `displays.toml`, `keybindings.toml`, and
+`workspace-blocks.toml`) to
+`~/.garage-backup/<timestamp>/pre-update/` before it changes the home or the
+system. The same directory records which files were absent, the checkout commit
+from before the pull, and the explicitly installed package list. Generated
+fragments are not copied: they are a cache rebuilt by the render step.
+
+To restore, replace `<newest>` below with the newest timestamped directory, copy
+its backed-up TOML files to `~/.config/garage/`, then apply them:
+
+```sh
+backup_dir="$HOME/.garage-backup/<newest>/pre-update"
+cp "$backup_dir"/*.toml "$HOME/.config/garage/"
+garage apply
+```
+
+The whole lifecycle in one command, deliberately **bootstrap plus the lifecycle
+work bootstrap cannot do**:
 
 1. **Pull the checkout.** Fast-forward only. Skipped with a note when the branch
    has no upstream — every install today (see [The one-liner](#the-one-liner)) —
    and when the working tree has local changes, because merging across those is the
    one operation that loses work.
-2. **Sweep links to files the new version deleted.** `stow --restow` only unlinks
+2. **Check room and preserve the host.** Update refuses a real run below its
+   free-space floor, then makes the complete `pre-update` copy described above.
+   A dry run crosses neither write boundary.
+3. **Sweep links to files the new version deleted.** `stow --restow` only unlinks
    what the package still contains, and bootstrap's pre-stow scan walks the paths
    the checkout manages *now*, so a file deleted between versions leaves a live
    symlink neither will ever look at. Update finds it from the other end: every
@@ -193,13 +213,13 @@ bootstrap cannot do**:
    that points into this checkout and no longer resolves — scoped to those four
    because `$HOME` is full of symlinks that dangle legitimately, and a broader
    sweep would eventually delete one.
-3. **Re-run `bootstrap.sh`**, which installs packages the list has gained, enables
+4. **Re-run `bootstrap.sh`**, which installs packages the list has gained, enables
    units it has gained, rebuilds and installs the five Rust backend binaries, writes
    new per-user files, backs up anything in the way, and restows — safely, for the reasons in
    [the freshness policy](#the-freshness-policy). This is also why update asks for
    `sudo` and can upgrade the system: installing a newly listed package on Arch
    without a full upgrade first is a partial upgrade, which is unsupported.
-4. **Render and reload.** The render runs any preference-schema migration the new
+5. **Render and reload.** The render runs any preference-schema migration the new
    version added, then `hyprctl reload` picks it all up. With no compositor
    reachable — a TTY, an SSH shell — the reload is skipped with a note and the new
    configuration lands at the next login.

@@ -5,8 +5,9 @@
 //! on the machines Garage actually runs on -- every install today is local-only, so the
 //! no-upstream branch is the one that actually runs.
 //!
-//! Separated from [`super`]'s six steps so it can be exercised against a scratch repository
-//! with a real upstream, which is the Python's own reason for splitting it out of `update()`.
+//! Separated from [`super`]'s remaining steps so it can be exercised against a scratch
+//! repository with a real upstream, which is the Python's own reason for splitting it out of
+//! `update()`.
 
 use std::path::Path;
 use std::time::Duration;

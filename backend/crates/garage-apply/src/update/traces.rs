@@ -1,4 +1,4 @@
-//! `update`'s seven steps, as traces: what it ran, in what order, and what it printed.
+//! `update`'s eight steps, as traces: what it ran, in what order, and what it printed.
 //!
 //! `testdata/update_traces.json` comes from a throwaway generator, as do the other trace
 //! fixtures. Git and bootstrap are faked: update streams bootstrap even in a dry run, so a
