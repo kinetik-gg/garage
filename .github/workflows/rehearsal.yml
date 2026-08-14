@@ -1,0 +1,67 @@
+name: Install rehearsal
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  # Replaces the manually run fresh-Arch container rehearsal. A plain container has no
+  # service manager, so only systemctl bookkeeping is tolerated; every other install step
+  # runs for real as the non-root desktop user.
+  arch-bootstrap:
+    name: Fresh Arch bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Prepare the container and desktop user
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/pacman -Syu --noconfirm --needed sudo git shadow
+
+          useradd --create-home --shell /bin/bash garage-ci
+          install -d -m 0750 /etc/sudoers.d
+          printf '%s\n' \
+            'Defaults:garage-ci secure_path="/usr/local/bin:/usr/bin:/bin"' \
+            'garage-ci ALL=(ALL) NOPASSWD: ALL' \
+            >/etc/sudoers.d/garage-ci
+          chmod 0440 /etc/sudoers.d/garage-ci
+
+          install -d -m 0755 /usr/local/bin
+          tee /usr/local/bin/pacman >/dev/null <<'PACMAN'
+          #!/usr/bin/env bash
+          exec /usr/bin/pacman --noconfirm "$@"
+          PACMAN
+          chmod 0755 /usr/local/bin/pacman
+
+          tee /usr/local/bin/systemctl >/dev/null <<'SYSTEMCTL'
+          #!/usr/bin/env bash
+          if [[ $* == 'is-enabled display-manager.service' ]]; then
+            exit 1
+          fi
+          printf 'container rehearsal: tolerated systemctl %s\n' "$*" >&2
+          exit 0
+          SYSTEMCTL
+          chmod 0755 /usr/local/bin/systemctl
+
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Give the desktop user its checkout
+        shell: bash
+        run: chown -R garage-ci:garage-ci "$GITHUB_WORKSPACE"
+
+      - name: Run the bootstrap non-interactively
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -H -u garage-ci env \
+            PATH=/usr/local/bin:/usr/bin:/bin \
+            CI=1 \
+            ./bootstrap.sh
