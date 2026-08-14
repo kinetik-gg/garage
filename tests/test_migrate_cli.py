@@ -38,19 +38,29 @@ class MigrateCli(unittest.TestCase):
         )
         return completed, home / ".local" / "state" / "garage" / "migrations.json"
 
-    def test_empty_registry_has_nothing_to_apply_and_stamps_nothing(self) -> None:
+    def test_fresh_home_settles_the_first_migration_as_nothing_to_do(self) -> None:
         completed, stamp = self.run_migrate()
         self.assertEqual(completed.returncode, 0)
-        self.assertEqual(completed.stdout, "Garage migrate\n\nNothing to apply.\n")
+        self.assertEqual(
+            completed.stdout,
+            "Garage migrate\n"
+            "  ok    001-python-backend-residue  remove the deleted Python backend's "
+            "bytecode residue -- nothing to do\n\n"
+            "1 migration(s) settled.\n",
+        )
         self.assertEqual(completed.stderr, "")
-        self.assertFalse(stamp.exists())
+        self.assertIn('"id": "001-python-backend-residue"', stamp.read_text())
+        self.assertIn('"kind": "nothing-to-do"', stamp.read_text())
 
-    def test_empty_registry_dry_run_is_read_only(self) -> None:
+    def test_fresh_home_dry_run_is_read_only(self) -> None:
         completed, stamp = self.run_migrate("--dry-run")
         self.assertEqual(completed.returncode, 0)
         self.assertEqual(
             completed.stdout,
-            "Garage migrate (dry run: nothing will be changed)\n\nNothing to apply.\n",
+            "Garage migrate (dry run: nothing will be changed)\n"
+            "  ok    001-python-backend-residue  remove the deleted Python backend's "
+            "bytecode residue -- nothing to do\n\n"
+            "Dry run complete. Nothing was changed.\n",
         )
         self.assertEqual(completed.stderr, "")
         self.assertFalse(stamp.exists())
