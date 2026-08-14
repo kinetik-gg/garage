@@ -172,7 +172,22 @@ default, coerce, set, access, and key-to-`Route` paths. `Route::steps()` is the 
 mechanism table that `apply_changed_preference()` walks; exhaustive enum dispatch and the schema
 crate's unit tests keep declaration order, shipped defaults, routes, and steps in sync.
 
-## 8. Do not touch (without reading the rustdoc first)
+## 8. Where a theme would attach
+
+No theme data or selection exists today: the two-scheme `PALETTE` is the whole look today. Three
+dormant seams mark where a future themes-as-data implementation would attach:
+
+- `template_search_path()` owns runtime template precedence; a selected theme directory would go
+  in front so each file overrides independently and omitted templates keep inheriting.
+- `role()` is the palette lookup seam and documents the ownership and context cost of loading a
+  palette from disk.
+- `Paths::themes` is the resolution root. Nothing writes there today.
+
+Activating those seams first requires an `appearance.theme` schema key — rebuild-class work under
+the values-are-data doctrine — a doctor row reporting the resolved theme, and re-validation of
+every rendered surface. Until all three exist, no current-theme state belongs in resolution.
+
+## 9. Do not touch (without reading the rustdoc first)
 
 | Invariant | What comes back if it changes |
 | --- | --- |
