@@ -1,7 +1,9 @@
 [Unit]
 Description=Synchronize Night Shift with Jakarta local time
+# This timer is active with the user manager, including before graphical login.
+# Pulling hyprsunset here would transitively pull graphical-session.target.
 After=hyprsunset.service
-Requires=hyprsunset.service
+ConditionEnvironment=WAYLAND_DISPLAY
 
 [Service]
 Type=oneshot

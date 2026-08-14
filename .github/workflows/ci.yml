@@ -55,6 +55,34 @@ jobs:
       - name: Check shell syntax
         run: bash -n bootstrap.sh install.sh install/lib.sh install/[0-9][0-9]-*.sh
 
+      - name: Check graphical user-unit ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -H -E '^After=.*graphical-session\.target' desktop/.config/systemd/user/*.path; then
+            echo "User path units are implicitly Before=paths.target; ordering one after graphical-session.target creates a cycle through basic.target." >&2
+            exit 1
+          fi
+
+          for timer in desktop/.config/systemd/user/*.timer; do
+            trigger=$(sed -n 's/^Unit=//p' "$timer")
+            [[ -n $trigger ]] || trigger="$(basename "${timer%.timer}").service"
+            trigger_path="desktop/.config/systemd/user/$trigger"
+            [[ -f $trigger_path ]] || continue
+
+            while IFS='=' read -r directive dependencies; do
+              [[ $directive == Wants || $directive == Requires ]] || continue
+              for dependency in $dependencies; do
+                if awk -v unit="$dependency" \
+                  '$1 == unit && $1 !~ /\.timer$/ { found = 1 } END { exit !found }' \
+                  system/manifest/units.list; then
+                  echo "$trigger_path: timer-triggered services must not pull managed graphical unit $dependency." >&2
+                  exit 1
+                fi
+              done
+            done <"$trigger_path"
+          done
+
       - name: Check the numbered install stages
         shell: bash
         run: |

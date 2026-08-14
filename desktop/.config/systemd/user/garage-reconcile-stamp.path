@@ -1,7 +1,9 @@
 [Unit]
 Description=Watch for package transactions that need Garage reconciliation
 PartOf=graphical-session.target
-After=graphical-session.target
+# Do not order a path unit after graphical-session.target. Path units are
+# implicitly ordered before paths.target, which is below basic.target; reversing
+# that chain here creates a cycle and lets the target become active before UWSM.
 
 [Path]
 PathChanged=/run/garage/reconcile-stamp
