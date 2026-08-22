@@ -546,6 +546,29 @@ ShellRoot {
         }
     }
 
+    // The bar. Its module clicks arrive here with the screen they were clicked on
+    // and, where the old waybar click carried one, the anchor X under the module --
+    // routed through the very same functions the keybinds use, so a bar click and a
+    // keybind can never disagree about what opens.
+    Bar {
+        onSurfaceRequested: (surface, screenName, anchorX) => {
+            if (surface === "session")
+                shell.sessionOn(screenName);
+            else if (surface === "launcher")
+                shell.launcherOn(screenName);
+            else if (surface === "notifications")
+                shell.notificationsOn(screenName);
+            else if (surface === "controlCenter")
+                shell.controlCenterOn(screenName);
+            else if (surface === "media")
+                shell.mediaOn(screenName, anchorX);
+            else if (surface === "aiUsage")
+                shell.aiUsageOn(screenName);
+            else if (surface.startsWith("monitor:"))
+                shell.monitorOn(screenName, anchorX);
+        }
+    }
+
     // Whether the shell's own launcher is switched on. SUPER+Space already asks
     // the same marker through its wrapper; this closes the other routes in, so
     // nothing can open a launcher the user turned off.
@@ -589,6 +612,21 @@ ShellRoot {
             shell.toggleSurface("launcher", () => {
                 shell.launcherScreenName = shell.focusedScreenName();
             });
+        }
+
+        function launcherOn(screenName: string): void {
+            if (String(launcherMode.text() || "").trim() === "external") {
+                shell.requestCloseSurface("launcher");
+                return;
+            }
+            const sameScreen = shell.launcherScreenName === screenName;
+            const open = () => {
+                shell.launcherScreenName = screenName;
+            };
+            if (sameScreen)
+                shell.toggleSurface("launcher", open);
+            else
+                shell.openSurface("launcher", open);
         }
 
         function closeLauncher(): void {
