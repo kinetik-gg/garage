@@ -201,15 +201,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "garage-waybar"
-version = "0.1.0"
-dependencies = [
- "garage-core",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -13,7 +13,6 @@ garage_binaries=(
     garage-metrics
     garage-file-index
     garage-ai-usage
-    garage-waybar-module
     garage-bar-probe
 )
 for garage_binary in "${garage_binaries[@]}"; do

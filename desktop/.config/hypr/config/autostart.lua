@@ -5,8 +5,8 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("dbus-update-activation-environment --systemd --all")
     hl.exec_cmd("~/.local/bin/garage reconcile")
     hl.exec_cmd("~/.local/bin/garage apply")
-    -- Keep session infrastructure supervised by systemd.
-    hl.exec_cmd("systemctl --user start waybar.service")
+    -- Keep session infrastructure supervised by systemd. The bar lives in
+    -- garage-shell now; there is no separate bar unit to start.
     hl.exec_cmd("systemctl --user start garage-shell.service")
     hl.exec_cmd("systemctl --user start swayosd.service")
     hl.exec_cmd("systemctl --user start hypridle.service")
