@@ -120,16 +120,15 @@ ShellRoot {
             || name === "aiPalette" || name === "launcher";
     }
 
-    // The surfaces whose click-outside dismissal the shared catcher owns.
-    //
-    // Not the session menu: it has its own dismissal, a non-consuming mouse
-    // bind that runs garage-menu-dismiss and compares the cursor against the
-    // menu's own box, and that one works. Not the screenshot pill either --
-    // the catcher stands down for the pill rather than guarding it.
+    // The surfaces whose click-outside dismissal the shared catcher owns. The
+    // session menu is among them now: its separate mouse-bind dismissal died
+    // with the bar swap, and the catcher's geometry trick -- collapse to 1px
+    // rather than unmap when disarmed -- is what replaces it.
     function catchesOutsideClicks(name) {
         return name === "launcher"
             || name === "notificationCenter"
             || name === "controlCenter"
+            || name === "session"
             || name === "monitorPalette"
             || name === "mediaPalette"
             || name === "aiPalette";

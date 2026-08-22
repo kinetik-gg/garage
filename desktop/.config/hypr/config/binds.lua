@@ -364,10 +364,8 @@ bind("Print",                      "Screenshot a region to the clipboard", (os.g
 bind(mainMod .. " + Print",        "Screenshot the display to the clipboard", (os.getenv("HOME") or "") .. "/.local/bin/garage-screenshot-copy monitor")
 bind(mainMod .. " + SHIFT + S",    "Open the screenshot tool",           "qs ipc --config garage call shell screenshot")
 bind(mainMod .. " + Escape",       "Open the session menu",              "qs ipc --config garage call shell session")
--- Non-consuming: the click still reaches the window underneath, this only tells
--- the shell to close an open system menu.
-bind("mouse:272", "Dismiss the open system menu", (os.getenv("HOME") or "") .. "/.local/bin/garage-menu-dismiss", { non_consuming = true })
-bind("mouse:273", "Dismiss the open system menu", (os.getenv("HOME") or "") .. "/.local/bin/garage-menu-dismiss", { non_consuming = true })
+-- Click-outside dismissal of every transient surface, the session menu included,
+-- is the shell's own DismissCatcher; no compositor mouse binds take part anymore.
 
 -- The Wallpaper pane, not the standalone picker script: the wallpaper is now a
 -- preference per appearance, and the script wrote the `current` symlink behind
