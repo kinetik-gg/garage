@@ -1,0 +1,16 @@
+[package]
+name = "garage-bar-probe"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "garage-bar-probe"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+garage-core = { path = "../garage-core" }
+serde_json = "1.0.145"
+thiserror = "2.0.20"
