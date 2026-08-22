@@ -46,7 +46,6 @@
 //! entry. No `unsafe` is introduced on either side of the boundary -- this crate forbids it,
 //! and so does the crate it now calls.
 
-use garage_core::fs::marker::write_marker;
 use garage_core::paths::Paths;
 use garage_core::pyrepr::py_str_repr;
 use garage_core::schema::enums::{Scheme, ThemeMode};
@@ -58,26 +57,17 @@ use crate::palette::table::role as palette_role;
 use crate::palette::toolkits::render_toolkits;
 use crate::search::render_search_engine;
 
-/// Write every file the resolved palette decides: the toolkit configs, the search engine
-/// marker, and the bar's foreground marker (garage:4628-4652).
+/// Write every file the resolved palette decides: the toolkit configs and the search engine
+/// marker (garage:4628-4652).
 ///
 /// # Errors
 ///
-/// [`RenderError::Marker`] if the bar foreground or search engine marker could not be
-/// written, or whatever [`render_toolkits`] returns.
+/// [`RenderError::Marker`] if the search engine marker could not be written, or whatever
+/// [`render_toolkits`] returns.
 pub fn render_theme(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let scheme = resolve_theme(cx.prefs());
     render_search_engine(cx)?;
-    // The bar's widgets draw their own SVG text, which no stylesheet reaches. Publish the
-    // resolved theme foreground so they match Waybar's CSS.
-    write_marker(
-        &cx.paths().markers.bar_foreground,
-        &format!("{}\n", opaque_role(scheme, "on_bg")),
-    )?;
-    // The configuration goes with it: the bar's stylesheet is the one file here that reads a
-    // preference rather than only the palette -- [bar]'s background and padding_scale, which
-    // have to be generated into the CSS.
-    render_toolkits(cx.paths(), scheme, cx.prefs())
+    render_toolkits(cx.paths(), scheme)
 }
 
 /// Which palette is in effect right now (garage:3693-3711), reading the wall clock through
@@ -195,10 +185,6 @@ fn is_hex_color(value: &str) -> bool {
 /// `#000000` / `#ffffff`; `palette::parity::every_role_is_defined_for_both_schemes` pins the
 /// table against the Python source, so a miss here would be a broken build rather than a
 /// condition a running renderer could reach.
-fn opaque_role(scheme: Scheme, name: &str) -> &'static str {
-    palette_role(scheme, name).unwrap_or_default()
-}
-
 /// Minutes since local midnight, which is the whole of what the two schedules compare.
 ///
 /// `tz-rs` reads `TZ` first and `/etc/localtime` after it, exactly as libc does for the

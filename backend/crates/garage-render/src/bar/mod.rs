@@ -1,11 +1,6 @@
-//! The bar's three generated fragments, plus the pure CSS pieces they and the palette share.
+//! The bar's rendered layout, plus the pure palette pieces it and the shell share.
 //!
-//! [`workspaces`] and [`widgets`] each write one fragment and carry a stub; [`style`] and
-//! [`spacing`] are the pure string builders behind the bar's stylesheet and stay doc-only,
-//! reached from [`crate::palette::waybar`] rather than from a fragment of their own.
+//! [`layout`] writes the one watched marker the shell's bar consumes; [`crate::palette`]
+//! keeps the role table every toolkit including the bar's tint reads from.
 
 pub(crate) mod layout;
-pub(crate) mod spacing;
-pub(crate) mod style;
-pub(crate) mod widgets;
-pub(crate) mod workspaces;

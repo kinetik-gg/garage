@@ -211,7 +211,7 @@ fn json_dumps_matches_cpython_indent_two_over_a_nested_table() {
 }
 
 /// Three levels of nesting -- a table inside a table inside a table -- the shape
-/// `waybar-clock.jsonc` actually writes.
+/// a generated JSON document actually writes.
 #[test]
 fn json_dumps_matches_cpython_indent_two_over_three_levels() {
     let clock = Value::Table(vec![(

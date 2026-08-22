@@ -28,7 +28,6 @@ pub fn run_apply(step: ApplyStep, cx: &mut SessionCx<'_>) -> Result<(), ApplyErr
         ApplyStep::CornerRadius => corner::apply_corner_radius(cx),
         ApplyStep::Border => border::apply_border(cx),
         ApplyStep::Motion => motion::apply_motion(cx),
-        ApplyStep::BarStyle => bar::apply_bar_style(cx),
         ApplyStep::ThemeIfSchemeMoved => theme::apply_theme_if_scheme_moved(cx),
         ApplyStep::Glass => glass::apply_glass(cx),
         ApplyStep::NightShift => {
@@ -43,7 +42,6 @@ pub fn run_apply(step: ApplyStep, cx: &mut SessionCx<'_>) -> Result<(), ApplyErr
         ApplyStep::Locale => locale::apply_locale(cx),
         ApplyStep::Region => region::apply_region(cx),
         ApplyStep::WorkspacePlan => workspaces::apply_workspace_plan(cx),
-        ApplyStep::BarWorkspaces => bar::apply_bar_workspaces(cx),
-        ApplyStep::BarWidgets => bar::apply_bar_widgets(cx),
+        ApplyStep::BarLayout => bar::apply_bar_layout(cx),
     }
 }

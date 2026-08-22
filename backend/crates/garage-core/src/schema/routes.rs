@@ -36,10 +36,8 @@ pub enum Route {
     Search,
     CornerRadius,
     Border,
-    /// The bar is the third party to this one. Its workspace dots are the only
-    /// movement outside the compositor, and waybar cannot see Hyprland's
-    /// animations switch, so the stylesheet carries a Reduce Motion of its own
-    /// and has to be rewritten and re-read when the setting moves.
+    /// Reduce Motion, for the surfaces the compositor's own switch cannot
+    /// reach: the shell reads the marker this route publishes.
     Motion,
     /// The scheme and its schedule; nothing moves unless the resolved scheme
     /// actually changed.
@@ -135,8 +133,6 @@ pub enum ApplyStep {
     Border,
     /// `apply_motion`
     Motion,
-    /// `apply_bar_style`
-    BarStyle,
     /// `apply_theme_if_scheme_moved`
     ThemeIfSchemeMoved,
     /// `apply_glass`
@@ -161,10 +157,8 @@ pub enum ApplyStep {
     Region,
     /// `apply_workspace_plan`
     WorkspacePlan,
-    /// `apply_bar_workspaces`
-    BarWorkspaces,
-    /// `apply_bar_widgets`
-    BarWidgets,
+    /// `apply_bar_layout`
+    BarLayout,
 }
 
 impl Route {
@@ -190,16 +184,10 @@ impl Route {
             Self::Search => &[Step::Render(R::SearchEngine)],
             Self::CornerRadius => &[Step::Render(R::Preferences), Step::Apply(A::CornerRadius)],
             Self::Border => &[Step::Render(R::Preferences), Step::Apply(A::Border)],
-            // The bar is the third party to this one. Its workspace dots are
-            // the only movement outside the compositor, and waybar cannot see
-            // Hyprland's animations switch, so the stylesheet carries a Reduce
-            // Motion of its own and has to be rewritten and re-read when the
-            // setting moves.
             Self::Motion => &[
                 Step::Render(R::Preferences),
                 Step::Render(R::Motion),
                 Step::Apply(A::Motion),
-                Step::Apply(A::BarStyle),
             ],
             Self::Theme => &[Step::Apply(A::ThemeIfSchemeMoved)],
             Self::Glass => &[Step::Render(R::Preferences), Step::Apply(A::Glass)],
@@ -237,17 +225,14 @@ impl Route {
             Self::Locale => &[Step::Apply(A::Locale), Step::Apply(A::Region)],
             Self::Region => &[Step::Apply(A::Region)],
             Self::Workspaces => &[Step::Apply(A::WorkspacePlan)],
-            // Nothing in the compositor depends on this, so the desktop is
-            // left alone.
-            Self::WorkspaceIndicator => &[Step::Apply(A::BarWorkspaces)],
-            // The two bar routes. Both end at reload_bar() and neither touches
-            // the compositor: the bar is a layer surface with its own config
-            // and its own stylesheet, and nothing in Hyprland reads either.
-            // They stay apart because one writes stylesheet state while the
-            // other writes module-layout state; media spans two module
-            // fragments, but still has nothing to do with CSS.
-            Self::BarStyle => &[Step::Apply(A::BarStyle)],
-            Self::BarWidgets => &[Step::Apply(A::BarWidgets)],
+            // Every bar key lands on the same step now: one applier
+            // republishes the whole watched layout marker, and the shell's
+            // FileView watch is the reload. Nothing touches the compositor --
+            // the bar is a layer surface of the shell's own process, so there
+            // is no signal step left to have.
+            Self::WorkspaceIndicator | Self::BarStyle | Self::BarWidgets => {
+                &[Step::Apply(A::BarLayout)]
+            }
         }
     }
 }
@@ -336,7 +321,6 @@ mod tests {
             A::CornerRadius => "apply_corner_radius",
             A::Border => "apply_border",
             A::Motion => "apply_motion",
-            A::BarStyle => "apply_bar_style",
             A::ThemeIfSchemeMoved => "apply_theme_if_scheme_moved",
             A::Glass => "apply_glass",
             A::NightShift => "apply_night_shift",
@@ -346,8 +330,7 @@ mod tests {
             A::Locale => "apply_locale",
             A::Region => "apply_region",
             A::WorkspacePlan => "apply_workspace_plan",
-            A::BarWorkspaces => "apply_bar_workspaces",
-            A::BarWidgets => "apply_bar_widgets",
+            A::BarLayout => "apply_bar_layout",
         }
     }
 
@@ -357,10 +340,9 @@ mod tests {
     const RENDER_DECLARED: &str = "render_search_engine render_preferences render_motion \
          render_general render_idle";
     const APPLY_DECLARED: &str = "apply_wallpaper apply_live_wallpaper apply_accent \
-         apply_corner_radius apply_border apply_motion apply_bar_style \
-         apply_theme_if_scheme_moved apply_glass apply_night_shift apply_terminal \
-         apply_file_index run_or_raise apply_locale apply_region apply_workspace_plan \
-         apply_bar_workspaces apply_bar_widgets";
+         apply_corner_radius apply_border apply_motion apply_theme_if_scheme_moved \
+         apply_glass apply_night_shift apply_terminal apply_file_index run_or_raise \
+         apply_locale apply_region apply_workspace_plan apply_bar_layout";
 
     #[test]
     fn every_settable_key_has_a_route() {
@@ -433,18 +415,14 @@ mod tests {
         );
     }
 
-    /// Both renders before both applies, and the bar's style among them:
-    /// waybar cannot see Hyprland's animations switch, so its stylesheet is
-    /// rewritten and re-read on this route too.
     #[test]
-    fn the_motion_route_reaches_the_bar_as_well_as_the_compositor() {
+    fn the_motion_route_renders_both_markers_before_it_applies() {
         assert_eq!(
             Route::Motion.steps(),
             &[
                 Step::Render(R::Preferences),
                 Step::Render(R::Motion),
                 Step::Apply(A::Motion),
-                Step::Apply(A::BarStyle),
             ]
         );
     }

@@ -103,6 +103,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "garage-bar-probe"
+version = "0.1.0"
+dependencies = [
+ "garage-core",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "garage-cli"
 version = "0.1.0"
 dependencies = [

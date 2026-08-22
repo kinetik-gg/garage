@@ -11,10 +11,10 @@
 //! which in GTK's case is a silent failure that drops the whole palette, not an error anyone
 //! would see. Writing both halves every time is what makes that interruption harmless.
 //!
-//! Written in place rather than atomically, unlike most of layer 3: waybar and kitty watch
-//! these paths with `inotify`, and an atomic rename-into-place leaves their watch pointing at
-//! the replaced inode. Every file here is small enough that a torn write is not a real risk,
-//! which is the trade that makes in-place writing acceptable.
+//! Kitty's theme is written in place rather than atomically: it watches its path with
+//! `inotify`, and an atomic rename-into-place leaves that watch pointing at the replaced
+//! inode. Every file here is small enough that a torn write is not a real risk, which is
+//! the trade that makes in-place writing acceptable.
 //!
 //! The material still supplies the surface everywhere else, but the terminal carries some
 //! body opacity of its own so text has something to sit on -- near-opaque would hide the
@@ -22,9 +22,8 @@
 //! opacity independently of the glass slider.
 //!
 //! Writes many small files through the per-toolkit builders in [`crate::palette::gtk`],
-//! [`crate::palette::rofi`], [`crate::palette::qt`], [`crate::palette::swayosd`] and
-//! [`crate::palette::waybar`], and is itself reached only from
-//! [`crate::theme::render_theme`].
+//! [`crate::palette::rofi`], [`crate::palette::qt`] and [`crate::palette::swayosd`], and is
+//! itself reached only from [`crate::theme::render_theme`].
 //!
 //! # Which of these are templates
 //!
@@ -37,20 +36,11 @@
 //! naming a file this same function just wrote, so their text is a statement about this
 //! module's own output layout rather than about how anything looks -- editing one without
 //! editing the write beside it produces a config pointing at a file that is not there.
-//! `waybar/style.css` is left out for its own reasons; see [`crate::palette::waybar`].
-//!
-//! # The twenty-first file
-//!
-//! `waybar/style.css` is the only file here whose contents read a preference rather than only
-//! the palette -- `waybar_style_css()` composes [`crate::bar::style`]'s `bar_background()`
-//! with [`crate::bar::spacing`]'s `waybar_spacing_css()`, so this function takes a
-//! [`Preferences`] purely to hand `[bar]`'s own section on to that one write.
 
 use garage_core::fs::atomic::atomic_write;
 use garage_core::fs::marker::write_marker;
 use garage_core::paths::Paths;
 use garage_core::schema::enums::Scheme;
-use garage_core::schema::Preferences;
 
 use crate::error::RenderError;
 use crate::palette::gtk::{gtk3_palette_css, gtk4_palette_css};
@@ -58,7 +48,6 @@ use crate::palette::qt::qt_palette_conf;
 use crate::palette::rofi::rofi_palette_rasi;
 use crate::palette::swayosd::swayosd_palette_css;
 use crate::palette::table::role;
-use crate::palette::waybar::waybar_style_css;
 use crate::template::shipped::{
     BTOP_THEME_HEAD, BTOP_THEME_LINE, HYPRLOCK_THEME, KITTY_THEME, XSETTINGSD,
 };
@@ -175,18 +164,11 @@ const TERM_OPACITY: &str = "0.5";
 /// the generated `hyprlock-theme.conf` could not be replaced,
 /// [`RenderError::CompositedRole`] if a role Qt or hyprlock reads is not an opaque hex, or
 /// [`RenderError::Template`] if a template on disk names a variable no renderer supplies.
-pub(crate) fn render_toolkits(
-    paths: &Paths,
-    scheme: Scheme,
-    prefs: &Preferences,
-) -> Result<(), RenderError> {
+pub(crate) fn render_toolkits(paths: &Paths, scheme: Scheme) -> Result<(), RenderError> {
     let look = look(scheme);
     write_gtk_settings(paths, scheme, &look)?;
     write_palettes(paths)?;
     write_xsettingsd_and_rofi(paths, scheme, &look)?;
-    // The bar's colours, its spacing and the base sheet it imports; render_bar_style() also
-    // writes this one file on its own, for a padding or background change alone.
-    write(paths, "waybar/style.css", &waybar_style_css(scheme, prefs))?;
     write_apps(paths, scheme)?;
     write_hyprlock(paths, scheme)?;
     write(
@@ -211,8 +193,8 @@ general=\"Plus Jakarta Sans,10,-1,5,50,0,0,0,0,0\"
     )
 }
 
-/// One config file, in place rather than atomically: waybar and kitty watch these paths, and
-/// a rename leaves their inotify watch pointing at the replaced inode. All of these are small
+/// One config file, in place rather than atomically: kitty watches its theme's path, and a
+/// rename leaves that inotify watch pointing at the replaced inode. All of these are small
 /// enough that a torn write is not a real risk.
 fn write(paths: &Paths, relative: &str, text: &str) -> Result<(), RenderError> {
     write_marker(&paths.config_home.join(relative), text)?;

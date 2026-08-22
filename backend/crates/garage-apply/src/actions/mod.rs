@@ -1,6 +1,6 @@
 //! `action()`: run one one-shot action -- volume, mute, default sink/source, night shift
 //! toggle, glass reset, a keybind edit, a default-application change, an immediate lock, a
-//! date/time change, a Waybar panel click, or a pointer-aware session-menu action.
+//! date/time change, or a keybind's pointer-resolved panel toggle.
 //!
 //! A second dispatch table, deliberately separate from [`crate::route`]'s route walking: an
 //! action is not a preference, has no key in `preferences.toml` and no
@@ -28,7 +28,6 @@
 
 mod audio;
 mod hyprland;
-mod menu;
 mod panel;
 mod preference;
 mod pyvalue;
@@ -84,8 +83,6 @@ pub fn action(
             spawn(cx, &["timedatectl", "set-ntp", ntp_word(value)])
         }),
         "datetime.timezone" => light(paths, proc, |cx| set_timezone(cx, value)),
-        "menu.dismiss" => light(paths, proc, |cx| menu::dismiss(cx)),
-        "menu.toggle" => light(paths, proc, |cx| menu::toggle(cx)),
         "panel.toggle" => light(paths, proc, |cx| panel::panel_toggle(cx, value)),
         // `name.split(".", 1)[1]`: everything after the first dot, which is the operation for
         // a keybind action and the role for a defaults one.

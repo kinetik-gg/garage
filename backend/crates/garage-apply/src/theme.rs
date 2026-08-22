@@ -17,7 +17,7 @@
 //!
 //! From there: GTK4 and libadwaita follow the portal setting live (`gsettings`), GTK3 and
 //! `XWayland` apps re-theme when `xsettingsd` rereads its config (`reload-or-restart`), and
-//! waybar, kitty and swayosd are each signalled to reread their own generated files.
+//! kitty and swayosd are each signalled to reread their own generated files.
 //!
 //! `apply_theme()` is render-then-push in one call: `render_theme()` followed by
 //! `push_theme()`. `apply_theme_if_scheme_moved()` is the actual `Route::Theme` step, and the
@@ -108,8 +108,7 @@ pub(crate) fn push_theme(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
         ],
     ));
 
-    // waybar rereads its stylesheet on SIGUSR2, kitty its whole config on SIGUSR1.
-    drop(run(cx, &["pkill", "-USR2", "-x", "waybar"]));
+    // Kitty rereads its whole config on SIGUSR1; the shell's bar reads Theme's markers.
     drop(run(cx, &["pkill", "-USR1", "-x", "kitty"]));
     drop(run(
         cx,
@@ -178,13 +177,12 @@ mod tests {
     use super::{apply_theme_if_scheme_moved, push_theme};
     use crate::testing::{Script, World};
 
-    /// The seven signals every push issues, in order, after the wallpaper decision.
-    const SIGNALS: [&str; 7] = [
+    /// The six signals every push issues, in order, after the wallpaper decision.
+    const SIGNALS: [&str; 6] = [
         "gsettings set org.gnome.desktop.interface color-scheme prefer-dark",
         "gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-dark",
         "gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark",
         "systemctl --user reload-or-restart xsettingsd.service",
-        "pkill -USR2 -x waybar",
         "pkill -USR1 -x kitty",
         "systemctl --user try-restart swayosd.service",
     ];

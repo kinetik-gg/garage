@@ -223,7 +223,7 @@ pub(crate) fn json_string(text: &str) -> String {
 }
 
 /// `json.dumps(value, indent=indent)`: `CPython`'s pretty-printer, for the generated
-/// `.jsonc` fragments (`waybar-widgets.jsonc`, `waybar-workspaces.jsonc`, `waybar-clock.jsonc`)
+/// JSON documents (the bar's watched markers among them)
 /// that a handful of renderers write from a [`Value::Table`]/[`Value::Array`] tree built in
 /// the order the Python's own `dict` literal or `list.append()` calls would produce it --
 /// `Value::Table`'s `Vec<(String, Value)>` is insertion-ordered for exactly this reason.

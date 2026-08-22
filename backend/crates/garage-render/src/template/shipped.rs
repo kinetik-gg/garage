@@ -76,19 +76,6 @@ shipped!(
 );
 
 shipped!(
-    /// `waybar-clock.jsonc`, with the locale member spliced in or left out.
-    WAYBAR_CLOCK,
-    "waybar-clock.tmpl"
-);
-
-shipped!(
-    /// The clock's `locale` member, comma and all: a JSON object's separators belong to
-    /// whichever member is not last, so the comma is part of this fragment's text.
-    WAYBAR_CLOCK_LOCALE,
-    "waybar-clock-locale.tmpl"
-);
-
-shipped!(
     /// The GTK3 palette's header line.
     GTK3_PALETTE_HEAD,
     "gtk3-palette-head.tmpl"
@@ -186,7 +173,7 @@ mod tests {
     use crate::palette::rofi::RofiVars;
     use crate::palette::swayosd::SwayosdVars;
     use crate::palette::toolkits::{BtopLineVars, HyprlockVars, KittyVars, XsettingsdVars};
-    use crate::region::{ClockLocaleVars, ClockVars, LocaleExportVars};
+    use crate::region::LocaleExportVars;
     use crate::template::TemplateVars;
     use crate::wallpaper::WallpaperVars;
 
@@ -200,8 +187,6 @@ mod tests {
         super::HYPRPAPER,
         super::LOCALE_ENV,
         super::LOCALE_ENV_EXPORT,
-        super::WAYBAR_CLOCK,
-        super::WAYBAR_CLOCK_LOCALE,
         super::GTK3_PALETTE_HEAD,
         super::GTK3_PALETTE_TOKEN,
         super::GTK4_PALETTE,
@@ -285,8 +270,6 @@ mod tests {
     #[test]
     fn region_placeholders_and_variables_agree() {
         check::<LocaleExportVars>("locale.env", &[super::LOCALE_ENV, super::LOCALE_ENV_EXPORT]);
-        check::<ClockVars>("the bar clock", &[super::WAYBAR_CLOCK]);
-        check::<ClockLocaleVars>("the bar clock's locale", &[super::WAYBAR_CLOCK_LOCALE]);
     }
 
     #[test]

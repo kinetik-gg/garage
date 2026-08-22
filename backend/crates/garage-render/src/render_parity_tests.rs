@@ -30,7 +30,6 @@ use garage_core::traits::{LuaCheckError, LuaSyntaxCheck, Monitor, MonitorError, 
 use garage_core::schema::enums::Scheme;
 
 use crate::accent::render_accent;
-use crate::bar::style::bar_background;
 use crate::cx::RenderCx;
 use crate::motion::render_motion;
 use crate::palette::toolkits::render_toolkits;
@@ -259,14 +258,8 @@ fn a_marker_rewrite_preserves_its_inode_and_the_lua_install_replaces_it() {
 /// radii and glass modes would carry thirty-four identical copies of twenty-one files. It is
 /// therefore two sections. `"toolkits"` holds every file `render_toolkits()` writes, once per
 /// appearance; `"scenarios"` holds the thirty-four-case matrix for the outputs that *do* vary
-/// -- the resolved scheme, the two markers `render_theme()` publishes, `hyprpaper.conf`, and
-/// `bar_background()` -- with each case's departures in the `"toml"` field exactly as
-/// `dump_toml()` wrote them.
-///
-/// `waybar/style.css` is now part of `"toolkits"` too, dumped at `bar.padding_scale`'s shipped
-/// default (`FALLBACK_DEFAULTS`) exactly as `render_theme()` calls `render_toolkits()` with
-/// the loaded configuration -- extended into this fixture once task 3.7 ported
-/// `waybar_style_css()` and wired `render_toolkits()` to take a [`Preferences`].
+/// -- the resolved scheme and the marker `render_theme()` publishes -- with each case's
+/// departures in the `"toml"` field exactly as `dump_toml()` wrote them.
 ///
 /// Absolute paths are spelled against `"home"` rather than against the scratch tree the dump
 /// ran in, so a comparison substitutes the running test's own home first. Two files carry one
@@ -315,18 +308,17 @@ fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
         .and_then(serde_json::Value::as_object)
         .expect("the fixture has a toolkits section");
     assert_eq!(toolkits.len(), 2, "both appearances are dumped");
-    let defaults = Defaults::compiled().expect("shipped defaults parse");
 
     for (name, expected) in toolkits {
         let scheme: Scheme = name.parse().expect("a toolkits key is a scheme name");
         let paths = scratch_paths(&format!("toolkits-{name}"));
         let (fixture_home, home) = homes(&paths, &all);
-        render_toolkits(&paths, scheme, defaults.values())
+        render_toolkits(&paths, scheme)
             .unwrap_or_else(|error| panic!("{name}: render_toolkits failed: {error}"));
 
         let files = expected.as_object().expect("a toolkits entry is an object");
         assert!(
-            files.len() >= 22,
+            files.len() >= 21,
             "{name}: the toolkit set should not shrink"
         );
         for (relative, contents) in files {
@@ -353,9 +345,8 @@ fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
 fn the_toolkit_render_writes_exactly_the_files_the_python_writes() {
     let all = theme_fixtures();
     let paths = scratch_paths("toolkit-set");
-    let defaults = Defaults::compiled().expect("shipped defaults parse");
-    render_toolkits(&paths, Scheme::Dark, defaults.values())
-        .expect("render_toolkits succeeds on a clean scratch");
+
+    render_toolkits(&paths, Scheme::Dark).expect("render_toolkits succeeds on a clean scratch");
 
     let mut expected: Vec<String> = all
         .get("toolkits")
@@ -368,9 +359,6 @@ fn the_toolkit_render_writes_exactly_the_files_the_python_writes() {
         .collect();
     expected.sort();
 
-    // waybar/style.css is now written like every other toolkit file; the fixture carries it
-    // too, so the two sides are equal rather than merely overlapping.
-    assert!(expected.iter().any(|name| name == "waybar/style.css"));
     assert_eq!(tree(&paths.config_home), expected);
     assert_eq!(
         tree(&paths.generated),
@@ -436,20 +424,7 @@ fn every_theme_scenario_matches_the_python_backend_byte_for_byte() {
             field(expected, "search_engine"),
             "{name}: search-engine marker"
         );
-        let foreground = std::fs::read_to_string(&paths.markers.bar_foreground)
-            .unwrap_or_else(|error| panic!("{name}: reading the bar marker: {error}"));
-        assert_eq!(
-            foreground,
-            field(expected, "bar_foreground"),
-            "{name}: bar-foreground marker"
-        );
-
         check_wallpaper(name, &cx, expected, &fixture_home, &home);
-        assert_eq!(
-            bar_background(scheme, &prefs),
-            field(expected, "bar_background"),
-            "{name}: bar background"
-        );
         drop(std::fs::remove_dir_all(&paths.home));
     }
 }
