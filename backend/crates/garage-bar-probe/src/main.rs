@@ -9,6 +9,9 @@
 //!   purpose; see the crate changelog note in `containers.rs`).
 //! * **SMB shares** -- which of the shares quoted in `~/.local/libexec/ensure-smb-mounted`
 //!   are currently mounted, per `gio mount -l`.
+//! * **Microphone** -- whether any pulse source is recording, parsed from
+//!   `pactl list sources` exactly as the waybar module parsed it (Quickshell's Pipewire
+//!   service exposes no node-level running state to read instead).
 //!
 //! Output is one JSON object per line on stdout, refreshed every [`CONTAINER_INTERVAL`]
 //! seconds with the SMB half re-probed every third tick. The bar parses the last line and
@@ -21,6 +24,7 @@
 
 mod containers;
 mod exec;
+mod microphone;
 mod smb;
 mod stream;
 
