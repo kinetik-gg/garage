@@ -1,5 +1,0 @@
-qs -c garage ipc call shell notificationsOn DP-2
-qs -c garage ipc call shell controlCenterOn DP-2
-qs -c garage ipc call shell monitorOn DP-2 1240
-qs -c garage ipc call shell mediaOn DP-2 350
-qs -c garage ipc call shell aiUsageOn DP-2

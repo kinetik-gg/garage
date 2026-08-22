@@ -81,13 +81,11 @@ pub use error::RenderError;
 // ability to signal anything by being reachable from a crate that can. That is the same
 // argument [`displays`] and [`workspaces`] are already public under.
 pub use accent::render_accent;
-pub use bar::widgets::render_bar_widgets;
-pub use bar::workspaces::render_bar_workspaces;
+pub use bar::layout::render_bar_layout;
 pub use corner::render_corner_radius;
 pub use general::{render_general, BrowserCommand};
 pub use palette::accents::border_colors;
 pub use palette::toolkits::{look, Look};
-pub use palette::waybar::waybar_style_css;
 pub use preferences::render_preferences;
 pub use region::render_region;
 pub use theme::render_theme;

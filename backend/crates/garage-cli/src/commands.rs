@@ -20,7 +20,7 @@
 //! path while the user's own sat at the old one.
 //!
 //! Fifteen command names in the settings-backend table: `snapshot`, `render`, `render-idle`,
-//! `render-bar`, `render-wallpaper`, `apply`, `set`, `action`, `display-test`,
+//! `render-wallpaper`, `apply`, `set`, `action`, `display-test`,
 //! `display-confirm`, `display-revert`, `_display-watchdog` (unlisted in `USAGE`, since it is
 //! the watchdog's own re-entry point and not something a person types), `theme-sync` and
 //! `night-shift-sync`.
@@ -30,7 +30,7 @@
 //! Every one of them reaches a real layer; the table is complete. `help` is answered here.
 //! The four render commands go to `garage-render` -- [`render_all`] for the whole set,
 //! [`run_render`] for `render-idle`'s one step, and
-//! [`render_bar`](garage_render::all::render_bar) /
+//! [`render_wallpaper`](garage_render::all::render_wallpaper) /
 //! [`render_wallpaper`](garage_render::all::render_wallpaper) for the two narrow unit
 //! `ExecStartPre`s. `set` is [`crate::set`], the four display commands are
 //! [`crate::displays`], and the four that move the running session -- `apply`, `action`,
@@ -55,7 +55,7 @@ use garage_core::schema::RenderStep;
 use garage_core::traits::Runner;
 use garage_prefs::{load_preferences, migrate_config_root};
 use garage_proc::{Hyprctl, Luac, System};
-use garage_render::all::{render_all, render_bar, render_wallpaper};
+use garage_render::all::{render_all, render_wallpaper};
 use garage_render::cx::RenderCx;
 use garage_render::dispatch::run_render;
 use serde_json::Value;
@@ -174,9 +174,6 @@ fn settings(
         // render, because `set lock.*` restarts that unit synchronously while holding
         // PREFERENCES_LOCK.
         "render-idle" => rendered(paths, proc, Some(RenderStep::Idle)),
-        // waybar's ExecStartPre: render_region + render_bar_workspaces + render_bar_widgets,
-        // narrow rather than a full render.
-        "render-bar" => rendered_bar(paths, proc),
         // hyprpaper's ExecStartPre, deliberately not "render".
         "render-wallpaper" => rendered_wallpaper(paths, proc),
         // render, then push everything into the running session.
@@ -234,22 +231,6 @@ fn rendered(
     Ok(Emitted::Envelope(Value::Bool(true)))
 }
 
-/// `render-bar`: `render_region()` + `render_bar_workspaces()` + `render_bar_widgets()`, the
-/// three fragments waybar's `ExecStartPre` needs and nothing else -- see
-/// [`garage_render::all::render_bar`] for why this is narrower than [`render_all`].
-///
-/// # Errors
-///
-/// Whatever [`garage_render::all::render_bar`] returns.
-fn rendered_bar(paths: &Paths, proc: &dyn Runner) -> Result<Emitted, CliError> {
-    let config = load_preferences(paths, None)?;
-    let monitors = Hyprctl::new(proc);
-    let lua = Luac::new(proc);
-    let cx = RenderCx::new(&config, paths, &monitors, &lua);
-    render_bar(&cx)?;
-    Ok(Emitted::Envelope(Value::Bool(true)))
-}
-
 /// `render-wallpaper`: `render_wallpaper(load_preferences())` alone -- hyprpaper's
 /// `ExecStartPre`. The moved flag [`garage_render::all::render_wallpaper`] reports is not
 /// read here, the same way `render`'s own call drops it: nothing downstream of this command
@@ -290,11 +271,10 @@ mod tests {
     /// The whole of USAGE's settings backend, plus the name that is not in it: the default
     /// when no subcommand is given. The watchdog is deliberately absent -- it sleeps fifteen
     /// seconds by design.
-    const COMMANDS: [&str; 12] = [
+    const COMMANDS: [&str; 11] = [
         "snapshot",
         "render",
         "render-idle",
-        "render-bar",
         "render-wallpaper",
         "apply",
         "action",
@@ -398,9 +378,9 @@ mod tests {
         assert_eq!(PLAIN_COMMANDS, ["doctor", "migrate", "repair", "update"]);
     }
 
-    /// A real scratch `HOME`, unlike [`paths`]'s deliberately unwritable one: `render-bar`
-    /// and `render-wallpaper` are exercised for real here, down to the bytes on disk, rather
-    /// than only "not `UnknownCommand`".
+    /// A real scratch `HOME`, unlike [`paths`]'s deliberately unwritable one: the narrow
+    /// render commands are exercised for real here, down to the bytes on disk, rather than
+    /// only "not `UnknownCommand`".
     fn scratch_paths(label: &str) -> Paths {
         let home = std::env::temp_dir().join(format!(
             "garage-cli-dispatch-{label}-{}-{:?}",
@@ -412,28 +392,6 @@ mod tests {
                 .into_iter()
                 .collect();
         Paths::from_env_map(&env)
-    }
-
-    #[test]
-    fn render_bar_writes_the_three_bar_fragments_and_nothing_else() {
-        let paths = scratch_paths("render-bar");
-        let outcome = settings(
-            &paths,
-            &Offline::new(),
-            "render-bar",
-            &argv(&["render-bar"]),
-        )
-        .expect("render-bar succeeds against a real scratch HOME");
-        assert!(
-            matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
-        );
-        assert!(paths.fragments.locale_env.exists());
-        assert!(paths.fragments.waybar_clock.exists());
-        assert!(paths.fragments.waybar_workspaces.exists());
-        assert!(paths.fragments.waybar_widgets.exists());
-        // Narrow, unlike `render`: no toolkit config and no theme marker are touched.
-        assert!(!paths.markers.bar_foreground.exists());
-        drop(std::fs::remove_dir_all(&paths.home));
     }
 
     /// `garage render` against a scratch tree with no `displays.toml` at all:
@@ -449,7 +407,7 @@ mod tests {
             matches!(outcome, Emitted::Envelope(value) if value == serde_json::Value::Bool(true))
         );
         assert!(paths.fragments.hyprland.exists());
-        assert!(paths.fragments.waybar_widgets.exists());
+        assert!(paths.markers.bar_layout.exists());
         assert!(!paths.fragments.displays.exists());
         drop(std::fs::remove_dir_all(&paths.home));
     }
@@ -469,7 +427,7 @@ mod tests {
         );
         assert!(paths.fragments.hyprpaper.exists());
         assert!(!paths.fragments.locale_env.exists());
-        assert!(!paths.markers.bar_foreground.exists());
+        assert!(!paths.markers.bar_layout.exists());
         drop(std::fs::remove_dir_all(&paths.home));
     }
 }

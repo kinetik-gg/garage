@@ -10,7 +10,7 @@
 //!
 //! # The support functions this orchestrates
 //!
-//! `reload_bar()` is the `pkill -USR2 waybar` signal every bar-owned change in this crate
+//! Bar-owned changes no longer pass through here: the shell watches its marker.
 //! shares -- named here because a workspace plan change is one of the things that can move
 //! the bar's indicator, even though this function's own job stops at the compositor.
 //!
@@ -73,21 +73,12 @@ pub(crate) mod salvage;
 
 use garage_render::workspaces::plan::{render_workspaces_for, workspace_plan_for};
 
-use crate::command::run;
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
 use crate::route::run_or_raise;
 use crate::workspaces::salvage::{
     active_workspaces, reap_stranded_windows, remap_workspaces, restore_active_workspaces,
 };
-
-/// Have waybar re-read its config and every file it includes.
-///
-/// SIGUSR2 is waybar's default full-reload action. The bar is already signalled this way on a
-/// theme change, so this is the route it already survives.
-pub(crate) fn reload_bar(cx: &SessionCx<'_>) {
-    drop(run(cx, &["pkill", "-USR2", "-x", "waybar"]));
-}
 
 /// Move the running session onto a new workspace plan, salvaging every window.
 ///

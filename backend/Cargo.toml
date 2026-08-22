@@ -11,7 +11,7 @@ members = [
     "crates/garage-metrics",
     "crates/garage-file-index",
     "crates/garage-ai-usage",
-    "crates/garage-waybar",
+    "crates/garage-bar-probe",
 ]
 
 [workspace.lints.rust]

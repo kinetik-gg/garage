@@ -25,7 +25,7 @@
 //! [`RenderCx::monitors`]'s question rather than an instruction: the plan cannot be written
 //! without knowing which displays exist. Nothing here answers back.
 
-use crate::bar::{widgets as bar_widgets, workspaces as bar_workspaces};
+use crate::bar::layout as bar_layout;
 use crate::cx::RenderCx;
 use crate::error::RenderError;
 use crate::keybinds::Document;
@@ -69,38 +69,13 @@ pub fn render_all(
     general::render_general(cx, browser)?;
     region::render_region(cx)?;
     plan::render_workspaces(cx)?;
-    bar_workspaces::render_bar_workspaces(cx)?;
-    bar_widgets::render_bar_widgets(cx)?;
+    bar_layout::render_bar_layout(cx)?;
     motion::render_motion(cx)?;
     accent::render_accent(cx)?;
     corner::render_corner_radius(cx)?;
     theme::render_theme(cx)?;
     let _moved = wallpaper::render_wallpaper(cx)?;
     render_display_fragment(cx)
-}
-
-/// `garage render-bar`'s whole body: `render_region()`, `render_bar_workspaces()`,
-/// `render_bar_widgets()`, in that order (garage:6673-6684).
-///
-/// waybar's `modules-left`, `modules-right`, `modules-center` and `height` now live only in
-/// these generated fragments, so the bar comes up with an empty left side and an empty right
-/// side if it starts before the first render -- `waybar.service` runs this as its
-/// `ExecStartPre` for exactly that reason. Narrow rather than a full [`render_all`], which
-/// would rewrite a dozen toolkit configs the bar does not read; nothing is signalled here
-/// either, because the unit starts the bar right after and it reads these fragments on the
-/// way up.
-///
-/// `garage-cli` is this function's only caller outside this crate -- see `garage-render`'s
-/// module docs for why `bar` and `region` are otherwise private.
-///
-/// # Errors
-///
-/// The first of [`region::render_region`], [`bar_workspaces::render_bar_workspaces`] or
-/// [`bar_widgets::render_bar_widgets`] to fail.
-pub fn render_bar(cx: &RenderCx<'_>) -> Result<(), RenderError> {
-    region::render_region(cx)?;
-    bar_workspaces::render_bar_workspaces(cx)?;
-    bar_widgets::render_bar_widgets(cx)
 }
 
 /// `garage render-wallpaper`'s whole body: `render_wallpaper(load_preferences())`

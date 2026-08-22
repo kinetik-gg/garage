@@ -365,7 +365,7 @@ impl DateFormat {
 }
 
 impl FirstDayOfWeek {
-    // waybar's iso8601 calendar switch: weeks begin on Monday when set.
+    // Weeks begin on Monday when set, ISO 8601 style.
     #[must_use]
     pub const fn iso8601(self) -> bool {
         match self {

@@ -1,13 +1,11 @@
-//! Byte-parity tests for [`crate::workspaces::plan::render_workspaces`], the block allocator
-//! behind it, and [`crate::bar::workspaces::render_bar_workspaces`], against the real Python
-//! backend.
+//! Byte-parity tests for [`crate::workspaces::plan::render_workspaces`] and the block
+//! allocator behind it, against the real Python backend.
 //!
 //! `testdata/workspace_fixtures.json` was captured during the Rust port by loading the former
 //! backend with `SourceFileLoader`, planting a `displays.toml`, a `workspace-blocks.toml`, a
 //! `preferences.toml` and sometimes an already-installed `workspaces.lua` into a scratch
 //! `HOME`, monkeypatches `json_command()` so `hyprctl monitors -j` answers a scripted list,
-//! then calls `render_workspaces()` and `render_bar_workspaces()` and reads back every byte
-//! the two of them wrote.
+//! then calls `render_workspaces_for()` and reads back every byte it wrote.
 //!
 //! The matrix, 38 scenarios: both modes; `shared_count` at 1, 8 and 10; `default_count` at 1,
 //! 4 and 10; counts strings that are clean, malformed, clamped and naming an absent output;
@@ -18,9 +16,9 @@
 //! remembered, remembered out of order, holed, junk-valued, `[block]`-less and
 //! `block`-not-a-table; and the empty plan with and without a fragment to take away.
 //!
-//! Three files are compared per scenario: `workspaces.lua` (or its absence),
-//! `waybar-workspaces.jsonc`, and `workspace-blocks.toml` after the render -- the last being
-//! the only layer-2 write a renderer makes, so its byte parity is the allocator's parity.
+//! Two files are compared per scenario: `workspaces.lua` (or its absence) and
+//! `workspace-blocks.toml` after the render -- the last being the only layer-2 write a
+//! renderer makes, so its byte parity is the allocator's parity.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -31,7 +29,6 @@ use garage_core::schema::notes::Notes;
 use garage_core::schema::Preferences;
 use garage_core::traits::{LuaCheckError, LuaSyntaxCheck, Monitor, MonitorError, MonitorSource};
 
-use crate::bar::workspaces::render_bar_workspaces;
 use crate::cx::RenderCx;
 use crate::workspaces::plan::render_workspaces_for;
 
@@ -143,18 +140,11 @@ fn every_scenario_matches_the_python_backend_byte_for_byte() {
 
         render_workspaces_for(&cx, &primary)
             .unwrap_or_else(|error| panic!("{name}: render_workspaces failed: {error}"));
-        render_bar_workspaces(&cx)
-            .unwrap_or_else(|error| panic!("{name}: render_bar_workspaces failed: {error}"));
 
         assert_eq!(
             read(&paths.fragments.workspaces),
             text(expected, "workspaces_lua"),
             "{name}: workspaces.lua"
-        );
-        assert_eq!(
-            read(&paths.fragments.waybar_workspaces),
-            text(expected, "waybar_workspaces_jsonc"),
-            "{name}: waybar-workspaces.jsonc"
         );
         assert_eq!(
             read(&paths.host.workspace_blocks),

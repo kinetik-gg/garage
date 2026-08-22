@@ -18,7 +18,7 @@ Garage
     +-- Settings: one schema, host preferences, generated state
     +-- Quickshell: the shell (bar, launcher, control panels)
     +-- Baseline configs: the static, opinionated defaults for everything
-        Hyprland, Waybar, Kitty, and the rest ship with
+        Hyprland, Kitty, and the rest ship with
 ```
 
 **Hyprland** is the compositor this all sits on top of; it's a prerequisite,
@@ -31,7 +31,7 @@ installs, pins, and rebuilds it as part of the desktop.
 
 **Garage** is everything else: the lifecycle layer that gets a bare Arch +
 Hyprland box to a working desktop and keeps it current, the settings system,
-the Quickshell shell, and the baseline configuration Hyprland/Waybar/Kitty/etc.
+the Quickshell shell, and the baseline configuration Hyprland/Kitty/etc.
 read.
 
 ## The settings system: one schema, one direction
@@ -42,7 +42,7 @@ it:
 ```
 shipped defaults  -->  host preferences (~/.config)  -->  generated state
                                                             (consumed by
-                                                             Hyprland, Waybar,
+                                                             Hyprland,
                                                              Kitty, ...)
 ```
 
@@ -52,7 +52,7 @@ shipped defaults  -->  host preferences (~/.config)  -->  generated state
   actually land; they layer on top of the defaults rather than replacing the
   schema.
 - **Generated state** is derived, read-only output — config fragments that
-  Hyprland, Waybar, Kitty, and other consumers actually read at runtime.
+  Hyprland, Kitty, and other consumers actually read at runtime.
 
 One writer produces the generated state, many readers consume it. Nothing
 downstream of the schema writes back upstream: presentation code reads

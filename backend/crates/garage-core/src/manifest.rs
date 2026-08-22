@@ -103,7 +103,7 @@ impl UnitKind {
 /// One per-user systemd unit this checkout enables.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnitEntry {
-    /// Unit name including its suffix, e.g. `waybar.service`.
+    /// Unit name including its suffix, e.g. `hypridle.service`.
     pub name: String,
     /// Whether a live session should show it running.
     pub kind: UnitKind,

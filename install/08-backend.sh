@@ -13,7 +13,7 @@ garage_binaries=(
     garage-metrics
     garage-file-index
     garage-ai-usage
-    garage-waybar-module
+    garage-bar-probe
 )
 for garage_binary in "${garage_binaries[@]}"; do
     run install -m 755 \
@@ -23,7 +23,7 @@ done
 
 # Backend commands always link to the installed binaries. Stow no longer owns
 # these names because desktop/.local/bin does not ship them.
-for garage_binary in garage garage-metrics garage-file-index garage-ai-usage garage-waybar-module; do
+for garage_binary in garage garage-metrics garage-file-index garage-ai-usage garage-waybar-module garage-bar-probe; do
     run ln -sfn "$garage_bin_dir/$garage_binary" "$HOME/.local/bin/$garage_binary"
 done
 

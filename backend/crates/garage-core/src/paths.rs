@@ -196,12 +196,6 @@ pub struct Fragments {
     pub hyprpaper: PathBuf,
     /// `LANG` and its neighbours, for what the session starts next.
     pub locale_env: PathBuf,
-    /// The bar's clock module.
-    pub waybar_clock: PathBuf,
-    /// The bar's workspace module.
-    pub waybar_workspaces: PathBuf,
-    /// The bar's widget modules.
-    pub waybar_widgets: PathBuf,
 }
 
 impl Fragments {
@@ -215,9 +209,6 @@ impl Fragments {
             hypridle: generated.join("hypridle.conf"),
             hyprpaper: generated.join("hyprpaper.conf"),
             locale_env: generated.join("locale.env"),
-            waybar_clock: generated.join("waybar-clock.jsonc"),
-            waybar_workspaces: generated.join("waybar-workspaces.jsonc"),
-            waybar_widgets: generated.join("waybar-widgets.jsonc"),
         }
     }
 }
@@ -237,8 +228,6 @@ pub struct Markers {
     pub color_scheme: PathBuf,
     /// The search engine the launcher hands a query to.
     pub search_engine: PathBuf,
-    /// The bar's foreground colour.
-    pub bar_foreground: PathBuf,
     /// The corner radius, in px.
     pub corner_radius: PathBuf,
     /// The Material palette the shell tints itself from.
@@ -251,6 +240,10 @@ pub struct Markers {
     pub browser: PathBuf,
     /// Whether animations are suppressed.
     pub reduce_motion: PathBuf,
+    /// The bar's whole layout state, consumed by the Quickshell bar.
+    pub bar_layout: PathBuf,
+    /// The bar clock's locale and format halves, consumed by the Quickshell bar.
+    pub clock_format: PathBuf,
 }
 
 impl Markers {
@@ -259,13 +252,14 @@ impl Markers {
             accent: generated.join("accent"),
             color_scheme: generated.join("color-scheme"),
             search_engine: generated.join("search-engine"),
-            bar_foreground: generated.join("bar-foreground"),
             corner_radius: generated.join("corner-radius"),
             material: generated.join("material"),
             launcher: generated.join("launcher"),
             terminal: generated.join("terminal"),
             browser: generated.join("browser"),
             reduce_motion: generated.join("reduce-motion"),
+            bar_layout: generated.join("bar-layout.json"),
+            clock_format: generated.join("clock-format.json"),
         }
     }
 }
@@ -317,8 +311,6 @@ impl Wallpaper {
 /// would edit a tracked file on every switch.
 #[derive(Debug, Clone)]
 pub struct Toolkit {
-    /// The bar's stylesheet.
-    pub waybar_style: PathBuf,
     /// GTK 3's settings.
     pub gtk3_settings: PathBuf,
     /// GTK 4's settings.
@@ -332,7 +324,6 @@ pub struct Toolkit {
 impl Toolkit {
     fn new(config_home: &Path) -> Self {
         Self {
-            waybar_style: config_home.join("waybar/style.css"),
             gtk3_settings: config_home.join("gtk-3.0/settings.ini"),
             gtk4_settings: config_home.join("gtk-4.0/settings.ini"),
             xsettingsd: config_home.join("xsettingsd/xsettingsd.conf"),

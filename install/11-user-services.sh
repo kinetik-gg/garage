@@ -52,6 +52,6 @@ record "enabled ${#user_units[@]} per-user units"
 
 # Nothing renders or applies here. The first full render-and-apply happens at
 # the first graphical login, as the `garage apply` in autostart.lua; the
-# waybar/hyprpaper/hypridle units each render their own narrow fragment in an
-# ExecStartPre on the way up. From a TTY there is no compositor for any of it
-# to talk to.
+# hyprpaper/hypridle units each render their own narrow fragment in an
+# ExecStartPre on the way up (the bar's marker is written by garage apply).
+# From a TTY there is no compositor for any of it to talk to.

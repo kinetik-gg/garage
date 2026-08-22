@@ -86,7 +86,7 @@ polkit modal and the checksum-pinned upstream backend it retains.
 - Thunar file explorer, with Garage chrome, split view, archive/media actions,
   recursive search, and background thumbnailing
 - Rofi launcher
-- Waybar status bar
+- Quickshell status bar (the shell's own top panel)
 - Quickshell shell (settings UI, launcher, control panels)
 - Native notification center and control center (Quickshell + Glass)
 - SwayOSD volume and brightness feedback

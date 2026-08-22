@@ -324,11 +324,11 @@ mod tests {
                 .position(|line| line.starts_with(needle))
                 .unwrap_or(usize::MAX)
         };
-        // accent, then corner radius, then the theme's own seven, then the reload, then the
+        // accent, then corner radius, then the theme's own six, then the reload, then the
         // wallpaper decision, the night shift push and the idle restart.
         assert!(positions("gsettings range") < positions("hyprctl eval hl.config({decoration"));
-        assert!(positions("hyprctl eval hl.config({decoration") < positions("pkill -USR2"));
-        assert!(positions("pkill -USR2") < positions("hyprctl reload"));
+        assert!(positions("hyprctl eval hl.config({decoration") < positions("pkill -USR1"));
+        assert!(positions("pkill -USR1") < positions("hyprctl reload"));
         assert!(positions("hyprctl reload") < positions("hyprctl hyprsunset"));
         assert_eq!(
             signals.last().map(String::as_str),

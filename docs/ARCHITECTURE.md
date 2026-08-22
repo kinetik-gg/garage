@@ -58,7 +58,7 @@ mechanisms:
 | --- | --- | --- | --- |
 | Reads live, per frame (Hyprland core options) | `hyprctl eval` (no reload *needed* — options are dereferenced per frame) + fragment written for durability, and a silent `hyprctl reload` if the eval fails | `ApplyStep::Border`, `ApplyStep::Motion` | `eval_config()`; `apply_border()`. `apply_motion()` calls `hyprctl eval` directly rather than through `eval_config()`, per its rustdoc |
 | Parse-time config (workspace/window rules, binds) | Fragment write + `hyprctl reload` | `ApplyStep::WorkspacePlan` | `apply_workspace_plan()` calls `render_workspaces_for()` then `run_or_raise()` with `&["hyprctl", "reload"]` |
-| Signal-rereaders (other daemons) | Write file in place + `pkill -USR1`/`-USR2` | `ApplyStep::ThemeIfSchemeMoved` | `push_theme()`: `pkill -USR2 waybar`, `pkill -USR1 kitty` |
+| Signal-rereaders (other daemons) | Write file in place + `pkill -USR1`/`-USR2` | `ApplyStep::ThemeIfSchemeMoved` | `push_theme()`: `pkill -USR1 kitty` |
 | Startup-readers (hypridle) | Write config + `systemctl restart` | `Route::Idle` | `Route::steps()` carries the `hypridle.service` restart after `RenderStep::Idle`; `render_idle()` is its `ExecStartPre` |
 | inotify watchers (Quickshell) | `write_marker()`, inode preserved | marker-writing render and apply steps | `render_accent()`, `render_corner_radius()` |
 | portal-backed toolkits (GTK/libadwaita) | `gsettings set` | `ApplyStep::ThemeIfSchemeMoved` | `push_theme()`: `gsettings set org.gnome.desktop.interface ...` |

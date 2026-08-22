@@ -21,15 +21,6 @@ pub(super) struct Point {
     pub(super) y: f64,
 }
 
-impl Point {
-    pub(super) fn floored(self) -> Self {
-        Self {
-            x: self.x.floor(),
-            y: self.y.floor(),
-        }
-    }
-}
-
 pub(super) fn cursor_position(cx: &SessionCx<'_>) -> Option<Point> {
     point(&json_object(cx, &["hyprctl", "cursorpos", "-j"]))
 }
