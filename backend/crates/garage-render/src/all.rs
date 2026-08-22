@@ -25,7 +25,7 @@
 //! [`RenderCx::monitors`]'s question rather than an instruction: the plan cannot be written
 //! without knowing which displays exist. Nothing here answers back.
 
-use crate::bar::{widgets as bar_widgets, workspaces as bar_workspaces};
+use crate::bar::{layout as bar_layout, widgets as bar_widgets, workspaces as bar_workspaces};
 use crate::cx::RenderCx;
 use crate::error::RenderError;
 use crate::keybinds::Document;
@@ -71,6 +71,7 @@ pub fn render_all(
     plan::render_workspaces(cx)?;
     bar_workspaces::render_bar_workspaces(cx)?;
     bar_widgets::render_bar_widgets(cx)?;
+    bar_layout::render_bar_layout(cx)?;
     motion::render_motion(cx)?;
     accent::render_accent(cx)?;
     corner::render_corner_radius(cx)?;
@@ -100,7 +101,8 @@ pub fn render_all(
 pub fn render_bar(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     region::render_region(cx)?;
     bar_workspaces::render_bar_workspaces(cx)?;
-    bar_widgets::render_bar_widgets(cx)
+    bar_widgets::render_bar_widgets(cx)?;
+    bar_layout::render_bar_layout(cx)
 }
 
 /// `garage render-wallpaper`'s whole body: `render_wallpaper(load_preferences())`

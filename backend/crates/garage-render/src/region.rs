@@ -16,6 +16,7 @@
 //! relaunch.
 
 use garage_core::fs::atomic::atomic_write;
+use garage_core::fs::marker::write_marker;
 use garage_core::paths::Paths;
 use garage_core::schema::enums::{DateFormat, FirstDayOfWeek, TimeFormat};
 use garage_core::schema::Preferences;
@@ -132,12 +133,40 @@ fn waybar_clock_json(paths: &Paths, prefs: &Preferences) -> Result<String, Rende
     Ok(text)
 }
 
+/// `clock-format.json`'s whole body: the four region values the Quickshell bar's clock
+/// consumes, as the schema spells them. The locale is carried even when empty -- an empty
+/// string is "resolve it the way the session would", which is a state worth publishing,
+/// not an absence to infer.
+fn clock_format_json(prefs: &Preferences) -> String {
+    let region = &prefs.region;
+    let value = Value::Table(vec![
+        (
+            "locale".to_owned(),
+            Value::Str(region.locale.as_str().to_owned()),
+        ),
+        (
+            "date_format".to_owned(),
+            Value::Str(region.date_format.as_str().to_owned()),
+        ),
+        (
+            "time_format".to_owned(),
+            Value::Str(region.time_format.as_str().to_owned()),
+        ),
+        (
+            "first_day_of_week".to_owned(),
+            Value::Str(region.first_day_of_week.as_str().to_owned()),
+        ),
+    ]);
+    format!("{}\n", json_dumps(&value, 2))
+}
+
 /// Write the locale override and the bar's clock format (`render_region()`, garage:4525-4552).
 ///
 /// # Errors
 ///
 /// [`RenderError::Template`] if either fragment's template names a variable this renderer
-/// does not supply, or [`RenderError::Atomic`] if either fragment could not be replaced.
+/// does not supply, [`RenderError::Atomic`] if either fragment could not be replaced, or
+/// [`RenderError::Marker`] if the clock-format marker could not be written.
 pub fn render_region(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let paths = cx.paths();
     atomic_write(&paths.fragments.locale_env, &locale_env(paths, cx.prefs())?)?;
@@ -145,6 +174,7 @@ pub fn render_region(cx: &RenderCx<'_>) -> Result<(), RenderError> {
         &paths.fragments.waybar_clock,
         &waybar_clock_json(paths, cx.prefs())?,
     )?;
+    write_marker(&paths.markers.clock_format, &clock_format_json(cx.prefs()))?;
     Ok(())
 }
 
@@ -250,6 +280,37 @@ mod tests {
         assert_eq!(
             clock,
             "{\n  \"clock\": {\n    \"format\": \"{:%a %Y-%m-%d  %I:%M %p}\",\n    \"calendar\": {\n      \"iso8601\": true\n    },\n    \"locale\": \"en_US.UTF-8\"\n  }\n}\n"
+        );
+        drop(std::fs::remove_dir_all(&paths.home));
+    }
+
+    /// The Quickshell bar's clock marker carries the same four values the waybar fragment
+    /// spells as `strftime`, in the schema's own words, with an empty locale published as
+    /// a state rather than omitted.
+    #[test]
+    fn the_clock_format_marker_carries_the_region_values() {
+        let prefs = prefs_from(
+            "[region]\nlocale = \"en_US.UTF-8\"\ndate_format = \"iso\"\ntime_format = \"12\"\n\
+             first_day_of_week = \"monday\"\n",
+        );
+        let paths = scratch_paths("marker");
+        let monitors = NoMonitors;
+        let lua = LuaAccepts;
+        let cx = RenderCx::new(&prefs, &paths, &monitors, &lua);
+        render_region(&cx).expect("render_region succeeds on a clean scratch");
+
+        let marker = std::fs::read_to_string(&paths.markers.clock_format)
+            .expect("the clock-format marker was written");
+        assert_eq!(
+            marker,
+            concat!(
+                "{\n",
+                "  \"locale\": \"en_US.UTF-8\",\n",
+                "  \"date_format\": \"iso\",\n",
+                "  \"time_format\": \"12\",\n",
+                "  \"first_day_of_week\": \"monday\"\n",
+                "}\n"
+            )
         );
         drop(std::fs::remove_dir_all(&paths.home));
     }

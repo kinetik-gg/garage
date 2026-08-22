@@ -251,6 +251,10 @@ pub struct Markers {
     pub browser: PathBuf,
     /// Whether animations are suppressed.
     pub reduce_motion: PathBuf,
+    /// The bar's whole layout state, consumed by the Quickshell bar.
+    pub bar_layout: PathBuf,
+    /// The bar clock's locale and format halves, consumed by the Quickshell bar.
+    pub clock_format: PathBuf,
 }
 
 impl Markers {
@@ -266,6 +270,8 @@ impl Markers {
             terminal: generated.join("terminal"),
             browser: generated.join("browser"),
             reduce_motion: generated.join("reduce-motion"),
+            bar_layout: generated.join("bar-layout.json"),
+            clock_format: generated.join("clock-format.json"),
         }
     }
 }

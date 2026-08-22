@@ -35,6 +35,7 @@ use crate::workspaces::reload_bar;
 /// [`ApplyError::Render`] if the fragment could not be written.
 pub(crate) fn apply_bar_workspaces(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     render_bar_workspaces(cx.render())?;
+    garage_render::render_bar_layout(cx.render())?;
     reload_bar(cx);
     Ok(())
 }
@@ -61,6 +62,7 @@ fn render_bar_style(cx: &SessionCx<'_>) -> Result<(), ApplyError> {
 /// Whatever [`render_bar_style`] returns.
 pub(crate) fn apply_bar_style(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     render_bar_style(cx)?;
+    garage_render::render_bar_layout(cx.render())?;
     reload_bar(cx);
     Ok(())
 }
@@ -70,7 +72,8 @@ pub(crate) fn apply_bar_style(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> 
 /// Both fragments, not just the widget one: media's definition is widget-owned while its
 /// place immediately after the workspace indicator is left-side-owned, so a media toggle has
 /// to republish both before the one reload. The other widget toggles harmlessly reproduce the
-/// unchanged left fragment.
+/// unchanged left fragment. The Quickshell layout marker is refreshed alongside, so both bar
+/// consumers see the same change.
 ///
 /// # Errors
 ///
@@ -78,6 +81,7 @@ pub(crate) fn apply_bar_style(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> 
 pub(crate) fn apply_bar_widgets(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     render_bar_workspaces(cx.render())?;
     render_bar_widgets(cx.render())?;
+    garage_render::render_bar_layout(cx.render())?;
     reload_bar(cx);
     Ok(())
 }
