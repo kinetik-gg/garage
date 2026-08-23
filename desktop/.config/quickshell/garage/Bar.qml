@@ -34,6 +34,11 @@ Scope {
             screen: modelData
             color: "transparent"
             aboveWindows: true
+            // Explicit, marker-driven height. Left to its own devices the window
+            // sizes from its contents' implicit measurement, which races the first
+            // layout and lands on a comical ~100px default; the palettes set their
+            // own implicit sizes for the same reason.
+            implicitHeight: BarState.height
             exclusiveZone: BarState.height
             focusable: false
             surfaceFormat.opaque: false
@@ -140,6 +145,7 @@ Scope {
 
                         visible: BarState.aiUsage && BarContext.aiGlyph !== ""
                         label: BarContext.aiGlyph
+                        labelFont: "Phosphor"
                         warning: BarContext.aiStale
                         tip: BarContext.aiTip
                         onActivated: bar.surfaceRequested(

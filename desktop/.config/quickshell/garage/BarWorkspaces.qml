@@ -5,24 +5,28 @@ import QtQuick
 // widening when active and reddening when a window on it is urgent. Clicking a
 // dot activates its workspace -- the ext/workspaces module's own behaviour.
 //
-// The dots are deliberately not buttons with pills: the old indicator's hover
-// feedback lived entirely in the dot itself (idle 45%, hover 65%, active 95%
-// opacity of one colour), and that is what this draws.
+// The dots read Hyprland's global workspace model and filter it by monitor name,
+// rather than asking a per-monitor model that only fills once the compositor's
+// event stream has answered for that specific output. The global model is the
+// reactive one: every workspace event lands in it whether or not any per-screen
+// bookkeeping has run yet.
 Item {
     id: workspaces
 
-    readonly property var monitor: Hyprland.monitorFor(barScreen)
     // The screen this bar instance sits on, handed in by the bar.
     property var barScreen: null
+    readonly property string screenName: barScreen ? barScreen.name : ""
 
     readonly property var entries: {
-        const list = monitor && monitor.workspaces ? monitor.workspaces.values : [];
-        const sorted = list.slice().sort((a, b) => a.id - b.id);
-        return sorted;
+        const list = Hyprland.workspaces ? Hyprland.workspaces.values : [];
+        const mine = list.filter(candidate =>
+            candidate.monitor && candidate.monitor.name === screenName);
+        return mine.sort((a, b) => a.id - b.id);
     }
 
     implicitWidth: dotRow.implicitWidth
     implicitHeight: 24
+    visible: entries.length > 0
 
     Row {
         id: dotRow
@@ -38,9 +42,7 @@ Item {
 
                 required property var modelData
 
-                readonly property bool active: workspaces.monitor
-                    && workspaces.monitor.activeWorkspace
-                    ? workspaces.monitor.activeWorkspace.id === modelData.id : false
+                readonly property bool active: modelData.focused === true
                 // Hover widens the target as well as brightening the dot, so the
                 // click area grows to meet the colour instead of trailing it.
                 readonly property bool hovered: dotArea.containsMouse

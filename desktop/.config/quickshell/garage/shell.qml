@@ -311,28 +311,113 @@ ShellRoot {
         loader.active = true;
     }
 
-    // Click-outside dismissal for the launcher, the two centres and the three
-    // panels the bar opens, in one place rather than one copy per palette: they
-    // all want the same gesture, they are all mutually exclusive by
-    // activeSurface, and a single catcher therefore never has to work out which
-    // of them it is guarding -- it closes whatever is up.
-    //
-    // Declared before the palette loaders on purpose. This and they both bind
-    // to activeSurface, so within the turn that changes it they are served in
-    // declaration order -- the catcher's surfaces map first, the palette's map
-    // second, and on this compositor the surface mapped second is the one that
-    // stacks on top. Measured. Moving this below them would put the catcher
-    // over the palette and turn every click on the panel into a dismissal.
-    DismissCatcher {
-        active: shell.catchesOutsideClicks(shell.activeSurface)
-        // Stood down for the whole screenshot flow: the pill's own clicks are
-        // not the user clicking away from the panel being photographed, and
-        // neither are slurp's while a region is being dragged out. Stood down
-        // the same way for a palette holding itself open through a gesture --
-        // see paletteHoldsOpen above.
-        armed: !(shell.screenshotOpen || captureProcess.running
-            || shell.paletteHoldsOpen())
-        onDismissed: shell.requestCloseSurface(shell.activeSurface)
+    // The surface openers live on the shell itself so the bar's in-process
+    // router and the IPC handler reach the same bodies: one function per
+    // surface, however it is invoked.
+
+    function launcherOn(screenName: string): void {
+        if (String(launcherMode.text() || "").trim() === "external") {
+            shell.requestCloseSurface("launcher");
+            return;
+        }
+        const sameScreen = shell.launcherScreenName === screenName;
+        const open = () => {
+            shell.launcherScreenName = screenName;
+        };
+        if (sameScreen)
+            shell.toggleSurface("launcher", open);
+        else
+            shell.openSurface("launcher", open);
+    }
+    function sessionOn(screenName: string): void {
+        // Asked for again on the screen it is already on, it closes; asked
+        // for on another screen, it moves there rather than closing under a
+        // pointer that is somewhere else entirely.
+        const sameScreen = shell.sessionScreenName === screenName;
+        const open = () => {
+            shell.sessionScreenName = screenName;
+            shell.sessionInitialAction = "";
+        };
+        if (sameScreen)
+            shell.toggleSurface("session", open);
+        else
+            shell.openSurface("session", open);
+    }
+    function notificationsOn(screenName: string): void {
+        const sameScreen = shell.notificationScreenName === screenName;
+        const open = () => {
+            shell.notificationScreenName = screenName;
+        };
+        if (sameScreen)
+            shell.toggleSurface("notificationCenter", open);
+        else
+            shell.openSurface("notificationCenter", open);
+    }
+    function controlCenterOn(screenName: string): void {
+        const sameScreen = shell.controlCenterScreenName === screenName;
+        const open = () => {
+            shell.controlCenterScreenName = screenName;
+        };
+        if (sameScreen)
+            shell.toggleSurface("controlCenter", open);
+        else
+            shell.openSurface("controlCenter", open);
+    }
+    function monitorOn(screenName: string, anchorX: int): void {
+        const sameScreen = shell.monitorScreenName === screenName;
+        const open = () => {
+            shell.monitorScreenName = screenName;
+            shell.monitorAnchorX = anchorX;
+        };
+        if (sameScreen)
+            shell.toggleSurface("monitorPalette", open);
+        else
+            shell.openSurface("monitorPalette", open);
+    }
+    function mediaOn(screenName: string, anchorX: int): void {
+        const sameScreen = shell.mediaScreenName === screenName;
+        const open = () => {
+            shell.mediaScreenName = screenName;
+            shell.mediaAnchorX = anchorX;
+        };
+        if (sameScreen)
+            shell.toggleSurface("mediaPalette", open);
+        else
+            shell.openSurface("mediaPalette", open);
+    }
+    function aiUsageOn(screenName: string): void {
+        const sameScreen = shell.aiUsageScreenName === screenName;
+        const open = () => {
+            shell.aiUsageScreenName = screenName;
+        };
+        if (sameScreen)
+            shell.toggleSurface("aiPalette", open);
+        else
+            shell.openSurface("aiPalette", open);
+    }
+
+// Click-outside dismissal for the launcher, the two centres and the three
+// panels the bar opens, in one place rather than one copy per palette: they
+// all want the same gesture, they are all mutually exclusive by
+// activeSurface, and a single catcher therefore never has to work out which
+// of them it is guarding -- it closes whatever is up.
+//
+// Declared before the palette loaders on purpose. This and they both bind
+// to activeSurface, so within the turn that changes it they are served in
+// declaration order -- the catcher's surfaces map first, the palette's map
+// second, and on this compositor the surface mapped second is the one that
+// stacks on top. Measured. Moving this below them would put the catcher
+// over the palette and turn every click on the panel into a dismissal.
+DismissCatcher {
+    active: shell.catchesOutsideClicks(shell.activeSurface)
+    // Stood down for the whole screenshot flow: the pill's own clicks are
+    // not the user clicking away from the panel being photographed, and
+    // neither are slurp's while a region is being dragged out. Stood down
+    // the same way for a palette holding itself open through a gesture --
+    // see paletteHoldsOpen above.
+    armed: !(shell.screenshotOpen || captureProcess.running
+        || shell.paletteHoldsOpen())
+    onDismissed: shell.requestCloseSurface(shell.activeSurface)
     }
 
     LazyLoader {
@@ -596,6 +681,35 @@ ShellRoot {
         property bool mediaVisible: mediaPaletteLoader.active
         property bool aiUsageVisible: aiPaletteLoader.active
 
+
+        function launcherOn(screenName: string): void {
+            shell.launcherOn(screenName);
+        }
+
+        function sessionOn(screenName: string): void {
+            shell.sessionOn(screenName);
+        }
+
+        function notificationsOn(screenName: string): void {
+            shell.notificationsOn(screenName);
+        }
+
+        function controlCenterOn(screenName: string): void {
+            shell.controlCenterOn(screenName);
+        }
+
+        function monitorOn(screenName: string, anchorX: int): void {
+            shell.monitorOn(screenName, anchorX);
+        }
+
+        function mediaOn(screenName: string, anchorX: int): void {
+            shell.mediaOn(screenName, anchorX);
+        }
+
+        function aiUsageOn(screenName: string): void {
+            shell.aiUsageOn(screenName);
+        }
+
         function launcher(): void {
             // Read per call rather than bound: the marker changes underneath a
             // running shell, and an empty one is a session that has not
@@ -613,20 +727,6 @@ ShellRoot {
             });
         }
 
-        function launcherOn(screenName: string): void {
-            if (String(launcherMode.text() || "").trim() === "external") {
-                shell.requestCloseSurface("launcher");
-                return;
-            }
-            const sameScreen = shell.launcherScreenName === screenName;
-            const open = () => {
-                shell.launcherScreenName = screenName;
-            };
-            if (sameScreen)
-                shell.toggleSurface("launcher", open);
-            else
-                shell.openSurface("launcher", open);
-        }
 
         function closeLauncher(): void {
             shell.requestCloseSurface("launcher");
@@ -647,20 +747,6 @@ ShellRoot {
             });
         }
 
-        function sessionOn(screenName: string): void {
-            // Asked for again on the screen it is already on, it closes; asked
-            // for on another screen, it moves there rather than closing under a
-            // pointer that is somewhere else entirely.
-            const sameScreen = shell.sessionScreenName === screenName;
-            const open = () => {
-                shell.sessionScreenName = screenName;
-                shell.sessionInitialAction = "";
-            };
-            if (sameScreen)
-                shell.toggleSurface("session", open);
-            else
-                shell.openSurface("session", open);
-        }
 
         // Through the surface, like every other close*: this is the session
         // menu's only click-outside path -- garage-menu-dismiss calls it -- so
@@ -714,16 +800,6 @@ ShellRoot {
             });
         }
 
-        function notificationsOn(screenName: string): void {
-            const sameScreen = shell.notificationScreenName === screenName;
-            const open = () => {
-                shell.notificationScreenName = screenName;
-            };
-            if (sameScreen)
-                shell.toggleSurface("notificationCenter", open);
-            else
-                shell.openSurface("notificationCenter", open);
-        }
 
         function closeNotifications(): void {
             shell.requestCloseSurface("notificationCenter");
@@ -739,16 +815,6 @@ ShellRoot {
             });
         }
 
-        function controlCenterOn(screenName: string): void {
-            const sameScreen = shell.controlCenterScreenName === screenName;
-            const open = () => {
-                shell.controlCenterScreenName = screenName;
-            };
-            if (sameScreen)
-                shell.toggleSurface("controlCenter", open);
-            else
-                shell.openSurface("controlCenter", open);
-        }
 
         function closeControlCenter(): void {
             shell.requestCloseSurface("controlCenter");
@@ -767,17 +833,6 @@ ShellRoot {
             });
         }
 
-        function monitorOn(screenName: string, anchorX: int): void {
-            const sameScreen = shell.monitorScreenName === screenName;
-            const open = () => {
-                shell.monitorScreenName = screenName;
-                shell.monitorAnchorX = anchorX;
-            };
-            if (sameScreen)
-                shell.toggleSurface("monitorPalette", open);
-            else
-                shell.openSurface("monitorPalette", open);
-        }
 
         function closeMonitor(): void {
             shell.requestCloseSurface("monitorPalette");
@@ -790,17 +845,6 @@ ShellRoot {
             });
         }
 
-        function mediaOn(screenName: string, anchorX: int): void {
-            const sameScreen = shell.mediaScreenName === screenName;
-            const open = () => {
-                shell.mediaScreenName = screenName;
-                shell.mediaAnchorX = anchorX;
-            };
-            if (sameScreen)
-                shell.toggleSurface("mediaPalette", open);
-            else
-                shell.openSurface("mediaPalette", open);
-        }
 
         function closeMedia(): void {
             shell.requestCloseSurface("mediaPalette");
@@ -812,16 +856,6 @@ ShellRoot {
             });
         }
 
-        function aiUsageOn(screenName: string): void {
-            const sameScreen = shell.aiUsageScreenName === screenName;
-            const open = () => {
-                shell.aiUsageScreenName = screenName;
-            };
-            if (sameScreen)
-                shell.toggleSurface("aiPalette", open);
-            else
-                shell.openSurface("aiPalette", open);
-        }
 
         function closeAiUsage(): void {
             shell.requestCloseSurface("aiPalette");
