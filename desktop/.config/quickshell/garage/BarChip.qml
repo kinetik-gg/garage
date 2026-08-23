@@ -11,6 +11,10 @@ Item {
     property string label: ""
     property bool warning: false
     property string tip: ""
+    // The label is usually plain text in the sans face; a chip whose label is a
+    // Phosphor codepoint (the AI usage sparkle) names the icon font here, or the
+    // codepoint falls through to a CJK fallback and reads as tofu.
+    property string labelFont: Theme.sans
 
     implicitWidth: chipText.implicitWidth + BarState.scaled("module") * 2
     implicitHeight: Math.max(chipText.implicitHeight + 8, 24)
@@ -32,7 +36,7 @@ Item {
         anchors.centerIn: parent
         text: chip.label
         color: chip.warning ? "#e01b24" : Theme.textMuted
-        font.family: Theme.sans
+        font.family: chip.labelFont
         font.pixelSize: 13
         font.weight: Font.DemiBold
         renderType: Text.NativeRendering
