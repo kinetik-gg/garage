@@ -1,8 +1,9 @@
 import QtQuick
 
-// A text chip: the containers counter, the SMB counter. One style for steady
-// state, one for a warning, nothing at all when the probe reports unavailable --
-// the caller decides by setting `visible`.
+// A text chip: the containers counter, the SMB counter, the AI usage
+// sparkle. Text sits in the old text-module face -- 13px Plus Jakarta Sans
+// 600 at full foreground -- unless the chip overrides size, family or
+// colour for a glyph-shaped label.
 Item {
     id: chip
 
@@ -11,10 +12,9 @@ Item {
     property string label: ""
     property bool warning: false
     property string tip: ""
-    // The label is usually plain text in the sans face; a chip whose label is a
-    // Phosphor codepoint (the AI usage sparkle) names the icon font here, or the
-    // codepoint falls through to a CJK fallback and reads as tofu.
     property string labelFont: Theme.sans
+    property real labelSize: 13
+    property color labelColor: Theme.text
 
     implicitWidth: chipText.implicitWidth + BarState.scaled("module") * 2
     implicitHeight: Math.max(chipText.implicitHeight + 8, 24)
@@ -22,8 +22,8 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 8
-        color: clickArea.pressed ? Theme.hoverStrong
-            : clickArea.containsMouse ? Theme.hover : "transparent"
+        color: clickArea.pressed ? Qt.alpha(Theme.text, 0.22)
+            : clickArea.containsMouse ? Qt.alpha(Theme.text, 0.12) : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: Theme.reduceMotion ? 0 : 130 }
@@ -35,9 +35,9 @@ Item {
 
         anchors.centerIn: parent
         text: chip.label
-        color: chip.warning ? "#e01b24" : Theme.textMuted
+        color: chip.warning ? "#e01b24" : chip.labelColor
         font.family: chip.labelFont
-        font.pixelSize: 13
+        font.pixelSize: chip.labelSize
         font.weight: Font.DemiBold
         renderType: Text.NativeRendering
     }
