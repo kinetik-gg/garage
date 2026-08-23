@@ -83,13 +83,16 @@ Scope {
 
                     BarIconButton {
                         glyph: "\uf303"
-                        glyphFamily: "Caskaydia Mono Nerd Font Mono"
+                        glyphFamily: "CaskaydiaMono Nerd Font"
                         glyphSize: 17
+                        square: 21
+                        nudgeRight: 6
                         onActivated: bar.surfaceRequested(
                             "session", output.screenName, -1)
                     }
 
                     BarWorkspaces {
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: BarState.indicator
                         barScreen: output.modelData
                     }
@@ -97,6 +100,7 @@ Scope {
                     BarMediaChip {
                         id: mediaChip
 
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: BarState.mediaPlayer && MediaController.visible
                         onActivated: bar.surfaceRequested(
                             "media", output.screenName, output.centreX(mediaChip))
@@ -128,6 +132,7 @@ Scope {
                             id: stripItem
 
                             required property var modelData
+                            anchors.verticalCenter: parent.verticalCenter
 
                             visible: BarState.monitors[modelData.key] === true
                             name: modelData.key
@@ -143,11 +148,14 @@ Scope {
                     BarChip {
                         id: aiChip
 
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: BarState.aiUsage && BarContext.aiGlyph !== ""
                         label: BarContext.aiGlyph
                         // \ue6a2 is a Nerd Font codepoint: Phosphor does not
                         // carry it, and the sans fallback turns it into tofu.
                         labelFont: "Caskaydia Mono Nerd Font Mono"
+                        labelSize: 16
+                        labelColor: Theme.text
                         warning: BarContext.aiStale
                         tip: BarContext.aiTip
                         onActivated: bar.surfaceRequested(
@@ -155,6 +163,7 @@ Scope {
                     }
 
                     BarChip {
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: BarContext.containersAvailable
                             && BarContext.containerCount > 0
                         label: "CTR " + BarContext.containerCount
@@ -163,6 +172,7 @@ Scope {
                     }
 
                     BarChip {
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: BarContext.smbAvailable
                         label: "SMB " + BarContext.smbConnected
                         warning: BarContext.smbConnected < BarContext.smbExpected
@@ -175,6 +185,7 @@ Scope {
 
                     // The mic dot: dim when idle, accent when something records.
                     Item {
+                        anchors.verticalCenter: parent.verticalCenter
                         width: 10
                         height: 10
                         visible: BarContext.micAvailable
@@ -195,27 +206,30 @@ Scope {
                         }
                     }
 
-                    BarTray {}
+                    BarTray { anchors.verticalCenter: parent.verticalCenter }
 
                     BarIconButton {
                         glyph: "\ue0ce"
+                        anchors.verticalCenter: parent.verticalCenter
                         onActivated: bar.surfaceRequested(
                             "notifications", output.screenName, -1)
                     }
 
                     BarIconButton {
                         glyph: "\ue30c"
+                        anchors.verticalCenter: parent.verticalCenter
                         onActivated: bar.surfaceRequested(
                             "launcher", output.screenName, -1)
                     }
 
                     BarIconButton {
                         glyph: "\ue676"
+                        anchors.verticalCenter: parent.verticalCenter
                         onActivated: bar.surfaceRequested(
                             "controlCenter", output.screenName, -1)
                     }
 
-                    BarClock {}
+                    BarClock { anchors.verticalCenter: parent.verticalCenter }
                 }
             }
         }

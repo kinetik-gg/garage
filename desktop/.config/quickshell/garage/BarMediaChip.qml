@@ -1,8 +1,10 @@
 import QtQuick
 
-// The media chip: source glyph, transport state, artist — title. Middle-click
-// toggles playback, right-click skips forward, and the wheel steps tracks in the
-// direction the old module's scroll bindings did -- up for previous, down for next.
+// The media chip: source glyph and "artist — title", the old module's whole
+// readout. Middle-click toggles playback, right-click skips forward, and the
+// wheel steps tracks in the direction the old module's scroll bindings did --
+// up for previous, down for next. There is no play/pause glyph in the bar:
+// the old module never drew one, and the transport lives in the media panel.
 Item {
     id: mediaChip
 
@@ -11,6 +13,17 @@ Item {
     implicitWidth: row.implicitWidth + BarState.scaled("module") * 2
     implicitHeight: Math.max(row.implicitHeight + 8, 24)
     visible: MediaController.visible
+
+    Rectangle {
+        anchors.fill: parent
+        radius: 8
+        color: clickArea.pressed ? Qt.alpha(Theme.text, 0.22)
+            : clickArea.containsMouse ? Qt.alpha(Theme.text, 0.12) : "transparent"
+
+        Behavior on color {
+            ColorAnimation { duration: Theme.reduceMotion ? 0 : 130 }
+        }
+    }
 
     Row {
         id: row
@@ -21,20 +34,9 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: MediaController.iconGlyph
-            color: Theme.textMuted
+            color: Theme.text
             font.family: "Caskaydia Mono Nerd Font Mono"
-            font.pixelSize: 14
-            renderType: Text.NativeRendering
-        }
-
-        // Play/pause as glyphs rather than icons: they follow the bar's colour,
-        // and the transport is the one part that must read at a glance.
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: MediaController.isPlaying ? "\u25b6" : "\u23f8"
-            color: MediaController.isPlaying ? Theme.accent : Theme.textMuted
-            font.family: "Phosphor"
-            font.pixelSize: 13
+            font.pixelSize: 16
             renderType: Text.NativeRendering
         }
 
@@ -49,21 +51,6 @@ Item {
             font.pixelSize: 13
             font.weight: Font.DemiBold
             renderType: Text.NativeRendering
-
-            // The variable width the old module's label had; the palette anchors
-            // under wherever this actually lands.
-            onImplicitWidthChanged: mediaChip.implicitWidthChanged()
-        }
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: 8
-        color: clickArea.pressed ? Theme.hoverStrong
-            : clickArea.containsMouse ? Theme.hover : "transparent"
-
-        Behavior on color {
-            ColorAnimation { duration: Theme.reduceMotion ? 0 : 130 }
         }
     }
 

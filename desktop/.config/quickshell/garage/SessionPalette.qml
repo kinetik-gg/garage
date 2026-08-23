@@ -138,6 +138,39 @@ Scope {
         }
     }
 
+    // Click-outside dismissal, owned here rather than by the shell's shared
+    // catcher: a fullscreen surface underneath the menu, mapped and unmapped
+    // with it, turning any press outside the menu's box into a dismissal. The
+    // confirmation dialog below is the precedent this follows.
+    PanelWindow {
+        id: menuBackdrop
+
+        visible: menu.pendingAction === ""
+        screen: menu.targetScreen()
+        color: "transparent"
+        focusable: false
+        aboveWindows: true
+        exclusionMode: ExclusionMode.Ignore
+        surfaceFormat.opaque: false
+
+        anchors {
+            left: true
+            top: true
+            right: true
+            bottom: true
+        }
+
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "garage-session-menu-backdrop"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onPressed: menu.requestDismissal()
+        }
+    }
+
     PanelWindow {
         id: palette
         visible: menu.pendingAction === ""
@@ -171,6 +204,25 @@ Scope {
         WlrLayershell.namespace: "garage-session-menu"
         WlrLayershell.keyboardFocus: menu.pendingAction === ""
             ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+
+        Shortcut { sequence: "A"; enabled: menu.pendingAction === ""; onActivated: menu.choose("about", false) }
+        Shortcut { sequence: "F"; enabled: menu.pendingAction === ""; onActivated: menu.choose("reloadHyprland", true) }
+        Shortcut { sequence: "L"; enabled: menu.pendingAction === ""; onActivated: menu.choose("lock", false) }
+        Shortcut { sequence: "O"; enabled: menu.pendingAction === ""; onActivated: menu.choose("logout", true) }
+        Shortcut { sequence: "S"; enabled: menu.pendingAction === ""; onActivated: menu.choose("suspend", true) }
+        Shortcut { sequence: "R"; enabled: menu.pendingAction === ""; onActivated: menu.choose("restart", true) }
+        Shortcut { sequence: "P"; enabled: menu.pendingAction === ""; onActivated: menu.choose("poweroff", true) }
+        Shortcut { sequence: "Return"; enabled: menu.pendingAction !== ""; onActivated: menu.confirmPending() }
+        Shortcut {
+            sequence: "Escape"
+            onActivated: {
+                if (menu.pendingAction !== "")
+                    menu.cancelPending();
+                else
+                    menu.requestDismissal();
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -445,21 +497,4 @@ Scope {
         }
     }
 
-    Shortcut { sequence: "A"; enabled: menu.pendingAction === ""; onActivated: menu.choose("about", false) }
-    Shortcut { sequence: "F"; enabled: menu.pendingAction === ""; onActivated: menu.choose("reloadHyprland", true) }
-    Shortcut { sequence: "L"; enabled: menu.pendingAction === ""; onActivated: menu.choose("lock", false) }
-    Shortcut { sequence: "O"; enabled: menu.pendingAction === ""; onActivated: menu.choose("logout", true) }
-    Shortcut { sequence: "S"; enabled: menu.pendingAction === ""; onActivated: menu.choose("suspend", true) }
-    Shortcut { sequence: "R"; enabled: menu.pendingAction === ""; onActivated: menu.choose("restart", true) }
-    Shortcut { sequence: "P"; enabled: menu.pendingAction === ""; onActivated: menu.choose("poweroff", true) }
-    Shortcut { sequence: "Return"; enabled: menu.pendingAction !== ""; onActivated: menu.confirmPending() }
-    Shortcut {
-        sequence: "Escape"
-        onActivated: {
-            if (menu.pendingAction !== "")
-                menu.cancelPending();
-            else
-                menu.requestDismissal();
-        }
-    }
 }

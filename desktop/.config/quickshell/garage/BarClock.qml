@@ -43,7 +43,7 @@ Item {
 
         anchors.centerIn: parent
         text: clock.now.toLocaleString(clock.locale, clock.pattern)
-        color: Theme.textMuted
+        color: Theme.text
         font.family: Theme.sans
         font.pixelSize: 13
         font.weight: Font.DemiBold

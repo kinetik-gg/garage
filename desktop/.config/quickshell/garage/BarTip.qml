@@ -35,7 +35,7 @@ Item {
     Rectangle {
         id: bubble
 
-        readonly property int gutter: 8
+        readonly property int gutter: BarState.scaled("tooltip")
 
         x: {
             const centre = tip.owner.width / 2;
@@ -61,7 +61,8 @@ Item {
             text: tip.text
             color: Theme.text
             font.family: Theme.sans
-            font.pixelSize: 12
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
             renderType: Text.NativeRendering
         }
     }

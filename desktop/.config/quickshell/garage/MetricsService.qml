@@ -274,6 +274,16 @@ Singleton {
         return "\u2193" + rateLabel(net.rx_bps) + " \u2191" + rateLabel(net.tx_bps);
     }
 
+    function downRate() {
+        const net = latest ? latest.network : null;
+        return net ? number(net.rx_bps) : NaN;
+    }
+
+    function upRate() {
+        const net = latest ? latest.network : null;
+        return net ? number(net.tx_bps) : NaN;
+    }
+
     function diskLabel() {
         const disk = latest ? latest.disk : null;
         if (!disk)
