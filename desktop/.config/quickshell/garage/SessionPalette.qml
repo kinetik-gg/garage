@@ -139,35 +139,42 @@ Scope {
     }
 
     // Click-outside dismissal, owned here rather than by the shell's shared
-    // catcher: a fullscreen surface underneath the menu, mapped and unmapped
-    // with it, turning any press outside the menu's box into a dismissal. The
-    // confirmation dialog below is the precedent this follows.
-    PanelWindow {
-        id: menuBackdrop
+    // catcher: a fullscreen surface underneath the menu on EVERY output,
+    // mapped and unmapped with it, turning a press anywhere on any monitor
+    // -- outside the menu's box -- into a dismissal. Per-screen because the
+    // menu lives on one output and the click that should dismiss it usually
+    // happens on another; the shared catcher's Variants shape is what makes
+    // that work, so this is that shape, owned by the palette.
+    Variants {
+        model: Quickshell.screens
 
-        visible: menu.pendingAction === ""
-        screen: menu.targetScreen()
-        color: "transparent"
-        focusable: false
-        aboveWindows: true
-        exclusionMode: ExclusionMode.Ignore
-        surfaceFormat.opaque: false
+        PanelWindow {
+            required property var modelData
 
-        anchors {
-            left: true
-            top: true
-            right: true
-            bottom: true
-        }
+            visible: menu.pendingAction === ""
+            screen: modelData
+            color: "transparent"
+            focusable: false
+            aboveWindows: true
+            exclusionMode: ExclusionMode.Ignore
+            surfaceFormat.opaque: false
 
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "garage-session-menu-backdrop"
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            anchors {
+                left: true
+                top: true
+                right: true
+                bottom: true
+            }
 
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-            onPressed: menu.requestDismissal()
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.namespace: "garage-session-menu-backdrop"
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                onPressed: menu.requestDismissal()
+            }
         }
     }
 
@@ -202,8 +209,13 @@ Scope {
 
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "garage-session-menu"
+        // OnDemand, not Exclusive: the menu takes the keyboard when it maps
+        // (Escape and the action shortcuts fire immediately), and a pointer
+        // press on any other surface is delivered to that surface -- the
+        // backdrop's included. Exclusive was the one thing separating this
+        // menu from every palette whose outside-click dismissal works.
         WlrLayershell.keyboardFocus: menu.pendingAction === ""
-            ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
 
         Shortcut { sequence: "A"; enabled: menu.pendingAction === ""; onActivated: menu.choose("about", false) }
