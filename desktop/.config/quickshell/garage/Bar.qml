@@ -145,7 +145,9 @@ Scope {
 
                         visible: BarState.aiUsage && BarContext.aiGlyph !== ""
                         label: BarContext.aiGlyph
-                        labelFont: "Phosphor"
+                        // \ue6a2 is a Nerd Font codepoint: Phosphor does not
+                        // carry it, and the sans fallback turns it into tofu.
+                        labelFont: "Caskaydia Mono Nerd Font Mono"
                         warning: BarContext.aiStale
                         tip: BarContext.aiTip
                         onActivated: bar.surfaceRequested(
