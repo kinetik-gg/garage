@@ -23,8 +23,12 @@ Item {
 
     signal surfaceRequested(string surface, string screenName, real anchor)
 
-    implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    implicitWidth: vertical ? verticalContent.implicitWidth
+        : horizontalContent.implicitWidth
+    implicitHeight: vertical ? verticalContent.implicitHeight
+        : horizontalContent.implicitHeight
+    width: implicitWidth
+    height: implicitHeight
 
     function filteredIds() {
         const ignored = registry.revision;
@@ -60,6 +64,8 @@ Item {
         visible: rail.overflowing
         implicitWidth: visible ? (rail.vertical ? BarState.thickness : 24) : 0
         implicitHeight: visible ? (rail.vertical ? 24 : BarState.thickness) : 0
+        width: implicitWidth
+        height: implicitHeight
 
         Rectangle {
             anchors.fill: parent
@@ -99,28 +105,43 @@ Item {
         }
     }
 
-    Grid {
-        id: content
-        rows: rail.vertical ? Math.max(1, children.length) : 1
-        columns: rail.vertical ? 1 : Math.max(1, children.length)
+    component ExtensionModule: BarModule {
+        required property string modelData
+        extensionId: modelData
+        registry: rail.registry
+        services: rail.services
+        screen: rail.screen
+        screenName: rail.screenName
+        edge: rail.edge
+        onSurfaceRequested: (surface, name, anchor) =>
+            rail.surfaceRequested(surface, name, anchor)
+    }
+
+    Row {
+        id: horizontalContent
+        visible: !rail.vertical
         spacing: BarState.scaled("module")
 
         ChevronButton { visible: rail.overflowing && rail.railRole === "right" }
 
         Repeater {
-            model: rail.displayedIds
+            model: rail.vertical ? [] : rail.displayedIds
+            delegate: ExtensionModule {}
+        }
 
-            delegate: BarModule {
-                required property string modelData
-                extensionId: modelData
-                registry: rail.registry
-                services: rail.services
-                screen: rail.screen
-                screenName: rail.screenName
-                edge: rail.edge
-                onSurfaceRequested: (surface, name, anchor) =>
-                    rail.surfaceRequested(surface, name, anchor)
-            }
+        ChevronButton { visible: rail.overflowing && rail.railRole !== "right" }
+    }
+
+    Column {
+        id: verticalContent
+        visible: rail.vertical
+        spacing: BarState.scaled("module")
+
+        ChevronButton { visible: rail.overflowing && rail.railRole === "right" }
+
+        Repeater {
+            model: rail.vertical ? rail.displayedIds : []
+            delegate: ExtensionModule {}
         }
 
         ChevronButton { visible: rail.overflowing && rail.railRole !== "right" }

@@ -12,6 +12,10 @@ PanelWindow {
     property string edge: BarState.position
     property real targetAnchor: -1
     property int gutter: Theme.windowGutter
+    // Distance from the opening edge. Most palettes use the same value as the
+    // corner gutter; monitor-relative surfaces can choose their own offset
+    // without changing the long-axis centring/clamp.
+    property int surfaceOffset: gutter
     property string surfaceNamespace: "garage-palette"
     property int keyboardFocusMode: WlrKeyboardFocus.OnDemand
     property bool escapeEnabled: true
@@ -77,7 +81,7 @@ PanelWindow {
     PanelMotion {
         id: motion
         edge: surface.edge
-        restingMargin: surface.gutter
+        restingMargin: surface.surfaceOffset
         onFinished: {
             surface.motionFinished();
             surface.dismissed();

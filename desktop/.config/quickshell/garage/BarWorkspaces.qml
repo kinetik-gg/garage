@@ -25,6 +25,7 @@ Item {
     // The screen this bar instance sits on, handed in by the bar.
     property var barScreen: null
     property var workspaceService: WorkspaceService
+    property bool vertical: false
     readonly property string screenName: barScreen ? barScreen.name : ""
 
     readonly property int workspaceRevision: workspaceService.revision
@@ -43,8 +44,10 @@ Item {
     readonly property int activePillWidth: 20
     readonly property int buttonPad: 6
 
-    implicitWidth: dotRow.implicitWidth
-    implicitHeight: 24
+    implicitWidth: vertical ? verticalDots.implicitWidth
+        : horizontalDots.implicitWidth
+    implicitHeight: vertical ? verticalDots.implicitHeight
+        : horizontalDots.implicitHeight
     visible: entries.length > 0
 
     Component.onCompleted: workspaceService.refresh()
@@ -61,84 +64,107 @@ Item {
         workspaceService.activate(id);
     }
 
-    Row {
-        id: dotRow
+    component WorkspaceDot: Item {
+        id: dotHolder
 
+        required property var modelData
+
+        readonly property bool active: workspaces.activeId === modelData.id
+        readonly property bool hovered: dotArea.containsMouse
+
+        // The holder tracks the pill, never the pointer: activation is the one
+        // state allowed to reflow the positioner.
+        width: workspaces.vertical ? 24
+            : (active ? workspaces.activePillWidth : workspaces.dotSize)
+                + workspaces.buttonPad * 2
+        height: workspaces.vertical
+            ? (active ? workspaces.activePillWidth : workspaces.dotSize)
+                + workspaces.buttonPad * 2
+            : 24
+
+        Behavior on width {
+            NumberAnimation {
+                duration: Theme.reduceMotion ? 0 : 180
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on height {
+            NumberAnimation {
+                duration: Theme.reduceMotion ? 0 : 180
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 8
+            color: Qt.alpha(Theme.text, 0.12)
+            visible: dotHolder.hovered && !dotHolder.active
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: workspaces.vertical ? workspaces.dotSize
+                : (dotHolder.active ? workspaces.activePillWidth
+                    : workspaces.dotSize)
+            height: workspaces.vertical
+                ? (dotHolder.active ? workspaces.activePillWidth
+                    : workspaces.dotSize) : workspaces.dotSize
+            radius: workspaces.dotSize / 2
+            color: dotHolder.active ? Qt.alpha(Theme.text, 0.95)
+                : dotHolder.hovered ? Qt.alpha(Theme.text, 0.65)
+                : Qt.alpha(Theme.text, 0.45)
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: Theme.reduceMotion ? 0 : 180
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on height {
+                NumberAnimation {
+                    duration: Theme.reduceMotion ? 0 : 180
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on color {
+                ColorAnimation { duration: Theme.reduceMotion ? 0 : 180 }
+            }
+        }
+
+        MouseArea {
+            id: dotArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: workspaces.activate(dotHolder.modelData.id)
+        }
+    }
+
+    Row {
+        id: horizontalDots
         anchors.centerIn: parent
         spacing: BarState.scaled("workspaceGap")
 
         Repeater {
-            model: workspaces.entries
+            model: workspaces.vertical ? [] : workspaces.entries
+            delegate: WorkspaceDot {}
+        }
+    }
 
-            delegate: Item {
-                id: dotHolder
+    Column {
+        id: verticalDots
+        anchors.centerIn: parent
+        spacing: BarState.scaled("workspaceGap")
 
-                required property var modelData
-
-                readonly property bool active: workspaces.activeId === modelData.id
-                readonly property bool hovered: dotArea.containsMouse
-
-                // The holder tracks the pill, never the pointer: activation is
-                // the one state allowed to reflow the row.
-                width: (active ? workspaces.activePillWidth : workspaces.dotSize)
-                    + workspaces.buttonPad * 2
-                height: 24
-
-                Behavior on width {
-                    NumberAnimation {
-                        duration: Theme.reduceMotion ? 0 : 180
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                // The button-box hover tint, extending over the padding. Colour
-                // only -- this is what hover is allowed to do.
-                Rectangle {
-                    x: 0
-                    width: parent.width
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    radius: 8
-                    color: Qt.alpha(Theme.text, 0.12)
-                    visible: dotHolder.hovered && !dotHolder.active
-                }
-
-                // The dot, or the active pill: same element, same 6px height,
-                // same 999-style stadium. 20px wide when active, 6 when not.
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: workspaces.buttonPad
-                    width: dotHolder.active
-                        ? workspaces.activePillWidth : workspaces.dotSize
-                    height: workspaces.dotSize
-                    radius: workspaces.dotSize / 2
-                    color: dotHolder.active ? Qt.alpha(Theme.text, 0.95)
-                        : dotHolder.hovered ? Qt.alpha(Theme.text, 0.65)
-                        : Qt.alpha(Theme.text, 0.45)
-
-                    Behavior on width {
-                        NumberAnimation {
-                            duration: Theme.reduceMotion ? 0 : 180
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.reduceMotion ? 0 : 180 }
-                    }
-                }
-
-                // The hit target: constant, padded, independent of the visual.
-                MouseArea {
-                    id: dotArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: workspaces.activate(dotHolder.modelData.id)
-                }
-            }
+        Repeater {
+            model: workspaces.vertical ? workspaces.entries : []
+            delegate: WorkspaceDot {}
         }
     }
 }

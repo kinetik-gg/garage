@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import "../.." as Garage
 
 // One monitor glyph and one badge. The badge is deliberately reserved for
@@ -18,8 +19,8 @@ Item {
     readonly property bool smbShort: context.smbAvailable
         && context.smbConnected < context.smbExpected
 
-    implicitWidth: 18 + bar.spacing.icon * 2
-    implicitHeight: Math.max(24, 16 + 8)
+    implicitWidth: 24 + bar.spacing.icon
+    implicitHeight: 24
 
     Rectangle {
         anchors.fill: parent
@@ -33,42 +34,30 @@ Item {
         }
     }
 
-    // A small code-native monitor outline so it follows the live foreground
-    // role in both schemes instead of baking a colour into an SVG.
     Item {
         id: monitorIcon
 
         anchors.centerIn: parent
-        width: 18
+        width: 16
         height: 16
 
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            width: 18
-            height: 12
-            radius: 2
-            color: "transparent"
-            border.width: 1.5
-            border.color: systemWidget.theme.text
+        Image {
+            id: monitorSource
+
+            anchors.fill: parent
+            source: Garage.GaragePaths.shellDir + "/icons/monitor.svg"
+            sourceSize.width: 32
+            sourceSize.height: 32
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: false
         }
 
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            width: 8
-            height: 1.5
-            radius: 1
+        ColorOverlay {
+            anchors.fill: monitorSource
+            source: monitorSource
             color: systemWidget.theme.text
-        }
-
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 1
-            width: 1.5
-            height: 4
-            color: systemWidget.theme.text
+            cached: true
         }
 
         Rectangle {

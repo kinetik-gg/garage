@@ -9,10 +9,8 @@ Garage.BarIconButton {
     required property var manifest
     property var probe: null
 
-    glyph: "\uf303"
-    glyphFamily: "CaskaydiaMono Nerd Font"
-    glyphSize: 17
-    square: 21
+    iconSource: Garage.GaragePaths.shellDir + "/icons/archlinux-logo.svg"
+    square: 24
     nudgeRight: bar.vertical ? 0 : 6
 
     onActivated: bar.openSurface("session", menuWidget)

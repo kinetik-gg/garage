@@ -22,6 +22,18 @@ PaletteSurface {
     id: launcher
     surfaceNamespace: "garage-launcher-host"
     escapeEnabled: false
+    // The launcher is a monitor-level affordance, not a popover belonging to
+    // the bar edge that opened it. Keep it horizontally centred and place its
+    // top edge one third down the selected monitor.
+    edge: "top"
+    targetAnchor: -1
+    // A top-docked bar contributes an exclusive zone before layer-shell applies
+    // this margin. Remove that zone so the launcher still lands at the same
+    // monitor-relative coordinate on every bar edge.
+    surfaceOffset: effectiveScreen ? Math.max(Theme.windowGutter,
+        Math.round(effectiveScreen.height / 3)
+            - (BarState.position === "top" ? BarState.thickness : 0))
+        : Theme.windowGutter
 
     signal sessionActionRequested(string action)
     signal shellActionRequested(string action)

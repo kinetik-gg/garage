@@ -13,8 +13,10 @@ Row {
     id: tray
 
     spacing: BarState.scaled("tray")
+    visible: trayItems.count > 0
 
     Repeater {
+        id: trayItems
         model: Quickshell.tray?.items ?? []
 
         delegate: Item {

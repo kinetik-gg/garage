@@ -90,28 +90,28 @@ Item {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: parent.height / 4
+            height: BarState.thickness
         }
         DropZone {
             zone: "bottom"
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            height: parent.height / 4
+            height: BarState.thickness
         }
         DropZone {
             zone: "left"
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: parent.left
-            width: parent.width / 4
+            width: BarState.thickness
         }
         DropZone {
             zone: "right"
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.right: parent.right
-            width: parent.width / 4
+            width: BarState.thickness
         }
     }
 }

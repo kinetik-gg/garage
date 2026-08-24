@@ -476,8 +476,6 @@ DismissCatcher {
 
         LauncherPalette {
             targetScreenName: shell.launcherScreenName
-            targetAnchor: shell.launcherAnchor
-            edge: BarState.position
             caffeine: shell.caffeine
             onSessionActionRequested: action => shell.confirmLauncherSessionAction(action)
             onShellActionRequested: action => shell.runLauncherShellAction(action)

@@ -34,12 +34,15 @@ Item {
 
     visible: extension !== null && (!vertical
         || extension.widget.vertical !== "hide")
+        && (!widgetLoader.item || widgetLoader.item.visible)
     implicitWidth: visible ? (vertical ? thickness
         : Math.max(thickness, widgetLoader.item
             ? widgetLoader.item.implicitWidth : thickness)) : 0
     implicitHeight: visible ? (vertical ? Math.max(thickness,
         widgetLoader.item ? widgetLoader.item.implicitHeight : thickness)
         : thickness) : 0
+    width: implicitWidth
+    height: implicitHeight
 
     function scaled(name) { return BarState.scaled(name); }
 

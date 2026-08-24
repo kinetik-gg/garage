@@ -112,7 +112,10 @@ Singleton {
 set -eu
 for extension_root in "$1" "$2"; do
     [ -d "$extension_root" ] || continue
-    find "$extension_root" -mindepth 2 -maxdepth 2 -name manifest.json -type f -print |
+    # Stow exposes shipped manifests as symlinks, while user manifests are
+    # normally regular files. -xtype f accepts both without accepting a broken
+    # link or a directory named manifest.json.
+    find "$extension_root" -mindepth 2 -maxdepth 2 -name manifest.json -xtype f -print |
         LC_ALL=C sort |
         while IFS= read -r manifest; do
             root=$(dirname -- "$manifest")

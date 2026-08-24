@@ -11,4 +11,5 @@ Garage.BarWorkspaces {
 
     barScreen: bar.screen
     workspaceService: services.workspaces
+    vertical: bar.vertical
 }
