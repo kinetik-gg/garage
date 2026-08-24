@@ -1,0 +1,13 @@
+{
+  "id": "microphone",
+  "name": "Microphone",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "microphone",
+    "popup": "Popup.qml",
+    "inline": true,
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

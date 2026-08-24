@@ -226,3 +226,6 @@ degrades visibly without becoming a respawn loop.
 The host, not an extension, owns edge docking, the left/center/right rails, overflow folding, drag
 drop-zones, popup placement, and the surface table. That boundary keeps extension packages portable
 across horizontal and vertical bars while preserving compatibility IPC shims for existing callers.
+AI quota state and microphone privacy are separate first-party extensions, so each can be placed,
+ordered, or disabled independently. The System extension owns machine telemetry, containers, and
+SMB state; it does not aggregate unrelated extension identities.

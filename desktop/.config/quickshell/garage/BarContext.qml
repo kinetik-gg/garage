@@ -4,7 +4,8 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 
-// The bar's context chips: containers, SMB shares, microphone, volume.
+// Shared first-party extension data: containers, SMB shares, microphone,
+// AI usage, and volume.
 //
 // Containers, SMB and the mic arrive on one JSON line every five seconds from
 // `garage-bar-probe stream` -- one process for the three probes, replacing the
@@ -30,16 +31,15 @@ Singleton {
     property var micDescriptions: []
 
     // False only when the probe stream died without ever answering -- the
-    // missing-binary case -- so the system icon can show degraded rather than
+    // missing-binary case -- so consumers can show degraded rather than
     // pretending three quiet probes.
     property bool probeAvailable: true
     property string probeError: ""
     property bool probeSawData: false
 
-    // -- Badge state ----------------------------------------------------------
+    // -- Derived state --------------------------------------------------------
 
-    // The one dot the collapsed system icon may draw, priority mic (privacy)
-    // over SMB shortfall (degraded). Derived here so icon and panel agree.
+    // Shared with the System extension and its detail panel.
     readonly property bool smbShort: smbAvailable && smbMissingLabels.length > 0
 
     // -- AI usage ------------------------------------------------------------
@@ -50,8 +50,8 @@ Singleton {
     property string aiTip: ""
     property bool aiStale: false
     // False when garage-ai-usage says tokscale is not installed -- a normal
-    // state, distinct from a stale reading, and what the system panel's AI
-    // section keys its empty state on.
+    // state, distinct from a stale reading, and what the dedicated AI extension
+    // keys its empty state on.
     property bool aiAvailable: false
 
     Process {

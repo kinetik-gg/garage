@@ -68,7 +68,7 @@ hl.layer_rule({
     -- instance has reloaded the two-surface launcher. The new interactive host
     -- is garage-launcher-host and deliberately absent from this rule. The bar
     -- tints itself over this blur the way the old stylesheet did.
-    match = { namespace = "^(garage-bar|notifications|rofi|garage-notifications|garage-launcher|garage-launcher-glass|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center|garage-monitor|garage-media|garage-ai-usage|garage-osd)$" },
+    match = { namespace = "^(garage-bar|notifications|rofi|garage-notifications|garage-launcher|garage-launcher-glass|garage-screenshot|garage-session-menu|garage-notification-center|garage-control-center|garage-monitor|garage-media|garage-ai-usage|garage-extension-[a-z0-9-]+|garage-osd)$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = 0.15,
@@ -88,7 +88,8 @@ hl.layer_rule({
 hl.layer_rule({
     name = "shell-palette-client-animation",
     match = { namespace = "^(garage-notification-center|garage-control-center"
-        .. "|garage-ai-usage|garage-media|garage-monitor)$" },
+        .. "|garage-ai-usage|garage-extension-[a-z0-9-]+"
+        .. "|garage-media|garage-monitor)$" },
     no_anim = true,
 })
 -- Toast popups only: they appear involuntarily and can carry message content,

@@ -23,10 +23,13 @@ Item {
     property int square: 0
     property int nudgeRight: 0
 
+    readonly property bool showingIcon: iconSource.toString() !== ""
+
     implicitWidth: square > 0 ? square + nudgeRight
-        : glyphText.implicitWidth + BarState.scaled("icon") * 2
+        : Math.max(showingIcon ? iconSize : 0, glyphText.implicitWidth)
+            + BarState.scaled("icon") * 2
     implicitHeight: square > 0 ? square
-        : Math.max(glyphText.implicitHeight + 8, 24)
+        : Math.max((showingIcon ? iconSize : glyphText.implicitHeight) + 8, 24)
 
     Rectangle {
         anchors.fill: parent
@@ -52,7 +55,7 @@ Item {
         font.pixelSize: button.glyphSize
         font.weight: Font.DemiBold
         renderType: Text.NativeRendering
-        visible: button.iconSource.toString() === ""
+        visible: !button.showingIcon
     }
 
     Image {
@@ -74,7 +77,7 @@ Item {
         source: sourceIcon
         color: Theme.text
         cached: true
-        visible: button.iconSource.toString() !== ""
+        visible: button.showingIcon
     }
 
     MouseArea {

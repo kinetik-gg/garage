@@ -118,7 +118,12 @@ mod tests {
         assert!(text.contains("\"position\": \"top\""));
         assert!(text.contains("\"left\": [\n    \"menu\",\n    \"workspaces\"\n  ]"));
         assert!(text.contains("\"center\": [\n    \"media\"\n  ]"));
-        assert!(text.contains("\"max_group_widgets\": 6"));
+        assert!(text.contains(
+            "\"right\": [\n    \"system\",\n    \"tray\",\n    \"notifications\",\n    \
+             \"launcher\",\n    \"control-center\",\n    \"microphone\",\n    \"ai-usage\",\n    \
+             \"clock\"\n  ]"
+        ));
+        assert!(text.contains("\"max_group_widgets\": 8"));
     }
 
     #[test]

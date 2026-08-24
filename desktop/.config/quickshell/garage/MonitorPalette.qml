@@ -4,8 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 
 // The system panel: the machine's telemetry drawn at a readable size, plus the
-// context the collapsed system icon only hints at -- containers, SMB shares,
-// the microphone, and the AI usage figure.
+// context the system icon only hints at -- containers and SMB shares.
 //
 // PaletteSurface hangs it inward from whichever edge owns the bar and centres
 // it on the system widget's long-axis coordinate, clamped into the output. The
@@ -16,8 +15,9 @@ import QtQuick.Layouts
 // release() as it is destroyed, so nothing polls behind a popup nobody has
 // open. The collector persists its own rolling history and replays it as the
 // seed line on spawn, which is why a freshly opened panel draws full graphs
-// rather than filling over two minutes. Containers, SMB, mic and AI usage read
-// from BarContext, whose probes run 24/7 anyway to drive the icon's badge.
+// rather than filling over two minutes. Containers and SMB read from
+// BarContext, whose probes run 24/7 anyway to drive their extension state.
+// Microphone privacy and AI quota state have dedicated extensions.
 PaletteSurface {
     id: monitor
     surfaceNamespace: "garage-monitor"
@@ -231,7 +231,7 @@ PaletteSurface {
     }
 
     // A context section's header line: a label and one figure, the compact
-    // shape the containers/SMB/mic/AI wells share so they read as one family.
+    // shape the containers and SMB wells share so they read as one family.
     component ContextHeader: RowLayout {
         property string label: ""
         property string value: ""
@@ -687,66 +687,6 @@ PaletteSurface {
                         }
                     }
 
-                    // -- Microphone --------------------------------------------
-                    Section {
-                        Layout.row: 4
-                        Layout.column: 0
-                        Layout.fillHeight: true
-
-                        ContextHeader {
-                            label: "Microphone"
-                            value: {
-                                if (!BarContext.micAvailable)
-                                    return "not probed";
-                                return BarContext.micRecording ? "in use" : "idle";
-                            }
-                        }
-
-                        ContextDetail {
-                            text: {
-                                if (!BarContext.micAvailable)
-                                    return "The audio probe is not answering.";
-                                if (!BarContext.micRecording)
-                                    return "Nothing is capturing audio.";
-                                return BarContext.micDescriptions.length > 0
-                                    ? BarContext.micDescriptions.join(" · ")
-                                    : "A source is capturing audio.";
-                            }
-                        }
-                    }
-
-                    // -- AI usage ----------------------------------------------
-                    // The bar payload rather than the full tokscale table the old
-                    // dedicated palette fetched: the panel wants the figure and
-                    // its quota lines at a glance, and the tip already carries
-                    // both. `stale` means garage-ai-usage served its cache
-                    // because tokscale did not answer in time.
-                    Section {
-                        Layout.row: 4
-                        Layout.column: 1
-                        Layout.fillHeight: true
-
-                        ContextHeader {
-                            label: "AI Usage"
-                            value: {
-                                if (!BarContext.aiAvailable)
-                                    return "unavailable";
-                                const glyph = BarContext.aiGlyph !== ""
-                                    ? BarContext.aiGlyph : "--";
-                                return BarContext.aiStale ? glyph + " · cached" : glyph;
-                            }
-                        }
-
-                        ContextDetail {
-                            text: {
-                                if (!BarContext.aiAvailable)
-                                    return "Install tokscale (~/.local/share/tokscale) "
-                                        + "or add it to PATH to see subscription usage.";
-                                return BarContext.aiTip !== ""
-                                    ? BarContext.aiTip : "No usage logged yet.";
-                            }
-                        }
-                    }
                 }
             }
         }

@@ -1,0 +1,13 @@
+{
+  "id": "ai-usage",
+  "name": "AI Usage",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "cpu",
+    "popup": "Popup.qml",
+    "inline": true,
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

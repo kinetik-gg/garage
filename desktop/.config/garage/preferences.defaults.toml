@@ -62,10 +62,10 @@ position = "top"
 # right rail is where widgets belong; left is available but crowds the menu.
 widgets_left = "menu\nworkspaces"
 widgets_center = "media"
-widgets_right = "system\ntray\nnotifications\nlauncher\ncontrol-center\nclock"
-# Past this many widgets a rail folds the excess behind a chevron. Six keeps the
-# shipped right rail from ever folding.
-max_group_widgets = 6
+widgets_right = "system\ntray\nnotifications\nlauncher\ncontrol-center\nmicrophone\nai-usage\nclock"
+# Past this many widgets a rail folds the excess behind a chevron. Eight keeps
+# every shipped right-rail extension visible by default.
+max_group_widgets = 8
 
 [general]
 terminal = ""
