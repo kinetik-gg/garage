@@ -3,26 +3,48 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// The metrics collector: one `garage-metrics --stream` process for the whole shell.
+// The metrics collector: one `garage-metrics --stream` process, refcounted.
 //
-// The bar's strips and MonitorPalette both read from this single stream instead of each
-// spawning their own -- one process, one JSON line per second, pushed to every reader.
-// The first line of the stream is the seed: the collector's own stored history for every
-// widget, so a strip drawn at login starts full rather than filling over a minute.
+// The stream runs only while something is reading it -- the system panel calls
+// acquire() as it opens and release() as it closes, and the process follows the
+// count. Nothing polls behind a popup nobody has open: the collector persists
+// its own rolling history and hands it back as the seed line on the next spawn,
+// so a reader that comes back after an hour still opens with full graphs.
+// The first line of the stream is that seed; everything after is one JSON
+// snapshot per second, pushed to every reader.
 Singleton {
     id: metrics
 
-    // Samples kept per series. The strips are ~60 px wide, one point per px; the
-    // monitor panel's graphs are the same shape and share these arrays.
+    // How many open surfaces are reading the stream right now. The process's
+    // lifetime is this count's: acquire on open, release on close, and the
+    // collector is reaped the moment the last reader lets go.
+    property int refs: 0
+
+    function acquire() {
+        refs += 1;
+    }
+
+    function release() {
+        if (refs > 0)
+            refs -= 1;
+    }
+
+    // Samples kept per series. The panel's graphs are ~2px per sample; 120 at
+    // the stream's 1 Hz is two minutes, and the seed restores the same window.
     readonly property int capacity: 120
 
     // The newest snapshot, whole, for label reads that want fields rather than series.
     property var latest: null
 
-    // Set while the collector reports a failed sensor; cleared by the next good frame.
-    property string streamError: ""
+    // What went wrong, if anything, in the shape the system icon binds: `error`
+    // is the collector's own report (or its exit), cleared by the next good
+    // frame; `available` drops only when a spawn dies without ever producing a
+    // line -- the missing-binary case -- so a degraded icon and a transient
+    // sensor failure read differently.
+    property string error: ""
+    property bool available: true
 
-    // Series keyed as the monitor panel has always named them. Each is a plain array
+    // Series keyed as the system panel has always named them. Each is a plain array
     // replaced on push, never mutated, so bindings fire and cached references stay safe.
     property var cpuHistory: []
     property var tempHistory: []
@@ -31,11 +53,44 @@ Singleton {
     property var networkUpHistory: []
     property var diskHistory: []
     property var gpuHistory: []
+    property var gpuVramHistory: []
+
+    // Per-core load, live only: the collector stores no history for it, and the
+    // panel's core bars are an instantaneous picture by design.
+    property var coreValues: []
+
+    // Set while a line has arrived since the last spawn. What separates a
+    // collector that started and then failed from one that never existed.
+    property bool sawData: false
+
+    // Down while the respawn timer is pending, so the running binding stays a
+    // binding: an exit flips this true (running drops), the timer flips it back
+    // (running re-evaluates and respawns) -- no imperative assignment that
+    // would sever the refcount from the process.
+    property bool cooldown: false
+
+    // True after the last reader releases the collector. Process reports the
+    // resulting termination through onExited too; keeping that exit distinct
+    // prevents a normal panel dismissal from becoming a red system warning.
+    property bool stopping: false
+
+    onRefsChanged: {
+        if (refs !== 0)
+            return;
+        stopping = true;
+        restartTimer.stop();
+        cooldown = false;
+    }
 
     Process {
         id: stream
-        running: true
-        command: [Quickshell.env("HOME") + "/.local/bin/garage-metrics", "--stream"]
+        running: metrics.refs > 0 && !metrics.cooldown
+        command: [GaragePaths.metrics, "--stream"]
+
+        onStarted: {
+            metrics.sawData = false;
+            metrics.stopping = false;
+        }
 
         stdout: SplitParser {
             splitMarker: "\n"
@@ -43,17 +98,36 @@ Singleton {
         }
 
         onExited: exitCode => {
-            if (exitCode !== 0)
-                metrics.streamError = "collector exited (" + exitCode + ")";
-            // A dead collector restarts in place; the seed re-backfills the series so
+            // A release kills the process and the kill reports non-zero; only
+            // an exit with a reader still waiting is worth reporting or
+            // retrying. The seed re-backfills the series on respawn, so
             // nothing but the seconds it was down goes missing.
+            if (metrics.stopping) {
+                // A reader may have reacquired while the intentional stop was
+                // still being delivered. Retry that demand after this old
+                // process has fully gone away.
+                if (metrics.refs > 0) {
+                    metrics.cooldown = true;
+                    restartTimer.restart();
+                }
+                return;
+            }
+            if (metrics.refs === 0)
+                return;
+            if (!metrics.sawData)
+                metrics.available = false;
+            metrics.error = exitCode !== 0
+                ? "collector exited (" + exitCode + ")"
+                : metrics.sawData ? "collector stopped"
+                    : "collector exited before reporting data";
+            metrics.cooldown = true;
             restartTimer.restart();
         }
     }
 
     property Timer restartTimer: Timer {
         interval: 2000
-        onTriggered: stream.running = true
+        onTriggered: metrics.cooldown = false
     }
 
     function number(value) {
@@ -68,9 +142,11 @@ Singleton {
         return isNaN(parsed) ? NaN : Math.max(0, Math.min(100, parsed));
     }
 
-    // The collector's log_scale, written without log1p exactly as the monitor panel
-    // writes its own copy.
-    readonly property real logCeilingMib: 100
+    // The collector's LOG_CEILING_MIB, written without log1p exactly as the
+    // Python side writes it. One ceiling for every reader: the seeded history
+    // was scaled through this constant on the way to disk, and a live sample
+    // scaled against a different one would step at the seam between the two.
+    readonly property real logCeilingMib: 2048
     readonly property real mib: 1048576
 
     function logScale(mibPerSecond) {
@@ -106,22 +182,26 @@ Singleton {
         let object = null;
         try {
             object = JSON.parse(text);
-        } catch (error) {
+        } catch (parseError) {
             // One truncated line costs nothing; the next is a second away.
             return;
         }
         if (object === null || typeof object !== "object")
             return;
 
+        sawData = true;
+        available = true;
+
         if (object.seed !== undefined) {
+            error = "";
             applySeed(object.seed);
             return;
         }
         if (object.error !== undefined) {
-            streamError = String(object.error);
+            error = String(object.error);
             return;
         }
-        streamError = "";
+        error = "";
         latest = object;
         applySnapshot(object);
     }
@@ -148,6 +228,9 @@ Singleton {
         const gpu = seedSeries(seed, "gpu");
         if (gpu !== null)
             gpuHistory = gpu;
+        const vram = seedSeries(seed, "gpu_vram");
+        if (vram !== null)
+            gpuVramHistory = vram;
     }
 
     function applySnapshot(snapshot) {
@@ -156,6 +239,10 @@ Singleton {
             const load = percent(cpu.load);
             if (!isNaN(load))
                 cpuHistory = pushPoint(cpuHistory, load);
+            // The first snapshot after the collector primes its counters
+            // carries no per-core figures. Not a reason to blank the bars.
+            if (Array.isArray(cpu.per_core) && cpu.per_core.length > 0)
+                coreValues = cpu.per_core.slice();
         }
         const celsius = snapshot.temp ? number(snapshot.temp.cpu_c) : NaN;
         if (!isNaN(celsius))
@@ -182,16 +269,29 @@ Singleton {
             const total = (isNaN(read) ? 0 : read) + (isNaN(write) ? 0 : write);
             diskHistory = pushPoint(diskHistory, logScale(total / mib));
         }
-        const gpus = Array.isArray(snapshot.gpus) ? snapshot.gpus : [];
-        if (gpus.length > 0) {
-            const load = number(gpus[0].load);
+        const gpu = primaryGpu(snapshot);
+        if (gpu !== null) {
+            const load = number(gpu.load);
             if (!isNaN(load))
                 gpuHistory = pushPoint(gpuHistory,
                     Math.max(0, Math.min(100, load)));
+            const vramTotal = number(gpu.vram_total);
+            const vramUsed = number(gpu.vram_used);
+            if (!isNaN(vramTotal) && vramTotal > 0 && !isNaN(vramUsed))
+                gpuVramHistory = pushPoint(gpuVramHistory,
+                    vramUsed / vramTotal * 100);
         }
     }
 
-    // -- Strip labels --------------------------------------------------------
+    // The discrete card if there is one: the collector sorts discrete first, and
+    // it is the one whose load anybody opens the panel to look at.
+    function primaryGpu(snapshot) {
+        if (!snapshot || !Array.isArray(snapshot.gpus) || snapshot.gpus.length === 0)
+            return null;
+        return snapshot.gpus[0];
+    }
+
+    // -- Labels ---------------------------------------------------------------
 
     function rateLabel(bytesPerSecond) {
         const value = number(bytesPerSecond);
@@ -219,13 +319,11 @@ Singleton {
     }
 
     function primaryGpuLoad() {
-        const gpus = latest && Array.isArray(latest.gpus) ? latest.gpus : [];
-        if (gpus.length === 0)
-            return NaN;
-        return percent(gpus[0].load);
+        const gpu = primaryGpu(latest);
+        return gpu !== null ? percent(gpu.load) : NaN;
     }
 
-    // -- Strip accessors -----------------------------------------------------
+    // -- Accessors ------------------------------------------------------------
 
     function seriesFor(name) {
         if (name === "cpu")
@@ -243,8 +341,7 @@ Singleton {
         return [];
     }
 
-    // The one figure the strip prints beside its graph, compact enough for the
-    // widths the old layout table budgeted.
+    // The one figure worth printing beside a graph, compact enough for a strip.
     function labelFor(name) {
         if (name === "cpu") {
             const load = latest && latest.cpu ? percent(latest.cpu.load) : NaN;
@@ -271,7 +368,7 @@ Singleton {
         const net = latest ? latest.network : null;
         if (!net)
             return "--";
-        return "\u2193" + rateLabel(net.rx_bps) + " \u2191" + rateLabel(net.tx_bps);
+        return "↓" + rateLabel(net.rx_bps) + " ↑" + rateLabel(net.tx_bps);
     }
 
     function downRate() {
@@ -324,14 +421,14 @@ Singleton {
             if (!net)
                 return "Network";
             return String(net.iface || "Network")
-                + "\n\u2193 " + rateLabel(net.rx_bps) + "/s"
-                + "   \u2191 " + rateLabel(net.tx_bps) + "/s";
+                + "\n↓ " + rateLabel(net.rx_bps) + "/s"
+                + "   ↑ " + rateLabel(net.tx_bps) + "/s";
         }
         if (name === "temp") {
             const temp = latest ? latest.temp : null;
             const celsius = temp ? number(temp.cpu_c) : NaN;
             return "Temperature\n" + (isNaN(celsius)
-                ? "--" : Math.round(celsius) + " \u00b0C"
+                ? "--" : Math.round(celsius) + " °C"
                     + (temp.label ? " (" + temp.label + ")" : ""));
         }
         if (name === "disk") {
@@ -339,14 +436,14 @@ Singleton {
             if (!disk)
                 return "Disk";
             return "Disk " + String(disk.device || "")
-                + "\n\u2193 read " + diskLabel() + "\nwrite "
+                + "\n↓ read " + diskLabel() + "\nwrite "
                 + rateLabel(disk.write_bps) + "/s";
         }
         if (name === "gpu") {
-            const gpus = latest && Array.isArray(latest.gpus) ? latest.gpus : [];
+            const gpu = primaryGpu(latest);
             const load = primaryGpuLoad();
-            return gpus.length > 0
-                ? "GPU " + String(gpus[0].name || "") + "\n"
+            return gpu !== null
+                ? "GPU " + String(gpu.name || "") + "\n"
                     + (isNaN(load) ? "--" : Math.round(load) + "%")
                 : "GPU";
         }

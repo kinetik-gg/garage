@@ -1,0 +1,13 @@
+{
+  "id": "menu",
+  "name": "Menu",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "archlinux-logo",
+    "surface": "session",
+    "inline": true,
+    "defaultAnchor": "left",
+    "vertical": "show"
+  }
+}

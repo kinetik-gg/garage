@@ -1,0 +1,12 @@
+{
+  "id": "workspaces",
+  "name": "Workspaces",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "squares-four",
+    "inline": true,
+    "defaultAnchor": "left",
+    "vertical": "show"
+  }
+}

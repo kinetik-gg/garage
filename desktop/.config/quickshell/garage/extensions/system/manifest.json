@@ -1,0 +1,13 @@
+{
+  "id": "system",
+  "name": "System",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "monitor",
+    "surface": "system",
+    "inline": true,
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

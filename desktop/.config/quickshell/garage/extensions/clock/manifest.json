@@ -1,0 +1,12 @@
+{
+  "id": "clock",
+  "name": "Clock",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "clock",
+    "inline": true,
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

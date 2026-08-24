@@ -1,0 +1,12 @@
+{
+  "id": "control-center",
+  "name": "Control Center",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "sliders",
+    "surface": "control-center",
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

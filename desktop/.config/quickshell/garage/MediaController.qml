@@ -7,7 +7,7 @@ import QtQuick
 
 // The media readout's state, event-driven end to end.
 //
-// Where the waybar module polled `playerctl` and `hyprctl clients` twice a second, this
+// The old external module polled `playerctl` and `hyprctl clients` twice a second; this
 // reads the MPRIS bus directly and keeps its browser-title evidence current from
 // Hyprland's own window events. Nothing here wakes up on a timer.
 //

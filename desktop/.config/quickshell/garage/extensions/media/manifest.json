@@ -1,0 +1,13 @@
+{
+  "id": "media",
+  "name": "Media",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "speaker-high",
+    "surface": "media",
+    "inline": true,
+    "defaultAnchor": "center",
+    "vertical": "hide"
+  }
+}

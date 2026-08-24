@@ -1,42 +1,27 @@
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 
-// The activity monitor: the six numbers the bar keeps in 44px strips, drawn at a
-// size they can be read at.
+// The system panel: the machine's telemetry drawn at a readable size, plus the
+// context the collapsed system icon only hints at -- containers, SMB shares,
+// the microphone, and the AI usage figure.
 //
-// A layer surface hung under the bar's metric strips -- anchored to the top and
-// to the left, because a left anchor plus a margin is the only way to place one
-// at a computed X. Otherwise the same idiom as the control centre next to it: a
-// panel the next click outside dismisses, above fullscreen clients so it stays
-// reachable, as tall as what it holds rather than full height. Everything
-// in it comes from one process -- `garage-metrics --stream`, one JSON object per
-// line at 1 Hz -- which is the same collector the bar renders its strips from, so
-// the panel and the bar cannot disagree about what the machine is doing.
+// PaletteSurface hangs it inward from whichever edge owns the bar and centres
+// it on the system widget's long-axis coordinate, clamped into the output. The
+// next click outside dismisses it; its height still follows its contents.
 //
-// The stream's lifetime is this window's lifetime. Nothing here polls when the
-// panel is closed: `running` is bound to `visible`, so the collector is spawned
-// as the panel maps and reaped as it unmaps, and the destruction guard at the
-// foot of the file covers the case where the window is destroyed outright (which
-// is the normal one -- the shell keeps its palettes in LazyLoaders).
-//
-// Which is also why the panel opens on PaletteCache: a destroyed window takes
-// its readings with it, and a monitor that shows an empty shell for a second
-// every time it is toggled is one nobody can glance at. The header says which
-// of the two it is showing.
-PanelWindow {
+// The graphs come from MetricsService, the one collector for the whole shell,
+// and the stream's lifetime is this window's: acquire() as the panel maps,
+// release() as it is destroyed, so nothing polls behind a popup nobody has
+// open. The collector persists its own rolling history and replays it as the
+// seed line on spawn, which is why a freshly opened panel draws full graphs
+// rather than filling over two minutes. Containers, SMB, mic and AI usage read
+// from BarContext, whose probes run 24/7 anyway to drive the icon's badge.
+PaletteSurface {
     id: monitor
-
-    // The monitor this was asked for, resolved by the shell at the moment of the
-    // click and held as a name. Same contract as every other palette.
-    required property string targetScreenName
-    // Horizontal centre of the complete Waybar metrics group in target-screen
-    // coordinates. Negative for keyboard launches, which use the output centre.
-    required property real targetAnchorX
-
-    signal dismissed()
+    surfaceNamespace: "garage-monitor"
+    escapeEnabled: false
 
     // Set while the panel must not be taken down by an ambient dismissal -- the
     // shape the shell needs for the screenshot flow, where the panel being
@@ -47,108 +32,28 @@ PanelWindow {
 
     readonly property int contentMargin: 12
 
-    // The rolling window, in samples. 120 at the stream's 1 Hz is two minutes;
-    // the seed the collector hands over is 120 samples of the bar's own 2s
-    // history, so a freshly opened panel shows four minutes and then walks down
-    // to two as live samples push the seeded ones off the left. That seam is
-    // visible only as the graph speeding up, and the alternative -- discarding
-    // the seed to keep one uniform time base -- is a panel that opens empty.
-    readonly property int capacity: 120
+    // The collector runs only while a reader holds it, and this window is
+    // created on open and destroyed on close (the shell keeps its palettes in
+    // LazyLoaders), so completed/destruction is exactly the open/close pair.
+    Component.onCompleted: MetricsService.acquire()
+    Component.onDestruction: MetricsService.release()
 
-    // The collector's LOG_CEILING_MIB. Throughput is plotted on a log curve
-    // because idle is 0.01 MiB/s and an NVMe burst is 3000, and the seeded
-    // history was written through the Python side of this constant: a live sample
-    // scaled against a different ceiling would step at the seam between the two.
-    readonly property real logCeilingMib: 2048
-    readonly property real mib: 1048576
-
-    // The last full snapshot, held whole rather than unpacked into a property per
-    // number. Every reading below is a binding on this, so one assignment per
-    // second updates the entire panel and there is no half-updated frame where
-    // the CPU is from this second and the GPU from the last.
-    property var latest: null
-
-    // What the collector said went wrong, if it did. The stream reports its own
-    // errors as JSON rather than dying, so this is a line in the header rather
-    // than an empty panel.
-    property string streamError: ""
-
-    // One series per graph, oldest sample first. Reassigned rather than mutated
-    // on every push: a mutated array does not notify, and the charts are bound to
-    // these.
-    property var cpuHistory: []
-    property var tempHistory: []
-    property var memoryHistory: []
-    property var networkDownHistory: []
-    property var networkUpHistory: []
-    property var diskHistory: []
-    property var gpuHistory: []
-    property var gpuVramHistory: []
-
-    // Per-core load, live only. There is no history for it -- the bar never
-    // stored one, and 32 sparklines is not a thing to put in a panel; the bars
-    // below are the instantaneous picture the overall graph does not show, which
-    // is one core pinned while the average looks idle.
-    property var coreValues: []
-
-    // False until this window has seen a snapshot of its own. Everything on
-    // screen before that came out of PaletteCache and is as old as `cachedAt`
-    // says, so this is what stands between a restored panel and a panel claiming
-    // to be reporting at 1 Hz.
+    // False until the collector has answered during this open. The seed
+    // pre-populates the graphs, so what separates "the machine now" from "the
+    // machine when the stream last ran" is this flag, and the header says which.
     property bool live: false
 
-    // When the reading this panel opened with was taken, read once at
-    // construction: PaletteCache.monitorSavedAt moves on as this window's own
-    // snapshots are stored, and the header is talking about the seed rather than
-    // about the newest thing in the cache.
-    property real cachedAt: 0
-
-    // Ages the header's cached-reading label. A second's granularity for a
-    // label printed in seconds, and only while there is a cached reading with
-    // nothing live over it -- once the collector answers there is nothing left
-    // to age.
-    property real now: Date.now()
-
-    function targetScreen() {
-        for (let index = 0; index < Quickshell.screens.length; ++index) {
-            const candidate = Quickshell.screens[index];
-            if (candidate.name === monitor.targetScreenName)
-                return candidate;
+    Connections {
+        target: MetricsService
+        function onLatestChanged() {
+            monitor.live = true;
         }
-        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
     }
 
-    // -- Numbers -------------------------------------------------------------
-
-    // Every reading in the stream is nullable: a box with no PSI has no memory
-    // pressure, an Intel card reports no VRAM in use, a machine with no k10temp
-    // has no package temperature. Nothing here may turn a missing reading into a
-    // zero, so this is what stands between the JSON and every label below.
-    function number(value) {
-        if (value === null || value === undefined)
-            return NaN;
-        const parsed = Number(value);
-        return isFinite(parsed) ? parsed : NaN;
-    }
-
-    function percent(value) {
-        const parsed = monitor.number(value);
-        return isNaN(parsed) ? NaN : Math.max(0, Math.min(100, parsed));
-    }
-
-    // The collector's log_scale. Written with log(1 + x) rather than log1p so it
-    // leans on nothing beyond the QML engine's baseline Math; the two agree to
-    // well past the precision a 2px-per-sample graph can show.
-    function logScale(mibPerSecond) {
-        const value = monitor.number(mibPerSecond);
-        if (isNaN(value) || value <= 0)
-            return 0;
-        return Math.min(100,
-            Math.log(1 + value) / Math.log(1 + monitor.logCeilingMib) * 100);
-    }
+    // -- Formatting ------------------------------------------------------------
 
     function formatBytes(bytes) {
-        const value = monitor.number(bytes);
+        const value = MetricsService.number(bytes);
         if (isNaN(value) || value < 0)
             return "--";
         if (value >= 1073741824)
@@ -161,7 +66,7 @@ PanelWindow {
     }
 
     function formatRate(bytesPerSecond) {
-        const value = monitor.number(bytesPerSecond);
+        const value = MetricsService.number(bytesPerSecond);
         if (isNaN(value) || value < 0)
             return "--";
         if (value >= 1073741824)
@@ -173,211 +78,14 @@ PanelWindow {
         return value.toFixed(0) + " B/s";
     }
 
-    // -- Stream --------------------------------------------------------------
-
-    function pushPoint(series, value) {
-        const list = Array.isArray(series) ? series : [];
-        const number = Number(value);
-        // Trimmed before the push rather than after, so the array is never
-        // capacity + 1 long even for an instant.
-        const next = list.slice(Math.max(0, list.length + 1 - monitor.capacity));
-        next.push(isFinite(number) ? number : 0);
-        return next;
-    }
-
-    // One series out of the seed object, trimmed to the window and sanitised.
-    // An absent or empty key leaves the graph as it was, which for a freshly
-    // opened panel means empty -- and an empty graph says "collecting…" rather
-    // than drawing a flat line at zero it has no evidence for.
-    function seedSeries(seed, key, current) {
-        const list = seed ? seed[key] : null;
-        if (!Array.isArray(list) || list.length === 0)
-            return current;
-        const values = [];
-        for (let index = Math.max(0, list.length - monitor.capacity);
-                index < list.length; ++index) {
-            const value = Number(list[index]);
-            values.push(isFinite(value) ? value : 0);
-        }
-        return values;
-    }
-
-    // The stream's first line: the bar's stored history, read by the collector
-    // from ~/.local/state/garage/metrics/<widget>.json and handed over as flat
-    // lists of the same 0..100 values the graphs plot.
-    //
-    // Read from the stream rather than from those files directly, which is the
-    // one place this panel does not do what it was specified to do. The reason is
-    // that the bar guards those files with an flock and writes them atomically,
-    // and the collector's own reader already honours that; a FileView here would
-    // be a second, unlocked reader of a file being rewritten every two seconds,
-    // parsing six JSON documents in QML to arrive at exactly the lists the
-    // process on the other end of this pipe has already assembled. Same data,
-    // same source, one reader.
-    function applySeed(seed) {
-        monitor.cpuHistory = monitor.seedSeries(seed, "cpu", monitor.cpuHistory);
-        monitor.tempHistory = monitor.seedSeries(seed, "temp", monitor.tempHistory);
-        monitor.memoryHistory = monitor.seedSeries(seed, "memory", monitor.memoryHistory);
-        monitor.networkDownHistory =
-            monitor.seedSeries(seed, "network", monitor.networkDownHistory);
-        monitor.networkUpHistory =
-            monitor.seedSeries(seed, "network_up", monitor.networkUpHistory);
-        monitor.diskHistory = monitor.seedSeries(seed, "disk", monitor.diskHistory);
-        monitor.gpuHistory = monitor.seedSeries(seed, "gpu", monitor.gpuHistory);
-        monitor.gpuVramHistory =
-            monitor.seedSeries(seed, "gpu_vram", monitor.gpuVramHistory);
-    }
-
-    // The state a reopened panel is rebuilt from, and the whole of what this
-    // window contributes to PaletteCache. The series are handed over by
-    // reference rather than copied because pushPoint and seedSeries both replace
-    // the array instead of mutating it -- what is stored here can never be
-    // rewritten behind the cache's back.
-    function snapshotState() {
-        return {
-            latest: monitor.latest,
-            coreValues: monitor.coreValues,
-            cpu: monitor.cpuHistory,
-            temp: monitor.tempHistory,
-            memory: monitor.memoryHistory,
-            networkDown: monitor.networkDownHistory,
-            networkUp: monitor.networkUpHistory,
-            disk: monitor.diskHistory,
-            gpu: monitor.gpuHistory,
-            gpuVram: monitor.gpuVramHistory
-        };
-    }
-
-    // Draw the previous reading before the collector has said anything. The
-    // stream overwrites all of it within a second or two -- its first line is
-    // the bar's own stored history, which is longer and more current than
-    // anything this panel accumulated while it was up -- so this is a first
-    // frame with figures in it rather than a source of truth.
-    function restore() {
-        const state = PaletteCache.monitorState;
-        if (!state)
-            return;
-        monitor.latest = state.latest;
-        monitor.coreValues = state.coreValues;
-        monitor.cpuHistory = state.cpu;
-        monitor.tempHistory = state.temp;
-        monitor.memoryHistory = state.memory;
-        monitor.networkDownHistory = state.networkDown;
-        monitor.networkUpHistory = state.networkUp;
-        monitor.diskHistory = state.disk;
-        monitor.gpuHistory = state.gpu;
-        monitor.gpuVramHistory = state.gpuVram;
-        monitor.cachedAt = PaletteCache.monitorSavedAt;
-    }
-
-    Component.onCompleted: monitor.restore()
-
-    function applySnapshot(snapshot) {
-        monitor.latest = snapshot;
-        monitor.live = true;
-
-        const cpu = snapshot.cpu || null;
-        if (cpu !== null) {
-            const load = monitor.percent(cpu.load);
-            if (!isNaN(load))
-                monitor.cpuHistory = monitor.pushPoint(monitor.cpuHistory, load);
-            // The first snapshot after the collector primes its counters carries
-            // no per-core figures, and a later one carries none if the core count
-            // changed under it. Neither is a reason to blank the bars.
-            if (Array.isArray(cpu.per_core) && cpu.per_core.length > 0)
-                monitor.coreValues = cpu.per_core.slice();
-        }
-
-        // Nothing is pushed for a reading the machine does not have. A skipped
-        // push leaves that graph shorter than its neighbours, which is correct:
-        // the charts are independent, and a graph with no samples says so.
-        const celsius = snapshot.temp ? monitor.number(snapshot.temp.cpu_c) : NaN;
-        if (!isNaN(celsius))
-            monitor.tempHistory = monitor.pushPoint(monitor.tempHistory,
-                Math.max(0, Math.min(100, celsius)));
-
-        const memory = snapshot.memory || null;
-        if (memory !== null) {
-            const total = monitor.number(memory.total);
-            const used = monitor.number(memory.used);
-            if (!isNaN(total) && total > 0 && !isNaN(used))
-                monitor.memoryHistory = monitor.pushPoint(monitor.memoryHistory,
-                    used / total * 100);
-        }
-
-        const network = snapshot.network || null;
-        if (network !== null) {
-            monitor.networkDownHistory = monitor.pushPoint(monitor.networkDownHistory,
-                monitor.logScale(monitor.number(network.rx_bps) / monitor.mib));
-            monitor.networkUpHistory = monitor.pushPoint(monitor.networkUpHistory,
-                monitor.logScale(monitor.number(network.tx_bps) / monitor.mib));
-        }
-
-        const disk = snapshot.disk || null;
-        if (disk !== null) {
-            const read = monitor.number(disk.read_bps);
-            const write = monitor.number(disk.write_bps);
-            const total = (isNaN(read) ? 0 : read) + (isNaN(write) ? 0 : write);
-            monitor.diskHistory = monitor.pushPoint(monitor.diskHistory,
-                monitor.logScale(total / monitor.mib));
-        }
-
-        const gpu = monitor.primaryGpu(snapshot);
-        if (gpu !== null) {
-            const load = monitor.number(gpu.load);
-            if (!isNaN(load))
-                monitor.gpuHistory = monitor.pushPoint(monitor.gpuHistory,
-                    Math.max(0, Math.min(100, load)));
-            const vramTotal = monitor.number(gpu.vram_total);
-            const vramUsed = monitor.number(gpu.vram_used);
-            if (!isNaN(vramTotal) && vramTotal > 0 && !isNaN(vramUsed))
-                monitor.gpuVramHistory = monitor.pushPoint(monitor.gpuVramHistory,
-                    vramUsed / vramTotal * 100);
-        }
-
-        // Last, once every series above has been pushed, so the cache never
-        // holds a half-updated second.
-        PaletteCache.saveMonitor(monitor.snapshotState());
-    }
-
-    // The discrete card if there is one: the collector sorts discrete first, and
-    // it is the one whose load anybody opens this panel to look at.
-    function primaryGpu(snapshot) {
-        if (!snapshot || !Array.isArray(snapshot.gpus) || snapshot.gpus.length === 0)
-            return null;
-        return snapshot.gpus[0];
-    }
-
-    function consume(line) {
-        const text = String(line).trim();
-        if (text === "")
-            return;
-
-        let object = null;
-        try {
-            object = JSON.parse(text);
-        } catch (error) {
-            // A truncated line is not worth a log entry every second. The next
-            // one is a whole second away and the graphs simply do not move.
-            return;
-        }
-        if (object === null || typeof object !== "object")
-            return;
-
-        if (object.seed !== undefined) {
-            monitor.applySeed(object.seed);
-            return;
-        }
-        if (object.error !== undefined) {
-            monitor.streamError = String(object.error);
-            return;
-        }
-
-        monitor.streamError = "";
-        monitor.applySnapshot(object);
-    }
-
     // -- Readings --------------------------------------------------------------
+
+    // Every reading in the stream is nullable: a box with no PSI has no memory
+    // pressure, an Intel card reports no VRAM in use, a machine with no k10temp
+    // has no package temperature. MetricsService.number is what stands between
+    // the JSON and every label below -- nothing here may turn a missing reading
+    // into a zero.
+    readonly property var latest: MetricsService.latest
 
     readonly property var cpuInfo: monitor.latest && monitor.latest.cpu
         ? monitor.latest.cpu : null
@@ -387,12 +95,12 @@ PanelWindow {
         ? monitor.latest.network : null
     readonly property var diskInfo: monitor.latest && monitor.latest.disk
         ? monitor.latest.disk : null
-    readonly property var gpuInfo: monitor.primaryGpu(monitor.latest)
+    readonly property var gpuInfo: MetricsService.primaryGpu(monitor.latest)
     readonly property int gpuCount: monitor.latest
         && Array.isArray(monitor.latest.gpus) ? monitor.latest.gpus.length : 0
 
     readonly property real cpuLoad: monitor.cpuInfo
-        ? monitor.percent(monitor.cpuInfo.load) : NaN
+        ? MetricsService.percent(monitor.cpuInfo.load) : NaN
     readonly property string cpuLoadAverage: {
         const load = monitor.cpuInfo ? monitor.cpuInfo.loadavg : null;
         if (!Array.isArray(load) || load.length < 3)
@@ -403,7 +111,7 @@ PanelWindow {
     }
 
     readonly property real cpuCelsius: monitor.latest && monitor.latest.temp
-        ? monitor.number(monitor.latest.temp.cpu_c) : NaN
+        ? MetricsService.number(monitor.latest.temp.cpu_c) : NaN
     readonly property string cpuSensor: {
         const temp = monitor.latest ? monitor.latest.temp : null;
         const label = temp ? String(temp.label || "").trim() : "";
@@ -411,42 +119,45 @@ PanelWindow {
     }
 
     readonly property real memoryPercent: {
-        const total = monitor.memoryInfo ? monitor.number(monitor.memoryInfo.total) : NaN;
-        const used = monitor.memoryInfo ? monitor.number(monitor.memoryInfo.used) : NaN;
+        const total = monitor.memoryInfo
+            ? MetricsService.number(monitor.memoryInfo.total) : NaN;
+        const used = monitor.memoryInfo
+            ? MetricsService.number(monitor.memoryInfo.used) : NaN;
         if (isNaN(total) || total <= 0 || isNaN(used))
             return NaN;
         return used / total * 100;
     }
     readonly property real memoryPressure: monitor.memoryInfo
-        ? monitor.number(monitor.memoryInfo.pressure_some_avg10) : NaN
+        ? MetricsService.number(monitor.memoryInfo.pressure_some_avg10) : NaN
 
     readonly property real networkDown: monitor.networkInfo
-        ? monitor.number(monitor.networkInfo.rx_bps) : NaN
+        ? MetricsService.number(monitor.networkInfo.rx_bps) : NaN
     readonly property real networkUp: monitor.networkInfo
-        ? monitor.number(monitor.networkInfo.tx_bps) : NaN
+        ? MetricsService.number(monitor.networkInfo.tx_bps) : NaN
 
     readonly property real diskRead: monitor.diskInfo
-        ? monitor.number(monitor.diskInfo.read_bps) : NaN
+        ? MetricsService.number(monitor.diskInfo.read_bps) : NaN
     readonly property real diskWrite: monitor.diskInfo
-        ? monitor.number(monitor.diskInfo.write_bps) : NaN
+        ? MetricsService.number(monitor.diskInfo.write_bps) : NaN
 
     readonly property real gpuLoad: monitor.gpuInfo
-        ? monitor.number(monitor.gpuInfo.load) : NaN
+        ? MetricsService.number(monitor.gpuInfo.load) : NaN
 
     // Never "utilization" for an Intel card: the collector labels that reading
     // "activity (freq proxy)" because it is derived from the clock rather than
     // measured, and the panel repeats the label it was given rather than
     // inventing a more confident one.
     readonly property string gpuLoadKind: {
-        const kind = monitor.gpuInfo ? String(monitor.gpuInfo.load_kind || "").trim() : "";
+        const kind = monitor.gpuInfo
+            ? String(monitor.gpuInfo.load_kind || "").trim() : "";
         return kind !== "" ? kind : "load unavailable";
     }
 
     readonly property string gpuVramLabel: {
         if (monitor.gpuInfo === null)
             return "";
-        const total = monitor.number(monitor.gpuInfo.vram_total);
-        const used = monitor.number(monitor.gpuInfo.vram_used);
+        const total = MetricsService.number(monitor.gpuInfo.vram_total);
+        const used = MetricsService.number(monitor.gpuInfo.vram_used);
         if (!isNaN(used) && !isNaN(total) && total > 0)
             return "vram " + monitor.formatBytes(used) + " / " + monitor.formatBytes(total);
         if (!isNaN(total) && total > 0)
@@ -454,28 +165,27 @@ PanelWindow {
         return "vram n/a";
     }
 
-    // The one place the panel says where its figures came from. A restored panel
-    // is showing real readings taken at a real moment, which is worth having on
+    // The one place the panel says where its figures came from. A seeded panel
+    // is showing real history the collector persisted, which is worth having on
     // screen -- but it is not reporting at 1 Hz yet, and the difference between
-    // "this is the machine now" and "this is the machine when you last looked"
-    // is the whole reason to read the panel.
+    // "this is the machine now" and "this is stored history" is the whole
+    // reason to read the header.
     readonly property string statusText: {
-        if (monitor.streamError !== "")
-            return monitor.streamError;
+        if (MetricsService.error !== "")
+            return MetricsService.error;
+        if (!MetricsService.available)
+            return "collector unavailable";
         if (monitor.live)
             return "1 Hz";
-        if (monitor.latest === null)
-            return "connecting…";
-        return "cached · " + PaletteCache.formatAge(monitor.cachedAt, monitor.now);
+        return "connecting…";
     }
 
     // -- Surface ---------------------------------------------------------------
 
-    screen: monitor.targetScreen()
     // Two equal monitoring columns with enough plot width to remain readable,
     // clamped for small outputs rather than allowed to cross an edge.
     implicitWidth: {
-        const target = monitor.targetScreen();
+        const target = monitor.effectiveScreen;
         const available = target ? target.width : 1920;
         return Math.max(1, Math.min(740, available - Theme.windowGutter * 2));
     }
@@ -483,117 +193,20 @@ PanelWindow {
     // is not a surface the compositor can show and the column's implicit height
     // is zero for the frame before its children are laid out. Deliberately no
     // ceiling: a maximum would have to either clip a section away or scroll it
-    // out of sight, and this panel is six readings that are all meant to be
+    // out of sight, and this panel is a set of readings that are all meant to be
     // readable at a glance.
     implicitHeight: Math.max(1, body.implicitHeight + monitor.contentMargin * 2)
-    color: "transparent"
-    // OnDemand rather than Exclusive, as with the control centre: this is a panel
-    // the user clicks into, not a modal, and an exclusive surface takes every
-    // keystroke in the session while it is up. The compositor hands an on-demand
-    // layer surface the keyboard as it maps, which is what makes the Escape at the
-    // foot of this file heard without a click first.
-    focusable: true
-    aboveWindows: true
-    exclusiveZone: 0
-    surfaceFormat.opaque: false
-
-
-    // A layer surface can be placed at an arbitrary horizontal position by
-    // anchoring it left and supplying that position as a margin. Centre around
-    // the full metrics group, then clamp the result into the output. Keybind
-    // launches have no bar geometry and use the output centre instead.
-    readonly property real surfaceLeft: {
-        const target = monitor.targetScreen();
-        const available = target ? target.width : 1920;
-        const desired = monitor.targetAnchorX >= 0
-            ? monitor.targetAnchorX - monitor.implicitWidth / 2
-            : (available - monitor.implicitWidth) / 2;
-        return Math.max(Theme.windowGutter, Math.min(desired,
-            available - monitor.implicitWidth - Theme.windowGutter));
-    }
-
-    anchors {
-        top: true
-        left: true
-    }
-
-    // -- Motion ----------------------------------------------------------------
-
-    PanelMotion {
-        id: motion
-        onFinished: monitor.dismissed()
-    }
-
     function requestDismissal() {
         if (!monitor.holdOpen)
-            motion.dismiss();
+            monitor.dismissSurface();
     }
-
-    margins.top: motion.surfaceTop
-    margins.left: monitor.surfaceLeft
-
-    WlrLayershell.layer: WlrLayer.Overlay
     // Not yet in the compositor's glass layer_namespaces or its blur rules --
     // adding it there is part of wiring this panel up, and until it is there the
     // material is not drawn beneath this surface. Which is why the body below is
     // contentTint rather than bare glass: the panel is legible either way, and a
     // wall of small figures over live desktop content needs the body regardless.
-    WlrLayershell.namespace: "garage-monitor"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
-    // The collector. One process, spawned as this window maps and reaped as it
-    // unmaps: `running` is bound to `visible`, so a closed panel costs nothing
-    // and there is no polling behind a surface nobody is looking at.
-    //
-    // The collector notices its own end of this too -- it exits on a broken pipe
-    // rather than writing into a closed one.
-    Process {
-        id: stream
-        running: monitor.visible
-        command: [Quickshell.env("HOME") + "/.local/bin/garage-metrics", "--stream"]
-
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: data => monitor.consume(data)
-        }
-
-        // The exit code alone; exited() also carries a QProcess::ExitStatus this
-        // has no use for. qmllint cannot resolve that second parameter's C++ enum
-        // from Quickshell's qmltypes and says so about the handler either way --
-        // it is a lint-side gap rather than anything this file can fix.
-        onExited: exitCode => {
-            // Only worth saying while the panel is up and on its way somewhere.
-            // Closing the panel is what ends this process -- and the kill that
-            // does it reports a non-zero code -- so without the two guards every
-            // dismissal would write an error into a header on its way out.
-            if (!monitor.closing && monitor.visible && exitCode !== 0)
-                monitor.streamError = "collector exited (" + exitCode + ")";
-        }
-    }
-
-    // Advances `now`, which only the cached-reading label re-reads. Stopped the
-    // moment a snapshot lands: the label it ages is gone by then, and a panel
-    // that is up all day must not be waking once a second for a string nobody
-    // is looking at.
-    Timer {
-        interval: 1000
-        repeat: true
-        running: monitor.visible && !monitor.live && monitor.latest !== null
-        onTriggered: monitor.now = Date.now()
-    }
-
-    // Read through to the motion, which owns the lifecycle. Guards the
-    // collector's exit code below: the window is normally destroyed rather than
-    // hidden -- the shell keeps its palettes in LazyLoaders -- and a destroyed
-    // window notifies nothing, so the binding never sees the close. Clearing
-    // `running` by hand is what makes sure the collector goes with the panel
-    // instead of being left streaming into a pipe with no reader, and this flag
-    // is what stops the kill that follows from being reported as a failure.
-    readonly property bool closing: motion.closing
-
-    Component.onDestruction: stream.running = false
-
-    // One metric's block: the well every section is drawn in, so the six of them
+    // One metric's block: the well every section is drawn in, so the sections
     // cannot drift apart. Same recessed hairline-framed shape SettingsGroup uses
     // for a group of controls.
     component Section: ContinuousRectangle {
@@ -617,6 +230,47 @@ PanelWindow {
         }
     }
 
+    // A context section's header line: a label and one figure, the compact
+    // shape the containers/SMB/mic/AI wells share so they read as one family.
+    component ContextHeader: RowLayout {
+        property string label: ""
+        property string value: ""
+
+        Layout.fillWidth: true
+        spacing: 8
+
+        Text {
+            Layout.fillWidth: true
+            text: parent.label
+            color: Theme.text
+            font.family: Theme.sans
+            font.pixelSize: 13
+            font.weight: Font.Medium
+            elide: Text.ElideRight
+            renderType: Text.NativeRendering
+        }
+
+        Text {
+            text: parent.value
+            color: Theme.textMuted
+            font.family: Theme.mono
+            font.pixelSize: 11
+            renderType: Text.NativeRendering
+        }
+    }
+
+    // A context section's body line, wrapped: names and share labels are
+    // open-ended lists and a clipped one would hide exactly the entry that
+    // made anybody open the panel.
+    component ContextDetail: Text {
+        Layout.fillWidth: true
+        color: Theme.textDisabled
+        font.family: Theme.sans
+        font.pixelSize: 11
+        wrapMode: Text.WordWrap
+        renderType: Text.NativeRendering
+    }
+
     ContinuousRectangle {
         id: panel
         anchors.fill: parent
@@ -632,7 +286,7 @@ PanelWindow {
         // Which is why the entrance is a move and a fade and nothing else -- a
         // scale would shrink the panel inside its own surface for the length of
         // the animation and put that border back on screen every time it opened.
-        opacity: motion.opacity
+        opacity: monitor.contentOpacity
 
 
         // The body, over the glass and under everything else. Theme.panel is
@@ -687,7 +341,7 @@ PanelWindow {
                         spacing: 2
 
                         Text {
-                            text: "System Activity"
+                            text: "System"
                             color: Theme.text
                             font.family: Theme.sans
                             font.pixelSize: 17
@@ -728,13 +382,13 @@ PanelWindow {
                                 // Dim for anything that is not a live stream, so
                                 // the pill reads as reporting or not reporting
                                 // from across the room without the text.
-                                opacity: monitor.live && monitor.streamError === ""
+                                opacity: monitor.live && MetricsService.error === ""
                                     ? 0.85 : 0.45
                             }
 
                             Text {
                                 text: monitor.statusText
-                                color: monitor.streamError !== ""
+                                color: MetricsService.error !== ""
                                     ? Theme.text : Theme.textMuted
                                 font.family: Theme.mono
                                 font.pixelSize: 10
@@ -765,7 +419,7 @@ PanelWindow {
                             value: isNaN(monitor.cpuLoad)
                                 ? "--" : monitor.cpuLoad.toFixed(0) + "%"
                             extra: monitor.cpuLoadAverage
-                            points: monitor.cpuHistory
+                            points: MetricsService.cpuHistory
                             active: !isNaN(monitor.cpuLoad) && monitor.cpuLoad >= 25
                             graphHeight: 48
                         }
@@ -782,7 +436,7 @@ PanelWindow {
                                 spacing: 2
 
                                 Repeater {
-                                    model: monitor.coreValues
+                                    model: MetricsService.coreValues
 
                                     delegate: Item {
                                         required property var modelData
@@ -791,7 +445,7 @@ PanelWindow {
                                         // show one core pinned against the rest, and a
                                         // missing slot would read as a missing core.
                                         readonly property real load: {
-                                            const value = monitor.percent(modelData);
+                                            const value = MetricsService.percent(modelData);
                                             return isNaN(value) ? 0 : value;
                                         }
 
@@ -846,7 +500,7 @@ PanelWindow {
                             label: "CPU Temperature"
                             value: isNaN(monitor.cpuCelsius)
                                 ? "n/a" : monitor.cpuCelsius.toFixed(0) + "°C"
-                            points: monitor.tempHistory
+                            points: MetricsService.tempHistory
                             active: !isNaN(monitor.cpuCelsius) && monitor.cpuCelsius >= 75
                             detail: monitor.cpuSensor + " · 0–100°C"
                             // A machine with no package sensor has nothing to collect,
@@ -873,7 +527,7 @@ PanelWindow {
                             extra: isNaN(monitor.memoryPressure)
                                 ? "pressure n/a"
                                 : "pressure " + monitor.memoryPressure.toFixed(2) + "%"
-                            points: monitor.memoryHistory
+                            points: MetricsService.memoryHistory
                             active: !isNaN(monitor.memoryPercent) && monitor.memoryPercent >= 70
                             detail: monitor.memoryInfo === null ? ""
                                 : monitor.formatBytes(monitor.memoryInfo.used) + " of "
@@ -893,13 +547,14 @@ PanelWindow {
                             label: "Network"
                             value: "↓ " + monitor.formatRate(monitor.networkDown)
                             extra: "↑ " + monitor.formatRate(monitor.networkUp)
-                            points: monitor.networkDownHistory
+                            points: MetricsService.networkDownHistory
                             // Up as the second line, no fill and a dimmer stroke: it
                             // shares the axis with down and is the subordinate of the
                             // two on a desktop.
-                            secondaryPoints: monitor.networkUpHistory
+                            secondaryPoints: MetricsService.networkUpHistory
                             active: !isNaN(monitor.networkDown) && !isNaN(monitor.networkUp)
-                                && (monitor.networkDown + monitor.networkUp) / monitor.mib >= 0.1
+                                && (monitor.networkDown + monitor.networkUp)
+                                    / MetricsService.mib >= 0.1
                             detail: {
                                 const iface = monitor.networkInfo
                                     ? String(monitor.networkInfo.iface || "").trim() : "";
@@ -917,20 +572,21 @@ PanelWindow {
 
                         MetricGraphRow {
                             label: "Disk"
-                            // Same two glyphs the network row and the bar's network
-                            // strip use, rather than an r/w of its own: a pair of
-                            // throughput figures reads the same way everywhere in the
-                            // shell, and the detail line below says which is which.
+                            // Same two glyphs the network row uses, rather than an
+                            // r/w of its own: a pair of throughput figures reads the
+                            // same way everywhere in the shell, and the detail line
+                            // below says which is which.
                             value: "↓ " + monitor.formatRate(monitor.diskRead)
                             extra: "↑ " + monitor.formatRate(monitor.diskWrite)
                             // Read and write are graphed as one line rather than two.
-                            // That is what the bar stores and therefore what the seed
-                            // can restore: splitting the line would mean opening this
-                            // section empty every time, and the two figures above are
-                            // where the split actually gets read.
-                            points: monitor.diskHistory
+                            // That is what the collector stores and therefore what the
+                            // seed can restore: splitting the line would mean opening
+                            // this section empty every time, and the two figures above
+                            // are where the split actually gets read.
+                            points: MetricsService.diskHistory
                             active: !isNaN(monitor.diskRead) && !isNaN(monitor.diskWrite)
-                                && (monitor.diskRead + monitor.diskWrite) / monitor.mib >= 1
+                                && (monitor.diskRead + monitor.diskWrite)
+                                    / MetricsService.mib >= 1
                             detail: {
                                 const device = monitor.diskInfo
                                     ? String(monitor.diskInfo.device || "").trim() : "";
@@ -955,8 +611,8 @@ PanelWindow {
                             value: isNaN(monitor.gpuLoad)
                                 ? "n/a" : monitor.gpuLoad.toFixed(0) + "%"
                             extra: monitor.gpuVramLabel
-                            points: monitor.gpuHistory
-                            secondaryPoints: monitor.gpuVramHistory
+                            points: MetricsService.gpuHistory
+                            secondaryPoints: MetricsService.gpuVramHistory
                             active: !isNaN(monitor.gpuLoad) && monitor.gpuLoad >= 10
                             detail: {
                                 if (monitor.gpuInfo === null)
@@ -965,7 +621,7 @@ PanelWindow {
                                     String(monitor.gpuInfo.name || "GPU").trim(),
                                     monitor.gpuLoadKind
                                 ];
-                                const celsius = monitor.number(monitor.gpuInfo.temp_c);
+                                const celsius = MetricsService.number(monitor.gpuInfo.temp_c);
                                 if (!isNaN(celsius))
                                     parts.push(celsius.toFixed(0) + "°C");
                                 if (monitor.gpuCount > 1)
@@ -974,6 +630,121 @@ PanelWindow {
                             }
                             idleLabel: monitor.latest !== null && monitor.gpuInfo === null
                                 ? "no GPU" : "collecting…"
+                        }
+                    }
+
+                    // -- Containers --------------------------------------------
+                    // The context the bar's chips used to carry, from the same
+                    // BarContext probes that still drive the icon's badge. In
+                    // the grid rather than a second list so the panel stays one
+                    // even surface of wells.
+                    Section {
+                        Layout.row: 3
+                        Layout.column: 0
+                        Layout.fillHeight: true
+
+                        ContextHeader {
+                            label: "Containers"
+                            value: BarContext.containersAvailable
+                                ? BarContext.containerCount + " running"
+                                : "no engine"
+                        }
+
+                        ContextDetail {
+                            text: {
+                                if (!BarContext.containersAvailable)
+                                    return "No container engine answered the probe.";
+                                if (BarContext.containerNames.length === 0)
+                                    return "Nothing running.";
+                                return BarContext.containerNames.join(" · ");
+                            }
+                        }
+                    }
+
+                    // -- SMB shares --------------------------------------------
+                    Section {
+                        Layout.row: 3
+                        Layout.column: 1
+                        Layout.fillHeight: true
+
+                        ContextHeader {
+                            label: "SMB Shares"
+                            value: BarContext.smbAvailable
+                                ? BarContext.smbConnected + " of "
+                                    + BarContext.smbExpected + " connected"
+                                : "not probed"
+                        }
+
+                        ContextDetail {
+                            text: {
+                                if (!BarContext.smbAvailable)
+                                    return "No shares are expected on this machine.";
+                                if (BarContext.smbMissingLabels.length === 0)
+                                    return "Every expected share is mounted.";
+                                return "Missing: "
+                                    + BarContext.smbMissingLabels.join(" · ");
+                            }
+                        }
+                    }
+
+                    // -- Microphone --------------------------------------------
+                    Section {
+                        Layout.row: 4
+                        Layout.column: 0
+                        Layout.fillHeight: true
+
+                        ContextHeader {
+                            label: "Microphone"
+                            value: {
+                                if (!BarContext.micAvailable)
+                                    return "not probed";
+                                return BarContext.micRecording ? "in use" : "idle";
+                            }
+                        }
+
+                        ContextDetail {
+                            text: {
+                                if (!BarContext.micAvailable)
+                                    return "The audio probe is not answering.";
+                                if (!BarContext.micRecording)
+                                    return "Nothing is capturing audio.";
+                                return BarContext.micDescriptions.length > 0
+                                    ? BarContext.micDescriptions.join(" · ")
+                                    : "A source is capturing audio.";
+                            }
+                        }
+                    }
+
+                    // -- AI usage ----------------------------------------------
+                    // The bar payload rather than the full tokscale table the old
+                    // dedicated palette fetched: the panel wants the figure and
+                    // its quota lines at a glance, and the tip already carries
+                    // both. `stale` means garage-ai-usage served its cache
+                    // because tokscale did not answer in time.
+                    Section {
+                        Layout.row: 4
+                        Layout.column: 1
+                        Layout.fillHeight: true
+
+                        ContextHeader {
+                            label: "AI Usage"
+                            value: {
+                                if (!BarContext.aiAvailable)
+                                    return "unavailable";
+                                const glyph = BarContext.aiGlyph !== ""
+                                    ? BarContext.aiGlyph : "--";
+                                return BarContext.aiStale ? glyph + " · cached" : glyph;
+                            }
+                        }
+
+                        ContextDetail {
+                            text: {
+                                if (!BarContext.aiAvailable)
+                                    return "Install tokscale (~/.local/share/tokscale) "
+                                        + "or add it to PATH to see subscription usage.";
+                                return BarContext.aiTip !== ""
+                                    ? BarContext.aiTip : "No usage logged yet.";
+                            }
                         }
                     }
                 }
