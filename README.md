@@ -23,7 +23,7 @@ Garage is **not**:
 - A Hyprland fork.
 - A plugin suite (Glass is its own project; Garage consumes it).
 
-<!-- Screenshot placeholder: a shot of the finished desktop belongs here. -->
+![Garage desktop with the bar, media controls, file manager, About window, and Appearance settings](assets/screenshots/garage-desktop.png)
 
 ## Install
 
