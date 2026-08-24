@@ -1,4 +1,3 @@
-import Quickshell.Services.Mpris
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
@@ -10,22 +9,9 @@ import QtQuick.Layouts
 ContinuousRectangle {
     id: card
 
-    // playerctld mirrors the selected real player on its own MPRIS name. It is
-    // transport plumbing, not a second listening session.
-    readonly property var players: Mpris.players ? Mpris.players.values.filter(
-        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
-
-    // Whatever is playing, else the first player on the bus. Browsers register a
-    // player per tab and leave the paused ones behind, so "the first one" alone
-    // would show a video the user finished with an hour ago while their music is
-    // playing in another.
-    readonly property var player: {
-        for (const candidate of card.players) {
-            if (candidate.isPlaying)
-                return candidate;
-        }
-        return card.players.length > 0 ? card.players[0] : null;
-    }
+    // The singleton owns the playing-over-paused selection rule so this card,
+    // the bar chip, launcher actions and hardware keys all target one player.
+    readonly property var player: MediaController.player
 
     readonly property bool isPlaying: card.player !== null && card.player.isPlaying
     readonly property string artUrl: card.player

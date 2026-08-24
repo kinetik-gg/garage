@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Services.Mpris
 import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
@@ -53,11 +52,10 @@ PaletteSurface {
 
     readonly property int contentMargin: 14
 
-    // playerctld exposes a proxy player whose identity and metadata mirror the
-    // real player. Keeping it would produce two identical Spotify/browser
-    // segments and send controls through an unnecessary second hop.
-    readonly property var players: Mpris.players ? Mpris.players.values.filter(
-        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
+    // One native player model shared with the bar, compact card, launcher and
+    // hardware-key actions. This palette may still pin a different entry from
+    // the shared list with its selector below.
+    readonly property var players: MediaController.players
 
     // Pinned by the selector below; falls back to the playing-over-paused
     // rule MediaCard uses -- for the same reason MediaCard uses it, a

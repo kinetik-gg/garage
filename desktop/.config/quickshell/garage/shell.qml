@@ -21,6 +21,7 @@ ShellRoot {
     property real controlCenterAnchor: -1
     property string launcherScreenName: ""
     property real launcherAnchor: -1
+    property string launcherInitialMode: "default"
     property string monitorScreenName: ""
     // Monitor-local coordinate of the system widget's centre.
     // A negative value means a keybind opened the dashboard, so it uses screen centre.
@@ -383,6 +384,8 @@ ShellRoot {
         }
         const sameScreen = spec.screen() === screenName;
         const configure = () => {
+            if (canonical === "launcher")
+                shell.launcherInitialMode = "default";
             spec.setScreen(screenName);
             if (spec.setAnchor)
                 spec.setAnchor(anchor === undefined ? -1 : anchor);
@@ -397,6 +400,19 @@ ShellRoot {
 
     function launcherOn(screenName: string): void {
         shell.surfaceOn("launcher", screenName, -1);
+    }
+    function launcherClipOn(screenName: string): void {
+        if (shell.activeSurface === "launcher"
+                && shell.launcherInitialMode === "clip"
+                && shell.launcherScreenName === screenName) {
+            shell.requestCloseSurface("launcher");
+            return;
+        }
+        shell.launcherInitialMode = "clip";
+        shell.openSurface("launcher", () => {
+            shell.launcherScreenName = screenName;
+            shell.launcherAnchor = -1;
+        });
     }
     function sessionOn(screenName: string): void {
         shell.surfaceOn("session", screenName, -1);
@@ -476,6 +492,7 @@ DismissCatcher {
 
         LauncherPalette {
             targetScreenName: shell.launcherScreenName
+            initialMode: shell.launcherInitialMode
             caffeine: shell.caffeine
             onSessionActionRequested: action => shell.confirmLauncherSessionAction(action)
             onShellActionRequested: action => shell.runLauncherShellAction(action)
@@ -654,6 +671,10 @@ DismissCatcher {
         }
     }
 
+    // Hardware feedback is shell-owned now; its IPC handler lives with the OSD
+    // so the mutation binds do not need to know anything about presentation.
+    Osd {}
+
     // The bar. Its module clicks arrive here with the screen they were clicked on
     // and, where a bar widget has one, its long-axis anchor under the module --
     // routed through the very same functions the keybinds use, so a bar click and a
@@ -738,6 +759,17 @@ DismissCatcher {
             // focused monitor moves with the pointer, so a binding would walk an
             // open launcher between screens.
             shell.surfaceOn("launcher", shell.focusedScreenName(), -1);
+        }
+
+        function launcherClip(): void {
+            // Clipboard history is a native source even when Super+Space uses
+            // an external application launcher; that external setting has no
+            // clipboard-mode contract to delegate to.
+            shell.launcherClipOn(shell.focusedScreenName());
+        }
+
+        function mediaAction(action: string): void {
+            MediaController.dispatch(action);
         }
 
 

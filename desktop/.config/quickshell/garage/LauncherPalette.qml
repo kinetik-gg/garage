@@ -46,6 +46,11 @@ PaletteSurface {
     // wearing a different hat.
     property string query: ""
     property int selected: 0
+    // "clip" is the dedicated Super+Shift+V source. The default mode retains
+    // every existing launcher source and also recognises an explicit `clip`
+    // query; only the dedicated mode interprets the whole field as a filter.
+    property string initialMode: "default"
+    readonly property bool clipboardMode: initialMode === "clip"
     // Desktop id of the browser to hand web searches to. Empty means none was
     // found, which the launcher has to say rather than silently doing nothing.
     property string browserId: ""
@@ -223,7 +228,8 @@ PaletteSurface {
         const needle = text.toLowerCase();
 
         const extras = extraSources.rowsFor(text, NotificationDaemon.dnd,
-            launcher.caffeine, Theme.dark, launcher.maxRows);
+            launcher.caffeine, Theme.dark, launcher.maxRows,
+            launcher.clipboardMode);
         for (const row of extras.rows)
             rows.push(row);
 
@@ -313,7 +319,7 @@ PaletteSurface {
             value: row.value, action: row.action, command: row.command,
             pid: row.pid, target: row.target, currency: row.currency,
             path: row.path, durationMs: row.durationMs, label: row.label,
-            timerId: row.timerId
+            timerId: row.timerId, clipId: row.clipId
         }));
 
         // Rewrite every preallocated slot in place. Slots beyond the current
@@ -352,7 +358,8 @@ PaletteSurface {
     function scheduleRebuild() {
         geometryCommit.stop();
         launcher.pendingRowCount = launcher.rowCount;
-        extraSources.prepareFiles(launcher.query);
+        if (!launcher.clipboardMode)
+            extraSources.prepareFiles(launcher.query);
         rebuildTimer.restart();
     }
 
@@ -392,8 +399,15 @@ PaletteSurface {
 
     onQueryChanged: scheduleRebuild()
     onBrowserResolvedChanged: scheduleRebuild()
+    onInitialModeChanged: {
+        launcher.query = "";
+        noBrowser.visible = false;
+        launcher.scheduleRebuild();
+        input.forceActiveFocus();
+    }
     Component.onCompleted: {
-        extraSources.prepareFiles(query);
+        if (!launcher.clipboardMode)
+            extraSources.prepareFiles(query);
         rebuild();
         // The compositor hands the layer surface the keyboard as it maps; this
         // is what points it at the search field rather than at the window, so
@@ -417,7 +431,10 @@ PaletteSurface {
             launcher.shellActionRequested(String(row.action));
             return;
         } else if (row.kind.indexOf("media-") === 0) {
-            Quickshell.execDetached(row.command);
+            if (row.command)
+                Quickshell.execDetached(row.command);
+            else
+                MediaController.dispatch(String(row.action));
         } else if (row.kind.indexOf("clock-") === 0) {
             TimerService.activate(row);
         } else if (row.kind === "file" || row.kind === "directory") {
@@ -428,6 +445,18 @@ PaletteSurface {
             // uwsm -T resolves the terminal published by System Preferences;
             // the validated target remains one argv value all the way to ssh.
             Quickshell.execDetached(["uwsm", "app", "-T", "ssh", "--", row.target]);
+        } else if (row.kind === "clip") {
+            const clipId = String(row.clipId || "");
+            if (!/^[0-9]+$/.test(clipId))
+                return;
+            // The database id is the only interpolated value and is passed as
+            // a positional argument after numeric validation. The preview is
+            // never decoded by the shell. Keeping the pipe preserves images
+            // and arbitrary bytes instead of coercing everything through a
+            // QML string clipboard property.
+            Quickshell.execDetached(["sh", "-c",
+                "cliphist decode \"$1\" | wl-copy",
+                "garage-clipboard", clipId]);
         } else if (row.kind === "currency-error") {
             extraSources.retryCurrency(row.currency);
             return;
@@ -547,7 +576,9 @@ PaletteSurface {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Search apps, commands, conversions, or the web"
+                        text: launcher.clipboardMode
+                            ? "Search clipboard history"
+                            : "Search apps, commands, conversions, or the web"
                         color: Theme.textDisabled
                         font: input.font
                         visible: input.text === ""
