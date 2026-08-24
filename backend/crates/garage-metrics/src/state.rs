@@ -37,8 +37,20 @@ impl History {
         let Some(top) = snapshot.as_object() else {
             return;
         };
-        push_nested(&mut self.series, "cpu", top, "cpu", "load", percent);
-        push_nested(&mut self.series, "temp", top, "temp", "cpu_c", percent);
+        push_nested(
+            &mut self.series,
+            "cpu",
+            section(top, "cpu"),
+            "load",
+            percent,
+        );
+        push_nested(
+            &mut self.series,
+            "temp",
+            section(top, "temp"),
+            "cpu_c",
+            percent,
+        );
         if let Some(memory) = section(top, "memory") {
             if let (Some(used), Some(total)) = (
                 number(memory, "used"),
@@ -80,12 +92,11 @@ fn number(fields: &Object, key: &str) -> Option<f64> {
 fn push_nested(
     series: &mut Object,
     series_key: &str,
-    top: &Object,
-    section_key: &str,
+    fields: Option<&Object>,
     value_key: &str,
     transform: fn(f64) -> f64,
 ) {
-    if let Some(value) = section(top, section_key).and_then(|fields| number(fields, value_key)) {
+    if let Some(value) = fields.and_then(|fields| number(fields, value_key)) {
         push(series, series_key, transform(value));
     }
 }
@@ -185,7 +196,7 @@ mod tests {
         let path = scratch.join("metrics/history.json");
         let mut history = History::default();
         for value in 0..=POINTS {
-            history.push_snapshot(&snapshot(value as f64));
+            history.push_snapshot(&snapshot(f64::from(u32::try_from(value).unwrap_or(0))));
         }
         history.write(&path).expect("history writes");
         let loaded = History::load(&path);

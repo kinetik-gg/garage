@@ -237,7 +237,12 @@ mod tests {
                 Some(Status::Failed(detail))
                     if detail == "refusing to remove ~/.config/waybar/__pycache__: expected a directory or symlink"
             ));
-            assert!(!world.paths.migrations.exists());
+            let stamp = fs::read_to_string(&world.paths.migrations)
+                .expect("the independent 002 migration is stamped");
+            assert!(
+                !stamp.contains("\"id\": \"001-python-backend-residue\""),
+                "the refused 001 migration stays eligible for the next loop"
+            );
         }
         assert!(
             valid.is_dir(),

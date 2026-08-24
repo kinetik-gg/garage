@@ -62,15 +62,6 @@ pub(crate) struct Fault {
 }
 
 impl Fault {
-    /// One of the script's own `raise OSError("...")` calls, where the message is a
-    /// sentence somebody wrote for the tooltip.
-    pub(crate) fn os(message: impl Into<String>) -> Self {
-        Self {
-            kind: Kind::Os,
-            message: message.into(),
-        }
-    }
-
     /// An `OSError` the operating system raised, spelled the way `CPython` spells one
     /// that carries a filename: `[Errno 2] No such file or directory: '/proc/stat'`.
     ///
@@ -180,18 +171,6 @@ mod tests {
     fn a_key_error_keeps_the_quotes_cpython_puts_round_it() {
         assert_eq!(Fault::key("MemTotal").to_string(), "'MemTotal'");
         assert_eq!(Fault::key("MemTotal").kind(), Kind::Key);
-    }
-
-    #[test]
-    fn the_scripts_own_refusals_are_their_own_sentences() {
-        assert_eq!(
-            Fault::os("no default route").to_string(),
-            "no default route"
-        );
-        assert_eq!(
-            Fault::os("no stat for nvme0n1").to_string(),
-            "no stat for nvme0n1"
-        );
     }
 
     #[test]

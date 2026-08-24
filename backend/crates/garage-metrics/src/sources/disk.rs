@@ -1,6 +1,6 @@
 //! Disk: which block device is "the disk", and what its sysfs stat line says.
 
-use crate::files::{as_float, read_int, read_text, sorted_children};
+use crate::files::{read_int, read_text, sorted_children};
 use garage_core::process;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -113,12 +113,6 @@ fn block_path(device: &str) -> PathBuf {
     PathBuf::from(format!("/sys/class/block/{device}"))
 }
 
-/// Whether the device still has a stat file, which is how a cached name is revalidated
-/// against a re-plugged drive.
-pub(crate) fn has_stat(device: &str) -> bool {
-    block_path(device).join("stat").exists()
-}
-
 /// Sectors read and written. Fields 3 and 7 of the sysfs stat line.
 pub(crate) fn counters(device: &str) -> (Option<i64>, Option<i64>) {
     let Some(text) = read_text(&block_path(device).join("stat")) else {
@@ -149,24 +143,6 @@ pub(crate) fn sector_size(device: &str) -> i64 {
         Some(size) if size != 0 => size,
         _ => 512,
     }
-}
-
-/// The drive's own temperature, where its controller publishes one.
-pub(crate) fn temperature(device: &str) -> Option<f64> {
-    let device_root = block_path(device).join("device");
-    for entry in sorted_children(&device_root) {
-        let name = entry
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
-        if !name.starts_with("hwmon") {
-            continue;
-        }
-        if let Some(milli) = read_int(&entry.join("temp1_input")) {
-            return Some(as_float(milli) / 1000.0);
-        }
-    }
-    None
 }
 
 #[cfg(test)]

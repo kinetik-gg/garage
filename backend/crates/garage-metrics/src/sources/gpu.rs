@@ -82,11 +82,6 @@ pub(crate) fn discover() -> Vec<Gpu> {
     gpus
 }
 
-/// The GPU the bar's single strip follows.
-pub(crate) fn primary(gpus: &[Gpu]) -> Option<&Gpu> {
-    gpus.first()
-}
-
 /// Everything nvidia-smi will say in one call, one card per line.
 ///
 /// A line that does not split into exactly five fields, or whose numbers do not parse,

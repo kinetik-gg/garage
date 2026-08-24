@@ -14,9 +14,6 @@ use crate::fault::Fault;
 use std::fs;
 use std::path::Path;
 
-/// A mebibyte, the unit every throughput figure in the strips is quoted in.
-pub(crate) const MIB: f64 = 1_048_576.0;
-
 /// The same constant where the Python is multiplying integers rather than dividing
 /// floats -- `int(parts[2]) * MIB` on nvidia-smi's MiB figures, which stays exact.
 pub(crate) const MIB_BYTES: i64 = 1_048_576;
