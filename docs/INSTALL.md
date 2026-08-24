@@ -42,19 +42,9 @@ packages and enabled services are not reverted.
 
 ## Installing
 
-### The one-liner
-
-```sh
-sh -c "$(curl -fsSL https://get.kinetik.gg/garage)"
-```
-
-**Not live yet.** Garage's repositories are local-only: `get.kinetik.gg` publishes
-nothing, and the `github.com/kinetik-gg` URLs in `install.sh` and the plugin deploy
-script are dormant placeholders. Use the git path below until they are published.
-
 ### From a clone
 
-Equally supported, and what the one-liner does for you:
+Clone the public repository and run the bootstrap from a bare TTY:
 
 ```sh
 git clone https://github.com/kinetik-gg/garage.git ~/repositories/garage
@@ -62,10 +52,10 @@ cd ~/repositories/garage
 ./bootstrap.sh
 ```
 
-`install.sh` is what the one-liner fetches: it checks that this is Arch, that you
+`install.sh` is the remote-entry wrapper: it checks that this is Arch, that you
 are not root, and that `sudo` and `git` are available, clones (or reuses)
 `~/repositories/garage`, and hands over to `./bootstrap.sh` with its arguments
-passed through — so `sh -c "$(curl -fsSL …)" -- --dry-run` works.
+passed through.
 
 ### Looking before you leap
 
@@ -159,9 +149,9 @@ returning to a Hyprland you have used before needs no rebuild at all.
 `~/repositories/glass`, a directory you can write to — anything running as you
 could edit the build files and have root run them at the next upgrade; a
 passwordless `sudo` rule has the same hole ([ARCHITECTURE.md](ARCHITECTURE.md) §6
-owns this reasoning). Once Glass is published and a root-owned clone can be
-verified against its pinned commit, the rebuild moves into a system service; until
-then it is one command, once, after an upgrade that moved the ABI.
+owns this reasoning). Moving the rebuild into a system service would first require
+a root-owned source checkout verified against its pinned commit; until then it is
+one command, once, after an upgrade that moved the ABI.
 
 ### The pinned commits
 
@@ -199,9 +189,8 @@ The whole lifecycle in one command, deliberately **bootstrap plus the lifecycle
 work bootstrap cannot do**:
 
 1. **Pull the checkout.** Fast-forward only. Skipped with a note when the branch
-   has no upstream — every install today (see [The one-liner](#the-one-liner)) —
-   and when the working tree has local changes, because merging across those is the
-   one operation that loses work.
+   has no upstream or when the working tree has local changes, because merging
+   across those is the one operation that loses work.
 2. **Check room and preserve the host.** Update refuses a real run below its
    free-space floor, then makes the complete `pre-update` copy described above.
    A dry run crosses neither write boundary.
@@ -254,8 +243,7 @@ out and back in.
 
 | Gap | Detail |
 | --- | --- |
-| **The one-liner is not live, and `garage update` cannot pull** | The repositories are local-only (see [The one-liner](#the-one-liner)); with no upstream, update says so and converges the machine on the local checkout. |
-| **The Glass plugin source is not available** | With no `~/repositories/glass` checkout the bootstrap warns and skips the plugin deploy — `hyprexpo` with it, since one pass handles both. Hyprland's config guards both loads, so the desktop comes up without them: you lose the glass material and `hyprexpo`, nothing else. |
+| **The Glass plugin source checkout is optional** | With no `~/repositories/glass` checkout the bootstrap warns and skips the plugin deploy — `hyprexpo` with it, since one pass handles both. Hyprland's config guards both loads, so the desktop comes up without them: you lose the glass material and `hyprexpo`, nothing else. |
 | **The GPU verdict is a heuristic** | It reads PCI vendor ids and device names: NVIDIA is always discrete, Intel integrated unless it names itself Arc, an AMD device discrete when it carries a card model number or a known GPU family name. A new AMD part breaking that pattern would be misclassified — one setting either way, not a broken install. Virtual adapters (virtio, QXL) count as integrated, deliberately: software rendering is the last place to run a full-framebuffer blur. |
 | **The bootstrap writes `preferences.toml` directly for the GPU gate** | Every other writer of that file is `garage` itself, as it should be, but the CLI cannot write a preference without also pushing it into a running compositor and there is none during the bootstrap — so this write goes around it, keeps to two keys, and is marked in the source for the render/apply split to remove. |
 | **The plugin ABI hook watches `hyprland` only** | A machine on `hyprland-git` is on its own; the hook will not fire for it. |

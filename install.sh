@@ -2,7 +2,7 @@
 #
 # Garage installer. Fetches the repository and hands over to bootstrap.sh.
 #
-#   sh -c "$(curl -fsSL https://get.kinetik.gg/garage)"          # not live yet
+#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/kinetik-gg/garage/main/install.sh)"
 #   sh -c "$(curl -fsSL .../install.sh)" -- --dry-run
 
 set -eu

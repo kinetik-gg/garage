@@ -22,7 +22,7 @@ if [[ ${GARAGE_SKIP_PLUGIN_DEPLOY:-0} == 1 ]]; then
     summary+=("left the plugin deploy to the caller")
 elif [[ -z $glass_repo ]]; then
     warn "no Glass plugin source at ~/repositories/glass -- skipping the plugin build."
-    warn "  Garage's repositories are not published yet, so this is expected."
+    warn "  The bootstrap deploys plugins only when a Glass checkout is present."
     warn "  The desktop runs without plugins; hyprland.lua treats both as optional."
     warn "  Once you have the source, run: ~/.config/hypr/scripts/garage-rebuild-plugins"
     summary+=("skipped the optional plugins (no Glass source)")
