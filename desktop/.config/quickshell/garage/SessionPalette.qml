@@ -9,12 +9,15 @@ import QtQuick.Layouts
 Scope {
     id: menu
     required property string targetScreenName
+    required property real targetAnchor
+    property string edge: BarState.position
     // A launcher power result opens this component directly on the same
     // confirmation UI the Arch menu uses. Normal menu opens leave it empty.
     property string initialAction: ""
     property string pendingAction: menu.initialAction
-    property int waybarBottom: 36
-    property int reservedTop: 36
+    readonly property var targetMonitor: Hyprland.monitorFor(menu.targetScreen())
+    readonly property var targetReserved: targetMonitor
+        && targetMonitor.lastIpcObject ? targetMonitor.lastIpcObject.reserved : null
 
     signal actionSelected(string action)
     signal dismissed()
@@ -23,7 +26,7 @@ Scope {
     // destroys this the moment dismissed() lands. Every path out of the menu
     // calls this rather than the signal.
     function requestDismissal() {
-        motion.dismiss();
+        palette.dismissSurface();
     }
 
     function targetScreen() {
@@ -102,42 +105,6 @@ Scope {
         menu.requestDismissal();
     }
 
-    function updateWaybarGeometry(text) {
-        try {
-            const monitor = Hyprland.monitorFor(menu.targetScreen());
-            const output = monitor ? JSON.parse(text)[monitor.name] : null;
-            if (!output || !output.levels)
-                return;
-
-            const monitorY = monitor.lastIpcObject && monitor.lastIpcObject.y
-                ? monitor.lastIpcObject.y : 0;
-            const reserved = monitor.lastIpcObject
-                ? monitor.lastIpcObject.reserved : null;
-            if (reserved && reserved.length > 1)
-                menu.reservedTop = reserved[1];
-            let bottom = 0;
-            for (const level of Object.values(output.levels)) {
-                for (const layer of level) {
-                    if (layer.namespace === "waybar")
-                        bottom = Math.max(bottom, layer.y - monitorY + layer.h);
-                }
-            }
-
-            if (bottom > 0)
-                menu.waybarBottom = bottom;
-        } catch (error) {
-            console.warn("Unable to resolve Waybar geometry:", error);
-        }
-    }
-
-    Process {
-        command: ["hyprctl", "layers", "-j"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: menu.updateWaybarGeometry(text)
-        }
-    }
-
     // Click-outside dismissal, owned here rather than by the shell's shared
     // catcher: a fullscreen surface underneath the menu on EVERY output,
     // mapped and unmapped with it, turning a press anywhere on any monitor
@@ -178,46 +145,24 @@ Scope {
         }
     }
 
-    PanelWindow {
+    PaletteSurface {
         id: palette
         visible: menu.pendingAction === ""
-        screen: menu.targetScreen()
+        targetScreenName: menu.targetScreenName
+        targetAnchor: menu.targetAnchor
+        edge: menu.edge
+        surfaceNamespace: "garage-session-menu"
+        escapeEnabled: false
+        keyboardFocusMode: menu.pendingAction === ""
+            ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         implicitWidth: 292
         implicitHeight: 284
-        color: "transparent"
-        focusable: true
-        aboveWindows: true
-        exclusiveZone: 0
-        surfaceFormat.opaque: false
-
-        // Top-to-bottom entrance, shared with every other palette. See
-        // PanelMotion. The menu drops out of the logo it was opened from, the
-        // same way the bar's panels drop out of their own modules.
-        PanelMotion {
-            id: motion
-            onFinished: menu.dismissed()
-        }
-
-        anchors {
-            left: true
-            top: true
-        }
-
-        margins.left: 6
-        // Overlay surfaces already begin below Waybar's exclusive zone.
-        margins.top: motion.surfaceTop
-
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "garage-session-menu"
+        onDismissed: menu.dismissed()
         // OnDemand, not Exclusive: the menu takes the keyboard when it maps
         // (Escape and the action shortcuts fire immediately), and a pointer
         // press on any other surface is delivered to that surface -- the
         // backdrop's included. Exclusive was the one thing separating this
         // menu from every palette whose outside-click dismissal works.
-        WlrLayershell.keyboardFocus: menu.pendingAction === ""
-            ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-
-
         Shortcut { sequence: "A"; enabled: menu.pendingAction === ""; onActivated: menu.choose("about", false) }
         Shortcut { sequence: "F"; enabled: menu.pendingAction === ""; onActivated: menu.choose("reloadHyprland", true) }
         Shortcut { sequence: "L"; enabled: menu.pendingAction === ""; onActivated: menu.choose("lock", false) }
@@ -239,7 +184,7 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: Theme.contentTint
-            opacity: motion.opacity
+            opacity: palette.contentOpacity
 
             ColumnLayout {
                 anchors.fill: parent
@@ -335,6 +280,7 @@ Scope {
 
     PanelWindow {
         id: confirmationWindow
+        readonly property var reserved: menu.targetReserved
         visible: menu.pendingAction !== ""
         screen: menu.targetScreen()
         implicitWidth: 480
@@ -350,8 +296,18 @@ Scope {
             top: true
         }
 
-        margins.left: Math.round((screen.width - implicitWidth) / 2)
-        margins.top: Math.round((screen.height - menu.reservedTop - implicitHeight) / 2)
+        margins.left: {
+            const left = reserved && reserved.length > 0 ? reserved[0] : 0;
+            const right = reserved && reserved.length > 2 ? reserved[2] : 0;
+            return left + Math.round((screen.width - left - right
+                - implicitWidth) / 2);
+        }
+        margins.top: {
+            const top = reserved && reserved.length > 1 ? reserved[1] : 0;
+            const bottom = reserved && reserved.length > 3 ? reserved[3] : 0;
+            return top + Math.round((screen.height - top - bottom
+                - implicitHeight) / 2);
+        }
 
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "garage-session-confirmation"

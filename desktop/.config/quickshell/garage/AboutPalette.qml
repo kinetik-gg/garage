@@ -309,7 +309,7 @@ FloatingWindow {
     }
 
     Process {
-        command: [Quickshell.env("HOME") + "/.local/bin/garage-vram-info"]
+        command: [GaragePaths.vramInfo]
         running: true
         stdout: StdioCollector { onStreamFinished: about.loadGpuMemory(text) }
     }

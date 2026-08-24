@@ -13,17 +13,13 @@ import QtQuick.Layouts
 // media module opens, is the richer version of the same Mpris logic and owns
 // that now, so the copy here is gone rather than kept in step with it.
 //
-// A layer surface anchored under the bar on the right, the same idiom as the
-// notification centre next to it: a panel the next click outside dismisses,
-// above fullscreen clients so it stays reachable. Unlike the centre it is not
-// full height -- there is a fixed amount in it, so the window wraps its content
-// and the glass is only as tall as what it holds.
-PanelWindow {
+// PaletteSurface opens it inward from the control widget on any bar edge. The
+// next click outside dismisses it, above fullscreen clients so it stays
+// reachable. Unlike the notification centre it wraps its fixed content.
+PaletteSurface {
     id: centre
-
-    required property string targetScreenName
-
-    signal dismissed()
+    surfaceNamespace: "garage-control-center"
+    escapeEnabled: false
 
     readonly property int contentMargin: 12
 
@@ -33,15 +29,6 @@ PanelWindow {
     // and this is the input half of it.
     property bool caffeine: false
     signal caffeineToggled()
-
-    function targetScreen() {
-        for (let index = 0; index < Quickshell.screens.length; ++index) {
-            const candidate = Quickshell.screens[index];
-            if (candidate.name === centre.targetScreenName)
-                return candidate;
-        }
-        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
-    }
 
     // -- Wi-Fi ---------------------------------------------------------------
     // The first Wi-Fi radio, the same choice the Network pane makes: a second
@@ -135,55 +122,22 @@ PanelWindow {
             centre.sinkAudio.muted = !centre.sinkAudio.muted;
     }
 
-    screen: centre.targetScreen()
     implicitWidth: 390
     // Sized to its content, the same way the toast stack is, and clamped to 1 px
     // for the same reason: a layer surface with no height at all is not a surface
     // the compositor can show, and the column's implicit height is zero for the
     // frame before its children have been laid out.
     implicitHeight: Math.max(1, body.implicitHeight + centre.contentMargin * 2)
-    color: "transparent"
-    // OnDemand rather than Exclusive, as with the notification centre: this is a
-    // panel the user clicks into, not a modal, and an exclusive surface takes
-    // every keystroke in the session while it is up. The compositor hands an
-    // on-demand layer surface the keyboard as it maps, which is what makes the
-    // Escape at the foot of this file heard without a click first.
-    focusable: true
-    aboveWindows: true
-    exclusiveZone: 0
-    surfaceFormat.opaque: false
-
-    // Top and right only: the panel is as tall as its contents, so anchoring the
-    // bottom as well would stretch it down the screen.
-    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
-    PanelMotion {
-        id: motion
-        onFinished: centre.dismissed()
-    }
-
     function requestDismissal() {
-        motion.dismiss();
+        centre.dismissSurface();
     }
 
-    anchors {
-        top: true
-        right: true
-    }
-
-    // Overlay surfaces already begin below Waybar's exclusive zone, so the top
-    // gutter is measured from there rather than from the top of the screen.
-    margins.top: motion.surfaceTop
-    margins.right: Theme.windowGutter
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "garage-control-center"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-    // The preferences backend, scoped to this panel the way PreferencesPalette
-    // scopes its own: the tiles that write theme_mode and night_shift_enabled go
-    // through the same helper and the same optimistic snapshot as the panes, so
-    // a tile and a pane cannot disagree about what is set.
-    PreferencesController { id: controller }
+    // The shared preferences backend: the tiles that write theme_mode and
+    // night_shift_enabled go through the same helper, the same command queue
+    // and the same optimistic snapshot as the preferences panes, so a tile and
+    // a pane cannot disagree about what is set. This used to be a second
+    // private instance, which was exactly that disagreement.
+    readonly property var controller: PreferencesController
 
     // Mandatory for anything on a PwNode to bind at all. Bound to the current
     // default sink rather than a fixed node, so switching outputs keeps the
@@ -194,7 +148,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
-        opacity: motion.opacity
+        opacity: centre.contentOpacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower

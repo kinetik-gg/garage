@@ -11,27 +11,74 @@ ShellRoot {
     // persistence active after the palette closes.
     readonly property var timerService: TimerService
     property string sessionScreenName: ""
+    property real sessionAnchor: -1
     property string sessionInitialAction: ""
     property string preferencesScreenName: ""
     property string preferencesSection: "general"
     property string notificationScreenName: ""
+    property real notificationAnchor: -1
     property string controlCenterScreenName: ""
+    property real controlCenterAnchor: -1
     property string launcherScreenName: ""
+    property real launcherAnchor: -1
     property string monitorScreenName: ""
-    // Monitor-local X coordinate of the complete Waybar metrics group's centre.
+    // Monitor-local coordinate of the system widget's centre.
     // A negative value means a keybind opened the dashboard, so it uses screen centre.
     property real monitorAnchorX: -1
     property string mediaScreenName: ""
     // Monitor-local click position for the variable-width media label. A keybind
     // has no bar click and leaves this negative for output-centred placement.
     property real mediaAnchorX: -1
-    property string aiUsageScreenName: ""
+
+    // Declarative routing table for every transient panel. The compatibility
+    // function names below are deliberately thin shims over this table so IPC
+    // callers and bar widgets cannot drift into two sets of behavior.
+    readonly property var surfaces: ({
+        session: {
+            panel: sessionLoader, screen: () => shell.sessionScreenName,
+            setScreen: value => shell.sessionScreenName = value,
+            setAnchor: value => shell.sessionAnchor = value,
+            anchor: "axis", catches: false, screenshot: false, animated: true
+        },
+        launcher: {
+            panel: launcherLoader, screen: () => shell.launcherScreenName,
+            setScreen: value => shell.launcherScreenName = value,
+            setAnchor: value => shell.launcherAnchor = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
+        },
+        notifications: {
+            panel: notificationCenterLoader,
+            screen: () => shell.notificationScreenName,
+            setScreen: value => shell.notificationScreenName = value,
+            setAnchor: value => shell.notificationAnchor = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
+        },
+        "control-center": {
+            panel: controlCenterLoader,
+            screen: () => shell.controlCenterScreenName,
+            setScreen: value => shell.controlCenterScreenName = value,
+            setAnchor: value => shell.controlCenterAnchor = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
+        },
+        system: {
+            panel: monitorPaletteLoader, screen: () => shell.monitorScreenName,
+            setScreen: value => shell.monitorScreenName = value,
+            setAnchor: value => shell.monitorAnchorX = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
+        },
+        media: {
+            panel: mediaPaletteLoader, screen: () => shell.mediaScreenName,
+            setScreen: value => shell.mediaScreenName = value,
+            setAnchor: value => shell.mediaAnchorX = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
+        }
+    })
 
     // Which transient surface is on screen, by name, or "" for none.
     //
     // The transient surfaces -- the launcher, the session menu, the notification
-    // centre, the control centre and the three panels the bar's own modules open
-    // (the activity monitor, the now-playing panel and the AI usage panel) -- are
+    // centre, the control centre and the two panels the bar's widgets open
+    // (the system dashboard and the now-playing panel) -- are
     // layer overlays that hold the keyboard or the pointer for as long as they are
     // up, so no two of them can usefully be on screen together. Holding that as
     // one name rather than a boolean per loader is what makes it true by
@@ -111,25 +158,39 @@ ShellRoot {
         return Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
     }
 
+    function canonicalSurface(name) {
+        const aliases = {
+            notificationCenter: "notifications",
+            controlCenter: "control-center",
+            monitorPalette: "system",
+            mediaPalette: "media",
+            aiPalette: "system",
+            aiUsage: "system",
+            "ai-usage": "system"
+        };
+        if (String(name).startsWith("monitor:"))
+            return "system";
+        return aliases[name] || name;
+    }
+
+    function surfaceSpec(name) {
+        return surfaces[canonicalSurface(name)] || null;
+    }
+
     // The surfaces the pill may share the screen with: the panels worth
     // taking a picture of. All of them stay up through the capture, which is
     // what disarming the dismiss catcher below is for.
     function sharesScreenWithScreenshot(name) {
-        return name === "notificationCenter" || name === "controlCenter"
-            || name === "monitorPalette" || name === "mediaPalette"
-            || name === "aiPalette" || name === "launcher";
+        const spec = surfaceSpec(name);
+        return spec !== null && spec.screenshot;
     }
 
     // The surfaces whose click-outside dismissal the shared catcher owns.
     // Not the session menu: it carries a fullscreen backdrop of its own, the
     // same pattern its confirmation dialog uses, and dismisses through it.
     function catchesOutsideClicks(name) {
-        return name === "launcher"
-            || name === "notificationCenter"
-            || name === "controlCenter"
-            || name === "monitorPalette"
-            || name === "mediaPalette"
-            || name === "aiPalette";
+        const spec = surfaceSpec(name);
+        return spec !== null && spec.catches;
     }
 
     // Whether a palette that is up has asked not to be dismissed out from under
@@ -140,8 +201,7 @@ ShellRoot {
     // case is MediaPalette's seek bar, where the pointer leaves the panel during
     // the drag and the release is the tail of that drag rather than the user
     // clicking away. Read through the loaders' items because the palettes only
-    // exist while they are up. AiUsagePalette has no holdOpen -- there is no
-    // gesture in it to interrupt -- so it is not asked.
+    // exist while they are up.
     function paletteHoldsOpen() {
         if (monitorPaletteLoader.item && monitorPaletteLoader.item.holdOpen)
             return true;
@@ -154,6 +214,7 @@ ShellRoot {
     // with the screen and section it is meant to open on rather than being moved
     // a frame later.
     function openSurface(name, configure) {
+        name = canonicalSurface(name);
         if (configure)
             configure();
         if (!shell.sharesScreenWithScreenshot(name))
@@ -165,6 +226,7 @@ ShellRoot {
     // still runs either way, which is where it ran before this was one function:
     // session() set the target screen and then toggled.
     function toggleSurface(name, configure) {
+        name = canonicalSurface(name);
         if (configure)
             configure();
         if (shell.activeSurface === name) {
@@ -181,6 +243,7 @@ ShellRoot {
     }
 
     function closeSurface(name) {
+        name = canonicalSurface(name);
         if (shell.activeSurface === name)
             shell.activeSurface = "";
     }
@@ -189,14 +252,8 @@ ShellRoot {
     // of these owns a PanelMotion and raises dismissed() when it has finished;
     // clearing activeSurface here instead would destroy the window mid-fade.
     function animatedLoader(name) {
-        if (name === "monitorPalette")      return monitorPaletteLoader;
-        if (name === "controlCenter")       return controlCenterLoader;
-        if (name === "notificationCenter")  return notificationCenterLoader;
-        if (name === "mediaPalette")        return mediaPaletteLoader;
-        if (name === "aiPalette")           return aiPaletteLoader;
-        if (name === "session")             return sessionLoader;
-        if (name === "launcher")            return launcherLoader;
-        return null;
+        const spec = surfaceSpec(name);
+        return spec && spec.animated ? spec.panel : null;
     }
 
     // Closing, but through the surface itself where the surface has something to
@@ -225,7 +282,7 @@ ShellRoot {
     // the tool photographing it.
     function captureScreenshot(mode) {
         const command = [
-            Quickshell.env("HOME") + "/.local/bin/garage-screenshot-copy",
+            GaragePaths.screenshotCopy,
             mode
         ];
         if (captureProcess.running) {
@@ -261,6 +318,7 @@ ShellRoot {
     function confirmLauncherSessionAction(action) {
         shell.openSurface("session", () => {
             shell.sessionScreenName = shell.launcherScreenName;
+            shell.sessionAnchor = shell.launcherAnchor;
             shell.sessionInitialAction = action;
         });
     }
@@ -278,10 +336,10 @@ ShellRoot {
         else if (action === "caffeine")
             shell.caffeine = !shell.caffeine;
         else if (action === "night")
-            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/garage",
+            Quickshell.execDetached([GaragePaths.garage,
                 "action", "appearance.night_shift.toggle"]);
         else if (action === "theme")
-            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/garage",
+            Quickshell.execDetached([GaragePaths.garage,
                 "set", "appearance.theme_mode", JSON.stringify(Theme.dark ? "light" : "dark")]);
         shell.closeSurface("launcher");
     }
@@ -313,85 +371,54 @@ ShellRoot {
     // router and the IPC handler reach the same bodies: one function per
     // surface, however it is invoked.
 
-    function launcherOn(screenName: string): void {
-        if (String(launcherMode.text() || "").trim() === "external") {
+    function surfaceOn(name, screenName, anchor) {
+        const canonical = canonicalSurface(name);
+        const spec = surfaceSpec(canonical);
+        if (!spec)
+            return;
+        if (canonical === "launcher"
+                && String(launcherMode.text() || "").trim() === "external") {
             shell.requestCloseSurface("launcher");
             return;
         }
-        const sameScreen = shell.launcherScreenName === screenName;
-        const open = () => {
-            shell.launcherScreenName = screenName;
+        const sameScreen = spec.screen() === screenName;
+        const configure = () => {
+            spec.setScreen(screenName);
+            if (spec.setAnchor)
+                spec.setAnchor(anchor === undefined ? -1 : anchor);
+            if (canonical === "session")
+                shell.sessionInitialAction = "";
         };
         if (sameScreen)
-            shell.toggleSurface("launcher", open);
+            shell.toggleSurface(canonical, configure);
         else
-            shell.openSurface("launcher", open);
+            shell.openSurface(canonical, configure);
+    }
+
+    function launcherOn(screenName: string): void {
+        shell.surfaceOn("launcher", screenName, -1);
     }
     function sessionOn(screenName: string): void {
-        // Asked for again on the screen it is already on, it closes; asked
-        // for on another screen, it moves there rather than closing under a
-        // pointer that is somewhere else entirely.
-        const sameScreen = shell.sessionScreenName === screenName;
-        const open = () => {
-            shell.sessionScreenName = screenName;
-            shell.sessionInitialAction = "";
-        };
-        if (sameScreen)
-            shell.toggleSurface("session", open);
-        else
-            shell.openSurface("session", open);
+        shell.surfaceOn("session", screenName, -1);
     }
     function notificationsOn(screenName: string): void {
-        const sameScreen = shell.notificationScreenName === screenName;
-        const open = () => {
-            shell.notificationScreenName = screenName;
-        };
-        if (sameScreen)
-            shell.toggleSurface("notificationCenter", open);
-        else
-            shell.openSurface("notificationCenter", open);
+        shell.surfaceOn("notifications", screenName, -1);
     }
     function controlCenterOn(screenName: string): void {
-        const sameScreen = shell.controlCenterScreenName === screenName;
-        const open = () => {
-            shell.controlCenterScreenName = screenName;
-        };
-        if (sameScreen)
-            shell.toggleSurface("controlCenter", open);
-        else
-            shell.openSurface("controlCenter", open);
+        shell.surfaceOn("control-center", screenName, -1);
     }
     function monitorOn(screenName: string, anchorX: int): void {
-        const sameScreen = shell.monitorScreenName === screenName;
-        const open = () => {
-            shell.monitorScreenName = screenName;
-            shell.monitorAnchorX = anchorX;
-        };
-        if (sameScreen)
-            shell.toggleSurface("monitorPalette", open);
-        else
-            shell.openSurface("monitorPalette", open);
+        shell.systemOn(screenName, anchorX);
+    }
+    function systemOn(screenName: string, anchor: int): void {
+        shell.surfaceOn("system", screenName, anchor);
     }
     function mediaOn(screenName: string, anchorX: int): void {
-        const sameScreen = shell.mediaScreenName === screenName;
-        const open = () => {
-            shell.mediaScreenName = screenName;
-            shell.mediaAnchorX = anchorX;
-        };
-        if (sameScreen)
-            shell.toggleSurface("mediaPalette", open);
-        else
-            shell.openSurface("mediaPalette", open);
+        shell.surfaceOn("media", screenName, anchorX);
     }
     function aiUsageOn(screenName: string): void {
-        const sameScreen = shell.aiUsageScreenName === screenName;
-        const open = () => {
-            shell.aiUsageScreenName = screenName;
-        };
-        if (sameScreen)
-            shell.toggleSurface("aiPalette", open);
-        else
-            shell.openSurface("aiPalette", open);
+        // The retired standalone AI panel now lives in the system dashboard.
+        shell.surfaceOn("system", screenName, -1);
     }
 
 // Click-outside dismissal for the launcher, the two centres and the three
@@ -449,6 +476,8 @@ DismissCatcher {
 
         LauncherPalette {
             targetScreenName: shell.launcherScreenName
+            targetAnchor: shell.launcherAnchor
+            edge: BarState.position
             caffeine: shell.caffeine
             onSessionActionRequested: action => shell.confirmLauncherSessionAction(action)
             onShellActionRequested: action => shell.runLauncherShellAction(action)
@@ -486,7 +515,7 @@ DismissCatcher {
     // catcher's `armed` expression above stands down for the whole time
     // captureProcess is running -- which is correct, slurp's own clicks are not
     // the user clicking away -- so for those six minutes click-outside dismissal
-    // was dead shell-wide: the launcher, both centres and all three bar panels
+    // was dead shell-wide: the launcher, both centres and both bar panels
     // could only be closed with Escape, and nothing on screen said why. One
     // forgotten selection disables a gesture in six unrelated surfaces.
     //
@@ -527,6 +556,8 @@ DismissCatcher {
 
         SessionPalette {
             targetScreenName: shell.sessionScreenName
+            targetAnchor: shell.sessionAnchor
+            edge: BarState.position
             initialAction: shell.sessionInitialAction
 
             onActionSelected: action => {
@@ -558,60 +589,56 @@ DismissCatcher {
 
     LazyLoader {
         id: notificationCenterLoader
-        active: shell.activeSurface === "notificationCenter"
+        active: shell.activeSurface === "notifications"
 
         NotificationCenterPalette {
             targetScreenName: shell.notificationScreenName
-            onDismissed: shell.closeSurface("notificationCenter")
+            targetAnchor: shell.notificationAnchor
+            edge: BarState.position
+            onDismissed: shell.closeSurface("notifications")
         }
     }
 
     LazyLoader {
         id: controlCenterLoader
-        active: shell.activeSurface === "controlCenter"
+        active: shell.activeSurface === "control-center"
 
         ControlCenterPalette {
             targetScreenName: shell.controlCenterScreenName
+            targetAnchor: shell.controlCenterAnchor
+            edge: BarState.position
             caffeine: shell.caffeine
             onCaffeineToggled: shell.caffeine = !shell.caffeine
-            onDismissed: shell.closeSurface("controlCenter")
+            onDismissed: shell.closeSurface("control-center")
         }
     }
 
-    // The three panels the bar's own modules open, on the same shape as the two
+    // The two panels the bar's own modules open, on the same shape as the two
     // centres above: one loader each, bound to activeSurface, and a dismissed()
-    // that clears the name it was activated by. AI usage sits against the right
-    // edge. Media and monitor receive a monitor-local X from the bar click and
+    // that clears the name it was activated by. Media and system receive a
+    // monitor-local coordinate from the bar click and
     // centre themselves under it, clamped inside the output.
     LazyLoader {
         id: monitorPaletteLoader
-        active: shell.activeSurface === "monitorPalette"
+        active: shell.activeSurface === "system"
 
         MonitorPalette {
             targetScreenName: shell.monitorScreenName
-            targetAnchorX: shell.monitorAnchorX
-            onDismissed: shell.closeSurface("monitorPalette")
+            targetAnchor: shell.monitorAnchorX
+            edge: BarState.position
+            onDismissed: shell.closeSurface("system")
         }
     }
 
     LazyLoader {
         id: mediaPaletteLoader
-        active: shell.activeSurface === "mediaPalette"
+        active: shell.activeSurface === "media"
 
         MediaPalette {
             targetScreenName: shell.mediaScreenName
-            targetAnchorX: shell.mediaAnchorX
-            onDismissed: shell.closeSurface("mediaPalette")
-        }
-    }
-
-    LazyLoader {
-        id: aiPaletteLoader
-        active: shell.activeSurface === "aiPalette"
-
-        AiUsagePalette {
-            targetScreenName: shell.aiUsageScreenName
-            onDismissed: shell.closeSurface("aiPalette")
+            targetAnchor: shell.mediaAnchorX
+            edge: BarState.position
+            onDismissed: shell.closeSurface("media")
         }
     }
 
@@ -624,30 +651,18 @@ DismissCatcher {
     NotificationPopups {
         onOpenCenterRequested: screenName => {
             shell.notificationScreenName = screenName;
-            shell.openSurface("notificationCenter", () => {});
+            shell.notificationAnchor = -1;
+            shell.openSurface("notifications", () => {});
         }
     }
 
     // The bar. Its module clicks arrive here with the screen they were clicked on
-    // and, where the old waybar click carried one, the anchor X under the module --
+    // and, where a bar widget has one, its long-axis anchor under the module --
     // routed through the very same functions the keybinds use, so a bar click and a
     // keybind can never disagree about what opens.
     Bar {
         onSurfaceRequested: (surface, screenName, anchorX) => {
-            if (surface === "session")
-                shell.sessionOn(screenName);
-            else if (surface === "launcher")
-                shell.launcherOn(screenName);
-            else if (surface === "notifications")
-                shell.notificationsOn(screenName);
-            else if (surface === "controlCenter")
-                shell.controlCenterOn(screenName);
-            else if (surface === "media")
-                shell.mediaOn(screenName, anchorX);
-            else if (surface === "aiUsage")
-                shell.aiUsageOn(screenName);
-            else if (surface.startsWith("monitor:"))
-                shell.monitorOn(screenName, anchorX);
+            shell.surfaceOn(surface, screenName, anchorX);
         }
     }
 
@@ -656,7 +671,7 @@ DismissCatcher {
     // nothing can open a launcher the user turned off.
     FileView {
         id: launcherMode
-        path: Quickshell.env("HOME") + "/.local/state/garage/generated/launcher"
+        path: GaragePaths.launcherMode
         printErrors: false
         // Read up front and re-read on every change: watchChanges reports the
         // write but does not pull it in, and an unloaded FileView reads as an
@@ -677,7 +692,7 @@ DismissCatcher {
         property bool controlCenterVisible: controlCenterLoader.active
         property bool monitorVisible: monitorPaletteLoader.active
         property bool mediaVisible: mediaPaletteLoader.active
-        property bool aiUsageVisible: aiPaletteLoader.active
+        property bool aiUsageVisible: monitorPaletteLoader.active
 
 
         function launcherOn(screenName: string): void {
@@ -700,6 +715,10 @@ DismissCatcher {
             shell.monitorOn(screenName, anchorX);
         }
 
+        function systemOn(screenName: string, anchor: int): void {
+            shell.systemOn(screenName, anchor);
+        }
+
         function mediaOn(screenName: string, anchorX: int): void {
             shell.mediaOn(screenName, anchorX);
         }
@@ -720,9 +739,7 @@ DismissCatcher {
             // inside the palette: the launcher is a layer surface now, and the
             // focused monitor moves with the pointer, so a binding would walk an
             // open launcher between screens.
-            shell.toggleSurface("launcher", () => {
-                shell.launcherScreenName = shell.focusedScreenName();
-            });
+            shell.surfaceOn("launcher", shell.focusedScreenName(), -1);
         }
 
 
@@ -739,10 +756,7 @@ DismissCatcher {
         }
 
         function session(): void {
-            shell.toggleSurface("session", () => {
-                shell.sessionScreenName = shell.focusedScreenName();
-                shell.sessionInitialAction = "";
-            });
+            shell.surfaceOn("session", shell.focusedScreenName(), -1);
         }
 
 
@@ -793,14 +807,12 @@ DismissCatcher {
         // notification service's controls, and garage-lock-session already calls
         // `shell closeNotifications` on its way to the lock screen.
         function notifications(): void {
-            shell.toggleSurface("notificationCenter", () => {
-                shell.notificationScreenName = shell.focusedScreenName();
-            });
+            shell.surfaceOn("notifications", shell.focusedScreenName(), -1);
         }
 
 
         function closeNotifications(): void {
-            shell.requestCloseSurface("notificationCenter");
+            shell.requestCloseSurface("notifications");
         }
 
         // The control centre, on the same three-function shape as the centre
@@ -808,55 +820,53 @@ DismissCatcher {
         // garage-panel-toggle, which resolves the monitor under the pointer and
         // calls controlCenterOn with it.
         function controlCenter(): void {
-            shell.toggleSurface("controlCenter", () => {
-                shell.controlCenterScreenName = shell.focusedScreenName();
-            });
+            shell.surfaceOn("control-center", shell.focusedScreenName(), -1);
         }
 
 
         function closeControlCenter(): void {
-            shell.requestCloseSurface("controlCenter");
+            shell.requestCloseSurface("control-center");
         }
 
-        // The three bar panels, each on the same three-function shape as the
+        // The bar panels, each on the same three-function shape as the
         // control centre above. The click on a bar module goes through
         // garage-panel-toggle, which resolves the monitor under the pointer and
         // calls the *On form with it; the parameterless form is there for a
         // keybind, which has no pointer to resolve and so takes the focused
         // monitor, the way launcher() and session() do.
         function monitor(): void {
-            shell.toggleSurface("monitorPalette", () => {
-                shell.monitorScreenName = shell.focusedScreenName();
-                shell.monitorAnchorX = -1;
-            });
+            shell.surfaceOn("system", shell.focusedScreenName(), -1);
+        }
+
+        function system(): void {
+            shell.surfaceOn("system", shell.focusedScreenName(), -1);
         }
 
 
         function closeMonitor(): void {
-            shell.requestCloseSurface("monitorPalette");
+            shell.requestCloseSurface("system");
+        }
+
+        function closeSystem(): void {
+            shell.requestCloseSurface("system");
         }
 
         function media(): void {
-            shell.toggleSurface("mediaPalette", () => {
-                shell.mediaScreenName = shell.focusedScreenName();
-                shell.mediaAnchorX = -1;
-            });
+            shell.surfaceOn("media", shell.focusedScreenName(), -1);
         }
 
 
         function closeMedia(): void {
-            shell.requestCloseSurface("mediaPalette");
+            shell.requestCloseSurface("media");
         }
 
         function aiUsage(): void {
-            shell.toggleSurface("aiPalette", () => {
-                shell.aiUsageScreenName = shell.focusedScreenName();
-            });
+            shell.surfaceOn("system", shell.focusedScreenName(), -1);
         }
 
 
         function closeAiUsage(): void {
-            shell.requestCloseSurface("aiPalette");
+            shell.requestCloseSurface("system");
         }
     }
 

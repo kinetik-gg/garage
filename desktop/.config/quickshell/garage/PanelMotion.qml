@@ -14,10 +14,9 @@ import QtQuick
 // palettes' namespaces are all no_anim in windowrules.lua so nothing animates
 // the same surface twice.
 //
-// Top to bottom for all of them. The panels the bar opens belong to the bar and
-// drop out of it; the ones anchored to a side used to come in sideways, which
-// said the panel had arrived from off-screen rather than from the control that
-// opened it.
+// The travel follows the edge the opener belongs to. Existing callers only read
+// surfaceTop and therefore keep their top-edge behavior; PaletteSurface reads
+// surfaceMargin and applies it to the selected edge.
 //
 // Usage, in a PanelWindow:
 //
@@ -33,7 +32,11 @@ QtObject {
     // Where the panel comes to rest, and how far above that it starts. The
     // travel is short on purpose: it gives the entrance a direction, it is not
     // there to make anyone watch a panel cross the screen.
-    property real restingTop: Theme.windowGutter
+    property string edge: "top"
+    property real restingMargin: Theme.windowGutter
+    // Compatibility for the existing palettes while they migrate to
+    // PaletteSurface.
+    property alias restingTop: motion.restingMargin
     readonly property real liftDistance: 34
 
     property bool revealed: false
@@ -48,8 +51,16 @@ QtObject {
     // contents: the compositor keeps blurring the surface until it is unmapped,
     // so a panel that travels on the way out drags an empty blurred rectangle up
     // the screen behind it. The exit is a fade and nothing else.
-    property real surfaceTop: motion.revealed
-        ? motion.restingTop : motion.restingTop - motion.liftDistance
+    property real surfaceMargin: motion.revealed
+        ? motion.restingMargin : motion.restingMargin - motion.liftDistance
+    readonly property real surfaceTop: motion.edge === "top"
+        ? motion.surfaceMargin : motion.restingMargin
+    readonly property real surfaceBottom: motion.edge === "bottom"
+        ? motion.surfaceMargin : motion.restingMargin
+    readonly property real surfaceLeft: motion.edge === "left"
+        ? motion.surfaceMargin : motion.restingMargin
+    readonly property real surfaceRight: motion.edge === "right"
+        ? motion.surfaceMargin : motion.restingMargin
 
     property real opacity: motion.presented ? 1 : 0
 
@@ -57,7 +68,7 @@ QtObject {
     // it belongs and lets it settle back. The overshoot is turned well down from
     // Qt's 1.70158 default, which at this travel is a bounce rather than the
     // suggestion of weight this wants.
-    Behavior on surfaceTop {
+    Behavior on surfaceMargin {
         NumberAnimation {
             duration: Theme.reduceMotion ? 0 : 340
             easing.type: Easing.OutBack

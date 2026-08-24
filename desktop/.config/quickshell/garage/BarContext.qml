@@ -7,8 +7,8 @@ import QtQuick
 // The bar's context chips: containers, SMB shares, microphone, volume.
 //
 // Containers, SMB and the mic arrive on one JSON line every five seconds from
-// `garage-bar-probe stream` -- one process for the three probes, replacing the waybar
-// module's three separate poll spawns. Volume reads live from PipeWire's default sink;
+// `garage-bar-probe stream` -- one process for the three probes, replacing the
+// previous bar's three separate poll spawns. Volume reads live from PipeWire's default sink;
 // nothing here polls.
 Singleton {
     id: context
@@ -29,6 +29,19 @@ Singleton {
     property bool micRecording: false
     property var micDescriptions: []
 
+    // False only when the probe stream died without ever answering -- the
+    // missing-binary case -- so the system icon can show degraded rather than
+    // pretending three quiet probes.
+    property bool probeAvailable: true
+    property string probeError: ""
+    property bool probeSawData: false
+
+    // -- Badge state ----------------------------------------------------------
+
+    // The one dot the collapsed system icon may draw, priority mic (privacy)
+    // over SMB shortfall (degraded). Derived here so icon and panel agree.
+    readonly property bool smbShort: smbAvailable && smbMissingLabels.length > 0
+
     // -- AI usage ------------------------------------------------------------
 
     // A rolling billing-window figure that moves over minutes, not seconds: the old
@@ -36,22 +49,28 @@ Singleton {
     property string aiGlyph: ""
     property string aiTip: ""
     property bool aiStale: false
+    // False when garage-ai-usage says tokscale is not installed -- a normal
+    // state, distinct from a stale reading, and what the system panel's AI
+    // section keys its empty state on.
+    property bool aiAvailable: false
 
     Process {
         id: aiProcess
 
-        command: [Quickshell.env("HOME") + "/.local/bin/garage-ai-usage", "--bar"]
+        command: [GaragePaths.aiUsage, "--bar"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
                     const payload = JSON.parse(text);
-                    context.aiGlyph = String(payload.text || "");
-                    context.aiTip = String(payload.tooltip || "");
-                    context.aiStale = payload.class === "stale";
+                    context.aiGlyph = String(payload.glyph || "");
+                    context.aiTip = String(payload.tip || "");
+                    context.aiStale = payload.stale === true;
+                    context.aiAvailable = payload.available === true;
                 } catch (error) {
                     // Absent tokscale is a normal state and prints an empty glyph.
                     context.aiGlyph = "";
                     context.aiTip = "";
+                    context.aiAvailable = false;
                 }
             }
         }
@@ -68,7 +87,9 @@ Singleton {
     Process {
         id: probeStream
         running: true
-        command: [Quickshell.env("HOME") + "/.local/bin/garage-bar-probe", "stream"]
+        command: [GaragePaths.barProbe, "stream"]
+
+        onStarted: context.probeSawData = false
 
         stdout: SplitParser {
             splitMarker: "\n"
@@ -80,7 +101,10 @@ Singleton {
                 containersAvailable = false;
                 smbAvailable = false;
                 micAvailable = false;
+                probeError = "probe exited (" + exitCode + ")";
             }
+            if (!probeSawData)
+                probeAvailable = false;
             restartTimer.restart();
         }
     }
@@ -102,6 +126,10 @@ Singleton {
         }
         if (object === null || typeof object !== "object")
             return;
+
+        probeSawData = true;
+        probeAvailable = true;
+        probeError = "";
 
         const boxes = object.containers;
         if (boxes === null || boxes === undefined) {

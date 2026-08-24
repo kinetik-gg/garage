@@ -5,7 +5,7 @@ import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
 
 // The notification centre: everything the daemon is still holding, drawn as a
-// column down the right edge of one screen.
+// tall column opening inward from the bar's notification widget.
 //
 // A layer surface rather than a FloatingWindow, unlike Preferences and About. It
 // is a panel pinned to an edge that the next click dismisses, not a window the
@@ -16,12 +16,10 @@ import QtQuick.Layouts
 // leaves the daemon the moment it is dismissed, so a card cannot play itself out
 // after the fact: the wave below plays the cards first and dismisses afterwards,
 // which is the same order the toast stack uses.
-PanelWindow {
+PaletteSurface {
     id: centre
-
-    required property string targetScreenName
-
-    signal dismissed()
+    surfaceNamespace: "garage-notification-center"
+    escapeEnabled: false
 
     // The list, grouped by app. A plain property fed by refresh() rather than a
     // binding on the model: the list is deliberately *not* rebuilt while cards
@@ -98,15 +96,6 @@ PanelWindow {
         else
             next[key] = true;
         centre.expandedGroups = next;
-    }
-
-    function targetScreen() {
-        for (let index = 0; index < Quickshell.screens.length; ++index) {
-            const candidate = Quickshell.screens[index];
-            if (candidate.name === centre.targetScreenName)
-                return candidate;
-        }
-        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
     }
 
     // Group by app name, newest group first, newest member first inside a group.
@@ -283,66 +272,21 @@ PanelWindow {
         centre.beginClose(centre.everything());
     }
 
-    screen: centre.targetScreen()
     implicitWidth: 390
-    color: "transparent"
-    // OnDemand rather than Exclusive: the centre has a reply field to type into,
-    // but it is a panel the user clicks into rather than a modal, and an
-    // exclusive surface takes every keystroke in the session for as long as it
-    // is up. The compositor hands an on-demand layer surface the keyboard as it
-    // maps, which is what makes the Escape at the foot of this file heard
-    // without a click first.
-    focusable: true
-    aboveWindows: true
-    exclusiveZone: 0
-    surfaceFormat.opaque: false
-
-    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
-    PanelMotion {
-        id: motion
-        onFinished: centre.dismissed()
+    // Keep the history viewport tall without anchoring both sides. Its fixed
+    // height lets PaletteSurface translate the window from any edge without a
+    // relayout on every animation frame.
+    implicitHeight: {
+        const target = centre.effectiveScreen;
+        const available = target ? target.height : 1080;
+        const bar = centre.edge === "top" || centre.edge === "bottom"
+            ? BarState.thickness : 0;
+        return Math.max(1, available - bar - Theme.windowGutter * 2);
     }
 
     function requestDismissal() {
-        motion.dismiss();
+        centre.dismissSurface();
     }
-
-    anchors {
-        top: true
-        right: true
-        bottom: true
-    }
-
-    // The animated top margin, made an integer once rather than at each margin.
-    //
-    // Margins are ints and PanelMotion's travel is a real, so letting the two
-    // margins below each convert it themselves is two conversions of a moving
-    // fractional value that do not always sum to the constant the compensation
-    // depends on: at a top of 3.7 they come out 3 and 8, which is 11 rather than
-    // 12 and so a surface one pixel taller than it was the frame before. A pixel
-    // is not the stretch this arrangement was written to stop, but it is a
-    // relayout of the list, and those are the whole cost. One integer, used
-    // twice, and the pair sums to the same number on every frame.
-    readonly property int surfaceTopPx: Math.round(motion.surfaceTop)
-
-    // Overlay surfaces already begin below Waybar's exclusive zone, so the top
-    // gutter is measured from there rather than from the top of the screen.
-    margins.top: centre.surfaceTopPx
-    margins.right: Theme.windowGutter
-    // The bottom margin moves with the top, by the same amount in the opposite
-    // direction, so the entrance translates this surface instead of resizing it.
-    //
-    // It is anchored top and bottom because the list wants the full height of
-    // the output. That makes margins.top a size as well as a position: animated
-    // on its own it stretched a 390x1025 surface on every frame of the
-    // entrance, and each of those frames was a full relayout of the notification
-    // list and a re-blur of the whole thing. Holding the height constant is what
-    // makes this cost a move rather than sixty relayouts a second.
-    margins.bottom: Theme.windowGutter * 2 - centre.surfaceTopPx
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "garage-notification-center"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     Component.onCompleted: centre.rebuild()
 
@@ -381,7 +325,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
-        opacity: motion.opacity
+        opacity: centre.contentOpacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower

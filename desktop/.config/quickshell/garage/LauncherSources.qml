@@ -142,7 +142,7 @@ Scope {
         if (fileProcess.running || sources.fileWantedQuery === "")
             return;
         sources.fileRequestQuery = sources.fileWantedQuery;
-        fileProcess.command = [Quickshell.env("HOME") + "/.local/bin/garage-file-index",
+        fileProcess.command = [GaragePaths.fileIndex,
             "search", sources.fileRequestQuery, String(8)];
         fileProcess.running = true;
     }
