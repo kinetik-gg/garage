@@ -14,10 +14,8 @@ use crate::shape;
 /// numbers nobody reads at a glance, and they are still a hover away in the tooltip built
 /// by [`build_bar_output`] and a click away in the AI palette. The codepoint is Phosphor's
 /// own private-use assignment, verified present in the bundled
-/// `desktop/.local/share/fonts/Phosphor.ttf`, and `waybar-base.css` puts "Phosphor" first
-/// in this module's font stack so nothing else can claim it. Written as an escape, the way
-/// `config.jsonc` spells the bell and the launcher: a private-use glyph pasted into source
-/// is invisible in a diff and one careless editor away from being lost.
+/// `desktop/.local/share/fonts/Phosphor.ttf`. Written as an escape because a private-use
+/// glyph pasted into source is invisible in a diff and one careless editor away from loss.
 const SPARKLE: char = '\u{e6a2}';
 
 fn object<const N: usize>(entries: [(&str, Value); N]) -> Value {
@@ -49,7 +47,7 @@ pub(crate) fn run_probe(tokscale: Option<&Path>) -> i32 {
     }
 }
 
-/// `build_bar_output()`: the waybar custom-module payload.
+/// `build_bar_output()`: the shell-native bar payload.
 ///
 /// `now_epoch_seconds` is the wall clock [`shape::reset_days`] measures against; `main()`
 /// supplies the real one, tests a fixed one.
@@ -59,11 +57,7 @@ pub(crate) fn build_bar_output(
     now_epoch_seconds: f64,
 ) -> Value {
     let Some(tokscale) = tokscale else {
-        return object([
-            ("text", Value::String(String::new())),
-            ("tooltip", Value::String(String::new())),
-            ("class", Value::String("unavailable".to_string())),
-        ]);
+        return bar_payload(false, "", "", false);
     };
 
     let (payload, stale) = cache::load_usage(tokscale, paths);
@@ -71,15 +65,13 @@ pub(crate) fn build_bar_output(
     if is_empty_list(&payload) {
         // Still the glyph, not "AI --": the module is an icon now, and a strip that
         // changes shape when a subprocess fails is a worse signal than the tooltip saying
-        // so. The class is there for a palette that wants to dim it.
-        return object([
-            ("text", Value::String(SPARKLE.to_string())),
-            (
-                "tooltip",
-                Value::String("Tokscale subscription usage unavailable".to_string()),
-            ),
-            ("class", Value::String("unavailable".to_string())),
-        ]);
+        // so. `available` lets the bar dim it.
+        return bar_payload(
+            false,
+            &SPARKLE.to_string(),
+            "Tokscale subscription usage unavailable",
+            stale,
+        );
     }
 
     let codex = shape::provider(&payload, "Codex");
@@ -106,13 +98,15 @@ pub(crate) fn build_bar_output(
         shape::percent(&claude, "Session"),
     );
 
+    bar_payload(true, &SPARKLE.to_string(), &tooltip, stale)
+}
+
+fn bar_payload(available: bool, glyph: &str, tip: &str, stale: bool) -> Value {
     object([
-        ("text", Value::String(SPARKLE.to_string())),
-        ("tooltip", Value::String(tooltip)),
-        (
-            "class",
-            Value::String(if stale { "stale" } else { "available" }.to_string()),
-        ),
+        ("available", Value::Bool(available)),
+        ("glyph", Value::String(glyph.to_owned())),
+        ("tip", Value::String(tip.to_owned())),
+        ("stale", Value::Bool(stale)),
     ])
 }
 
@@ -186,13 +180,13 @@ mod tests {
         let value = build_bar_output(None, &paths, 0.0);
         assert_eq!(
             value,
-            serde_json::json!({"text": "", "tooltip": "", "class": "unavailable"})
+            serde_json::json!({"available": false, "glyph": "", "tip": "", "stale": false})
         );
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn bar_output_is_the_glyph_with_an_unavailable_class_when_nothing_validates() {
+    fn bar_output_is_the_glyph_with_unavailable_status_when_nothing_validates() {
         let dir = scratch("bar-unavailable");
         let script = dir.join("tokscale");
         write_shell_script(&script, "echo '[]'");
@@ -200,12 +194,12 @@ mod tests {
 
         let value = build_bar_output(Some(&script), &paths, 0.0);
         assert_eq!(
-            field(&value, "text"),
+            field(&value, "glyph"),
             serde_json::json!(SPARKLE.to_string())
         );
-        assert_eq!(field(&value, "class"), serde_json::json!("unavailable"));
+        assert_eq!(field(&value, "available"), serde_json::json!(false));
         assert_eq!(
-            field(&value, "tooltip"),
+            field(&value, "tip"),
             serde_json::json!("Tokscale subscription usage unavailable")
         );
         let _ = fs::remove_dir_all(&dir);
@@ -225,11 +219,12 @@ mod tests {
 
         let value = build_bar_output(Some(&script), &paths, now);
         assert_eq!(
-            field(&value, "text"),
+            field(&value, "glyph"),
             serde_json::json!(SPARKLE.to_string())
         );
-        assert_eq!(field(&value, "class"), serde_json::json!("available"));
-        let tooltip_value = field(&value, "tooltip");
+        assert_eq!(field(&value, "available"), serde_json::json!(true));
+        assert_eq!(field(&value, "stale"), serde_json::json!(false));
+        let tooltip_value = field(&value, "tip");
         let tooltip = tooltip_value.as_str().expect("tooltip is a string");
         assert!(tooltip.contains("OAI / Codex (pro)"));
         assert!(tooltip.contains("91% remaining (6D)"));

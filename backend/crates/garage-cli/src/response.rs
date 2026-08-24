@@ -27,8 +27,6 @@
 
 use serde_json::Value;
 
-use crate::pyjson;
-
 /// What `garage help` prints. The Python's `print(USAGE, end="")`, so the trailing newline
 /// is the one this string already carries and nothing adds a second.
 pub(crate) const USAGE: &str = r#"Usage: garage [COMMAND [ARGUMENTS]]
@@ -69,14 +67,11 @@ pub(crate) fn emit(data: &Value, error: &str) {
 /// The envelope as a string, which is what the tests compare and [`emit`] prints.
 #[must_use]
 pub(crate) fn envelope(data: &Value, error: &str) -> String {
-    let mut out = String::from("{\"ok\":");
-    out.push_str(if error.is_empty() { "true" } else { "false" });
-    out.push_str(",\"data\":");
-    pyjson::write_value(data, &mut out);
-    out.push_str(",\"error\":");
-    pyjson::write_string(error, &mut out);
-    out.push('}');
-    out
+    let mut fields = serde_json::Map::new();
+    fields.insert("ok".to_owned(), Value::Bool(error.is_empty()));
+    fields.insert("data".to_owned(), data.clone());
+    fields.insert("error".to_owned(), Value::String(error.to_owned()));
+    garage_core::pyjson::dumps_compact(&Value::Object(fields))
 }
 
 #[cfg(test)]

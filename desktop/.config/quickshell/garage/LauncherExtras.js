@@ -242,10 +242,10 @@ var POWER_ACTIONS = [
 ];
 
 var MEDIA_ACTIONS = [
-    { action: "play", title: "Play", aliases: ["play"], command: ["playerctl", "play"] },
-    { action: "pause", title: "Pause", aliases: ["pause"], command: ["playerctl", "pause"] },
-    { action: "stop", title: "Stop", aliases: ["stop"], command: ["playerctl", "stop"] },
-    { action: "skip", title: "Skip Track", aliases: ["skip", "next"], command: ["playerctl", "next"] },
+    { action: "play", title: "Play", aliases: ["play"] },
+    { action: "pause", title: "Pause", aliases: ["pause"] },
+    { action: "stop", title: "Stop", aliases: ["stop"] },
+    { action: "skip", title: "Skip Track", aliases: ["skip", "next"] },
     { action: "mute", title: "Toggle Mute", aliases: ["mute", "unmute"], command: ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"] }
 ];
 
@@ -413,6 +413,65 @@ function fileSearchQuery(input) {
     return match ? String(match[1] || "").trim() : null;
 }
 
+// `clip` is an explicit launcher source in the normal launcher. The dedicated
+// clipboard entry point supplies the field text directly and does not need the
+// prefix; LauncherSources selects that path with its mode argument.
+function clipboardQuery(input) {
+    var text = String(input || "");
+    var exact = /^\s*clip\s*$/i.exec(text);
+    if (exact)
+        return "";
+    var match = /^\s*clip(?:\s*:\s*|\s+)(.*?)\s*$/i.exec(text);
+    return match ? String(match[1] || "").trim() : null;
+}
+
+function safeClipboardPreview(value) {
+    var text = String(value || "")
+        .replace(/[\x00-\x1f\x7f]/g, " ")
+        .replace(/\s+/g, " ").trim();
+    if (text === "")
+        return "Empty clipboard item";
+    return text.length > 180 ? text.slice(0, 179) + "…" : text;
+}
+
+// cliphist list is one numeric database id, a tab, then an untrusted preview.
+// Only the validated id crosses back into `cliphist decode`; the preview is
+// display/search data and can never become an argument or shell fragment.
+function parseClipboardList(output) {
+    var entries = [];
+    var seen = {};
+    var lines = String(output || "").split(/\r?\n/);
+    for (var index = 0; index < lines.length; ++index) {
+        var match = /^([0-9]+)\t(.*)$/.exec(lines[index]);
+        if (!match || seen[match[1]])
+            continue;
+        seen[match[1]] = true;
+        var preview = safeClipboardPreview(match[2]);
+        var binary = /^\[\[\s*binary data/i.test(preview);
+        entries.push({ id: match[1], preview: preview, binary: binary });
+    }
+    return entries;
+}
+
+function clipboardRows(entries, input, limit) {
+    var query = cleanToken(input);
+    var rows = [];
+    for (var index = 0; index < entries.length && rows.length < limit; ++index) {
+        var entry = entries[index];
+        if (query !== "" && cleanToken(entry.preview).indexOf(query) < 0)
+            continue;
+        rows.push({
+            kind: "clip",
+            title: entry.binary ? "Image or binary clipboard item" : entry.preview,
+            subtitle: entry.binary
+                ? entry.preview + " — copy from clipboard history"
+                : "Clipboard history — copy item",
+            clipId: entry.id
+        });
+    }
+    return rows;
+}
+
 function isExclusiveQuery(input) {
     return unitConversion(input) !== null
         || currencyRequest(input) !== null
@@ -425,6 +484,7 @@ function isExclusiveQuery(input) {
         || shellRows(input, false, false, false) !== null
         || timerSpec(input) !== null
         || stopwatchSpec(input) !== null
+        || clipboardQuery(input) !== null
         || fileSearchQuery(input) !== null;
 }
 

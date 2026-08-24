@@ -20,6 +20,7 @@ syntax.
 | Unit conversion | `1 m in inch` | Copy the conversion. |
 | Currency conversion | `$1 to IDR` or `10 euro in rupiah` | Fetch a Frankfurter rate and copy the conversion. |
 | Emoji search | `emoji love` | Copy the selected emoji. |
+| Clipboard history | `clip` or `clip project name` | Copy the selected text, image, or binary item back to the clipboard. |
 | UUID | `uuid` | Generate and copy a UUID v4. |
 | Random digits | `rand(16)` | Generate and copy 16 random digits; the limit is 128. |
 | Indexed files | `file launch notes` or a plain filename | Open the selected file or directory. |
@@ -49,6 +50,12 @@ and a manual **Refresh Now** action. It also controls whether indexing runs,
 the refresh frequency, maximum traversal depth, and the directories included.
 Indexed roots are confined to the user's home directory.
 
+`Super+Shift+V` opens the launcher directly in clipboard mode. Clipboard
+previews come from `cliphist`, but only its numeric database id is sent back to
+`cliphist decode`; preview text is never evaluated as a command. The decoded
+bytes are piped directly to `wl-copy`, preserving images and other non-text
+clipboard entries.
+
 Timers accept duration components from one second through seven days, for
 example `timer 45s`, `timer 1h 30m`, or `timer 25m Pomodoro`. Type `timer` to
 list active timers and `timer cancel` to select one to cancel. Stopwatch
@@ -64,7 +71,7 @@ the launcher does not reset it.
 | `power` or `system` | List shutdown, restart, sleep, logout, and lock actions. |
 | `power reboot` | Open the existing session confirmation UI with Restart selected. |
 | `audio` or `media` | List play, pause, stop, next-track, and mute actions. |
-| `audio play` | Send the selected command through `playerctl`; mute uses `wpctl`. |
+| `audio play` | Control the selected player through the shell's native MPRIS service; mute uses `wpctl`. |
 | `kill quickshell` | Fuzzy-search the current user's processes and send `SIGTERM` to the selected PID. |
 | `ssh user@example.com` | Open the configured default terminal and connect with SSH. |
 | `settings`, `preferences`, or `system preferences` | Open Garage System Preferences. |

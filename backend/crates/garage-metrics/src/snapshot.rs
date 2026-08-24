@@ -2,18 +2,14 @@
 //!
 //! Full-system snapshots with the counters a rate needs held in memory.
 //!
-//! [`Snapshotter`] deliberately does not touch the bar's history files. The bar owns
-//! those and guards them with a minimum sample interval; a second writer at 1 Hz would
-//! double the sample rate and the two would race over the same 120 slots. The popover
-//! reads that history exactly once, as the seed, and keeps its own from there.
+//! [`Snapshotter`] owns only live counter deltas. The stream mode turns its completed
+//! snapshots into durable graph history; one-shot mode remains read-only.
 
-use crate::dirs::{Dirs, WIDGETS};
 use crate::fault::Fault;
 use crate::files::{as_float, rate};
-use crate::json::{object, Object, Value};
+use crate::json::{object, Value};
 use crate::pyfmt::py_round;
 use crate::sources::{cpu, disk, gpu, memory, net, temp};
-use crate::state::load_state;
 
 /// One read of every counter a rate is a delta between, with the moment it was taken.
 #[derive(Debug, Clone)]
@@ -214,35 +210,6 @@ fn split_temperature(reading: Option<temp::Reading>) -> (Option<f64>, Option<Str
     }
 }
 
-/// The bar's stored history, so the popover's graphs open already drawn.
-///
-/// Flat lists of numbers throughout, one key per series rather than tuples per point, so
-/// a consumer never has to branch on which widget it is holding.
-pub(crate) fn seed_object(dirs: &Dirs) -> Value {
-    let mut seed = Object::new();
-    for widget in WIDGETS {
-        let state = load_state(&dirs.state_file(widget));
-        if let Some(history) = present(&state, "history") {
-            seed.insert(widget, history);
-        }
-        if let Some(second) = present(&state, "history2") {
-            let suffix = if widget == "network" { "up" } else { "vram" };
-            seed.insert(format!("{widget}_{suffix}"), second);
-        }
-    }
-    Value::Object(object! {
-        "ts" => Value::Float(now()),
-        "seed" => Value::Object(seed),
-    })
-}
-
-/// A stored series, but only when it is a list with something in it -- and copied as it
-/// stands, ints and all, because the seed is republished rather than recomputed.
-fn present(state: &Object, key: &str) -> Option<Value> {
-    let history = state.get(key)?.as_list()?;
-    (!history.is_empty()).then(|| Value::List(history.to_vec()))
-}
-
 /// `time.time()` -- seconds since the epoch as a float. A clock before 1970 is not a
 /// thing this has to survive, so the failure folds to zero rather than propagating.
 pub(crate) fn now() -> f64 {
@@ -261,13 +228,9 @@ pub(crate) fn now() -> f64 {
     clippy::cast_precision_loss
 )]
 mod tests {
-    use super::{per_core, present, seed_object, split_temperature, Counters};
-    use crate::data::POINTS as SEED_POINTS;
-    use crate::dirs::Dirs;
-    use crate::json::{dumps, object, Object, Value};
-    use crate::scratch::Scratch;
+    use super::{per_core, split_temperature, Counters};
+    use crate::json::Value;
     use crate::sources::cpu;
-    use std::fs;
 
     fn counters(timestamp: f64, cores: &[(i64, i64)]) -> Counters {
         Counters {
@@ -312,89 +275,5 @@ mod tests {
             split_temperature(Some((68.75, "k10temp Tctl".to_string()))),
             (Some(68.75), Some("k10temp Tctl".to_string()))
         );
-    }
-
-    #[test]
-    fn a_series_is_only_republished_when_it_is_a_non_empty_list() {
-        let state = object! {
-            "history" => Value::List(vec![Value::Float(1.0)]),
-            "history2" => Value::List(vec![]),
-            "device" => Value::str("nvme0n1"),
-        };
-        assert_eq!(
-            present(&state, "history"),
-            Some(Value::List(vec![Value::Float(1.0)]))
-        );
-        assert_eq!(present(&state, "history2"), None);
-        assert_eq!(present(&state, "device"), None);
-        assert_eq!(present(&state, "missing"), None);
-    }
-
-    #[test]
-    fn a_seed_names_the_second_series_after_what_it_is() {
-        let scratch = Scratch::new("seed");
-        let dirs = Dirs::scratch(scratch.path());
-        fs::create_dir_all(&dirs.state).expect("mkdir");
-        fs::write(
-            dirs.state_file("network"),
-            r#"{"history": [1.0], "history2": [2.0]}"#,
-        )
-        .expect("write");
-        fs::write(
-            dirs.state_file("gpu"),
-            r#"{"history": [3.0], "history2": [4.0]}"#,
-        )
-        .expect("write");
-
-        let rendered = dumps(&seed_object(&dirs));
-        assert!(
-            rendered.contains(r#""network": [1.0], "network_up": [2.0]"#),
-            "{rendered}"
-        );
-        assert!(
-            rendered.contains(r#""gpu": [3.0], "gpu_vram": [4.0]"#),
-            "{rendered}"
-        );
-    }
-
-    #[test]
-    fn a_seed_from_an_empty_state_directory_is_an_empty_seed() {
-        let scratch = Scratch::new("seed-empty");
-        let dirs = Dirs::scratch(scratch.path());
-        let rendered = dumps(&seed_object(&dirs));
-        assert!(rendered.contains(r#""seed": {}"#), "{rendered}");
-        assert!(rendered.starts_with(r#"{"ts": "#), "{rendered}");
-    }
-
-    #[test]
-    fn the_seed_carries_a_full_bar_history_when_there_is_one() {
-        let scratch = Scratch::new("seed-full");
-        let dirs = Dirs::scratch(scratch.path());
-        fs::create_dir_all(&dirs.state).expect("mkdir");
-        let history = Value::List(vec![Value::Float(5.0); SEED_POINTS]);
-        let state = object! { "history" => history };
-        fs::write(dirs.state_file("cpu"), dumps(&Value::Object(state))).expect("write");
-
-        let Value::Object(top) = seed_object(&dirs) else {
-            panic!("a seed is an object");
-        };
-        let Some(Value::Object(seed)) = top.get("seed") else {
-            panic!("a seed carries a seed");
-        };
-        let cpu = seed
-            .get("cpu")
-            .and_then(Value::as_list)
-            .expect("cpu series");
-        assert_eq!(cpu.len(), SEED_POINTS);
-    }
-
-    #[test]
-    fn an_unreadable_state_file_simply_contributes_nothing() {
-        let scratch = Scratch::new("seed-broken");
-        let dirs = Dirs::scratch(scratch.path());
-        fs::create_dir_all(&dirs.state).expect("mkdir");
-        fs::write(dirs.state_file("cpu"), "not json").expect("write");
-        assert!(dumps(&seed_object(&dirs)).contains(r#""seed": {}"#));
-        assert_eq!(Object::new(), Object::new());
     }
 }

@@ -67,8 +67,9 @@ use crate::schema::coerce::{
 };
 use crate::schema::defaults::{DefaultsError, MissingDefault};
 use crate::schema::enums::{
-    AccelProfile, AccentColor, BarBackground, CornerRadius, DateFormat, FirstDayOfWeek, GlassBlur,
-    GlassMode, SearchEngine, ThemeMode, TimeFormat, WallpaperFit, WallpaperSource, WorkspaceMode,
+    AccelProfile, AccentColor, BarBackground, BarPosition, CornerRadius, DateFormat,
+    FirstDayOfWeek, GlassBlur, GlassMode, SearchEngine, ThemeMode, TimeFormat, WallpaperFit,
+    WallpaperSource, WorkspaceMode,
 };
 use crate::schema::macros::preferences;
 use crate::schema::newtypes::{ClockTime, HexColor};
@@ -197,17 +198,14 @@ preferences! {
         GlassHighlight = glass_highlight: RangedFloat<UnitInterval> => Glass;
     }
 
-    /// The menu bar. Two routes out, and the split is the one thing worth
-    /// reading twice: `bar_style` reaches the *stylesheet* only, and
-    /// `bar_widgets` reaches the *module list* only. They are separate files
-    /// with separate writers -- one writer per fragment -- so a key on the
-    /// wrong route would silently rewrite the file that does not hold it.
+    /// The menu bar. Two routes out, and both end at the same republished
+    /// layout marker -- the split survives because it says what a key *means*:
+    /// a `BarStyle` key shapes the bar's chrome, a `BarWidgets` key decides
+    /// what is in it, and the shell reads the whole document either way.
     Bar = bar {
-        /// px, and the range is what a bar can be: below thirty the workspace
-        /// dots and the icon trio stop fitting, above sixty it is a panel
-        /// rather than a bar. The metric strips are sized from this rather
-        /// than from a preference of their own, so a taller bar draws taller
-        /// graphs with nothing to keep in step.
+        /// px on the bar's thin axis, and the range is what a bar can be:
+        /// below thirty the workspace dots and the widget icons stop fitting,
+        /// above sixty it is a panel rather than a bar.
         BarHeight = height: RangedInt<30, 60> => BarWidgets;
         /// A multiplier over the shipped spacing table. One is that spacing
         /// exactly, two is as loose as the bar gets before the right side runs
@@ -217,26 +215,25 @@ preferences! {
         /// From the same two names the stylesheet's alpha is written from, so
         /// the offered names and what is drawn for them cannot come apart.
         BarBackground = background: BarBackground => BarStyle;
-        /// One switch per metric strip, all on the same route: each one adds
-        /// or drops a module, and the list is published whole. The three that
-        /// are on by default are the three every machine has; temperature,
-        /// disk and GPU are off because each depends on hardware
-        /// garage-metrics may find nothing for, and a strip that draws a flat
-        /// line is worse than no strip.
-        MonitorCpu = monitor_cpu: bool => BarWidgets;
-        MonitorMemory = monitor_memory: bool => BarWidgets;
-        MonitorNetwork = monitor_network: bool => BarWidgets;
-        MonitorTemp = monitor_temp: bool => BarWidgets;
-        MonitorDisk = monitor_disk: bool => BarWidgets;
-        MonitorGpu = monitor_gpu: bool => BarWidgets;
-        /// On by default and safe to be: garage-ai-usage prints an empty text
-        /// when the tokscale CLI is absent, and the module carries
-        /// hide-empty-text, so a machine without it shows nothing rather than
-        /// an empty box.
-        AiUsage = ai_usage: bool => BarWidgets;
-        /// The centre of the bar, which is the only thing in it. The media
-        /// readout also hides itself when no player is running.
-        MediaPlayer = media_player: bool => BarWidgets;
+        /// Which screen edge the bar docks to. The drag gesture ends in a
+        /// `set` on this same key, so a drop and a typed command cannot
+        /// disagree about where the bar is.
+        BarPosition = position: BarPosition => BarStyle;
+        /// The three rails, one extension id per line. The newline-separated
+        /// lists stay scalars because this schema's leaves deliberately
+        /// exclude list values (the `indexing.directories` precedent), and the
+        /// ids are deliberately unchecked: which extensions exist is the
+        /// shell registry's to know, so an id it cannot find is skipped there
+        /// rather than refused here -- a third-party widget needs no schema
+        /// change.
+        BarWidgetsLeft = widgets_left: String => BarWidgets;
+        BarWidgetsCenter = widgets_center: String => BarWidgets;
+        BarWidgetsRight = widgets_right: String => BarWidgets;
+        /// Past this many widgets a rail folds the excess behind a chevron.
+        /// Two is the least a fold can leave visible, sixteen is more than any
+        /// rail can draw; the default keeps the shipped right rail from ever
+        /// folding.
+        BarMaxGroupWidgets = max_group_widgets: RangedInt<2, 16> => BarWidgets;
     }
 
     /// The two settings that are about the session rather than about a surface.
@@ -314,10 +311,6 @@ preferences! {
         /// because the two modes answer different questions and switching
         /// between them must not rewrite the other one's answer.
         WorkspacesSharedCount = shared_count: RangedInt<1, 10> => Workspaces;
-        /// Only the bar is affected -- the workspaces, their rules and their
-        /// keys are untouched -- so this is the one workspaces key that does
-        /// not disturb the compositor.
-        WorkspacesIndicator = indicator: bool => WorkspaceIndicator;
     }
 
     /// Language, clock and calendar, which all reach the bar clock.
@@ -403,7 +396,7 @@ mod tests {
             assert_eq!(PreferenceKey::from_str(&dotted).unwrap(), key);
             assert_eq!(dotted, format!("{}.{}", key.section(), key.name()));
         }
-        assert_eq!(PreferenceKey::ALL.len(), 66);
+        assert_eq!(PreferenceKey::ALL.len(), 62);
         assert!(PreferenceKey::from_str("appearance.nonesuch").is_err());
         assert!(PreferenceKey::from_str("nonesuch.accent_color").is_err());
         assert!(PreferenceKey::from_str("accent_color").is_err());

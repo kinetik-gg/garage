@@ -108,7 +108,6 @@ version = "0.1.0"
 dependencies = [
  "garage-core",
  "serde_json",
- "thiserror",
 ]
 
 [[package]]
@@ -155,7 +154,6 @@ name = "garage-metrics"
 version = "0.1.0"
 dependencies = [
  "garage-core",
- "rustix",
  "thiserror",
 ]
 

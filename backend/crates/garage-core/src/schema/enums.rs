@@ -1,8 +1,8 @@
-//! The fifteen string-valued preference enums, parsed once at the boundary.
+//! The sixteen string-valued preference enums, parsed once at the boundary.
 //!
 //! Each mirrors one of the Python source's member sets or tuples (garage's
 //! `ACCENTS`, `GLASS_BLUR_LEVELS`, `SEARCH_ENGINES`, `WORKSPACE_MODES`,
-//! `WALLPAPER_FITS`, `CORNER_RADII`, `BAR_BACKGROUNDS`, `TIME_FORMATS`,
+//! `WALLPAPER_FITS`, `CORNER_RADII`, `BAR_BACKGROUNDS`, bar positions, `TIME_FORMATS`,
 //! `DATE_FORMATS`, `FIRST_WEEKDAYS`, `THEME_TOOLKITS`'s two keys, and the
 //! inline `"members"` sets on `theme_mode`, `glass_mode`, the wallpaper
 //! sources and `input.accel_profile`) plus what `PREFERENCE_SCHEMA` allows
@@ -42,10 +42,10 @@ impl ParseEnumError {
     }
 }
 
-/// Generates the boilerplate every one of the fifteen enums shares: the
+/// Generates the boilerplate every one of the sixteen enums shares: the
 /// derive set, `ALL`, `as_str`, `FromStr` and `Display`. Kept as one macro
-/// rather than fifteen hand-written copies so the file stays under the
-/// per-file line budget with fifteen members in it.
+/// rather than sixteen hand-written copies so the file stays under the
+/// per-file line budget with sixteen members in it.
 macro_rules! string_enum {
     (
         $(#[$meta:meta])*
@@ -200,6 +200,18 @@ string_enum! {
     pub enum BarBackground {
         Blurred = "blurred",
         Transparent = "transparent",
+    }
+}
+
+string_enum! {
+    // The four edges a layer surface can anchor to. An enum rather than free
+    // text because the shell's per-edge anchors, the drag overlay's drop zones
+    // and this member set have to be the same four by construction.
+    pub enum BarPosition {
+        Top = "top",
+        Bottom = "bottom",
+        Left = "left",
+        Right = "right",
     }
 }
 
@@ -378,9 +390,9 @@ impl FirstDayOfWeek {
 #[cfg(test)]
 mod tests {
     use super::{
-        AccelProfile, AccentColor, BarBackground, CornerRadius, DateFormat, FirstDayOfWeek,
-        GlassBlur, GlassMode, Scheme, SearchEngine, ThemeMode, TimeFormat, WallpaperFit,
-        WallpaperSource, WorkspaceMode,
+        AccelProfile, AccentColor, BarBackground, BarPosition, CornerRadius, DateFormat,
+        FirstDayOfWeek, GlassBlur, GlassMode, Scheme, SearchEngine, ThemeMode, TimeFormat,
+        WallpaperFit, WallpaperSource, WorkspaceMode,
     };
 
     macro_rules! round_trip_test {
@@ -407,6 +419,7 @@ mod tests {
     round_trip_test!(accent_color_round_trips, AccentColor);
     round_trip_test!(search_engine_round_trips, SearchEngine);
     round_trip_test!(bar_background_round_trips, BarBackground);
+    round_trip_test!(bar_position_round_trips, BarPosition);
     round_trip_test!(accel_profile_round_trips, AccelProfile);
     round_trip_test!(workspace_mode_round_trips, WorkspaceMode);
     round_trip_test!(time_format_round_trips, TimeFormat);

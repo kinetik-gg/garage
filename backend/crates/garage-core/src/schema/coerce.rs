@@ -12,8 +12,9 @@
 //! to the departures document and to the notes.
 
 use crate::schema::enums::{
-    AccelProfile, AccentColor, BarBackground, CornerRadius, DateFormat, FirstDayOfWeek, GlassBlur,
-    GlassMode, SearchEngine, ThemeMode, TimeFormat, WallpaperFit, WallpaperSource, WorkspaceMode,
+    AccelProfile, AccentColor, BarBackground, BarPosition, CornerRadius, DateFormat,
+    FirstDayOfWeek, GlassBlur, GlassMode, SearchEngine, ThemeMode, TimeFormat, WallpaperFit,
+    WallpaperSource, WorkspaceMode,
 };
 use crate::schema::newtypes::{ClockTime, HexColor};
 use crate::schema::notes::{py_str_toml, Notes};
@@ -263,6 +264,7 @@ enum_kind!(
     AccelProfile,
     AccentColor,
     BarBackground,
+    BarPosition,
     CornerRadius,
     DateFormat,
     FirstDayOfWeek,

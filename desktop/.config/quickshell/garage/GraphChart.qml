@@ -1,8 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// One time-series strip: the graph the waybar activity modules draw, moved into
-// the shell and given room.
+// One time-series strip, shared by the shell's metrics service and System panel.
 //
 // The geometry is a port of garage-metrics' render_widget -- the same constants,
 // because the same collector feeds both surfaces and a graph that disagreed with

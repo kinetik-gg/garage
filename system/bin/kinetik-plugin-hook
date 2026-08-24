@@ -43,24 +43,23 @@
 #      Deferring it out of the transaction (hook does `systemctl start
 #      --no-block`) would fix the blocking half, but not the next two.
 #
-#   2. Glass has no published upstream yet. The only source on the machine is
-#      the user's own working tree at ~/repositories/glass. A root build of a
+#   2. Garage deploys Glass from the user's working tree at
+#      ~/repositories/glass. A root build of a
 #      CMake project living in a user-writable directory is a local privilege
 #      escalation: anything running as the desktop user can edit CMakeLists.txt
-#      and have root execute it on the next `pacman -Syu`. A root-owned clone
-#      cannot be seeded without a URL to clone from, so (B) reduces to exactly
-#      that escalation. hyprexpo alone does have a public URL, but rebuilding
-#      only hyprexpo leaves the interesting plugin broken and adds a second
+#      and have root execute it on the next `pacman -Syu`. The current deploy
+#      path therefore cannot seed (B) from that checkout. Rebuilding only
+#      hyprexpo would leave the interesting plugin broken and add a second
 #      pipeline to keep in step.
 #
 #   3. A build wants the network (`git fetch` at the pin) and a pacman
 #      transaction is precisely where the network may have just been used up or
 #      may not exist at all.
 #
-#   (B) becomes worth revisiting once Glass is published: a root-owned clone in
-#   /var/cache/kinetik verified against the pinned object id, built by a
-#   separate oneshot system unit the hook merely nudges, would then be both
-#   unattended and safe. Until then, honest is better than magic.
+#   (B) becomes worth revisiting with a root-owned clone in /var/cache/kinetik
+#   verified against the pinned object id and built by a separate oneshot system
+#   unit the hook merely nudges. That would be unattended and safe, but still
+#   carries the latency and offline constraints above.
 #
 # The user-visible cost of (A) is one command with one sudo prompt after an
 # upgrade that moved the ABI. The two things that make that cost bearable are
@@ -130,7 +129,7 @@ act() {
 }
 
 # Nothing to look after: this machine has never deployed a plugin. The common
-# case on a Garage install, since Glass's source is not published yet.
+# case on a Garage install whose optional Glass checkout is absent.
 [ -d "$plugin_root" ] || exit 0
 
 # ---------------------------------------------------------------------------

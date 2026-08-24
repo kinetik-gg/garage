@@ -42,19 +42,9 @@ packages and enabled services are not reverted.
 
 ## Installing
 
-### The one-liner
-
-```sh
-sh -c "$(curl -fsSL https://get.kinetik.gg/garage)"
-```
-
-**Not live yet.** Garage's repositories are local-only: `get.kinetik.gg` publishes
-nothing, and the `github.com/kinetik-gg` URLs in `install.sh` and the plugin deploy
-script are dormant placeholders. Use the git path below until they are published.
-
 ### From a clone
 
-Equally supported, and what the one-liner does for you:
+Clone the public repository and run the bootstrap from a bare TTY:
 
 ```sh
 git clone https://github.com/kinetik-gg/garage.git ~/repositories/garage
@@ -62,10 +52,10 @@ cd ~/repositories/garage
 ./bootstrap.sh
 ```
 
-`install.sh` is what the one-liner fetches: it checks that this is Arch, that you
+`install.sh` is the remote-entry wrapper: it checks that this is Arch, that you
 are not root, and that `sudo` and `git` are available, clones (or reuses)
 `~/repositories/garage`, and hands over to `./bootstrap.sh` with its arguments
-passed through — so `sh -c "$(curl -fsSL …)" -- --dry-run` works.
+passed through.
 
 ### Looking before you leap
 
@@ -84,15 +74,15 @@ without stopping on it, and checks package names against the current sync databa
 | --- | --- | --- |
 | 1 | **Refuses to continue** unless the machine is fresh (above) or `GARAGE_FORCE=1`. | `install/01-freshness-gate.sh` |
 | 2 | **Upgrades the system** (`pacman -Syu`), then checks its whole package list against the repositories, reporting every missing name at once rather than failing partway through an install. | `install/02-package-database.sh` |
-| 3 | **Installs the package set**: Hyprland and its portals, Quickshell, Kitty, Fish, Rofi, SwayOSD, PipeWire, Thunar and its file integrations, the GNOME utility apps it uses, fonts, and the Node/Rust/C++ toolchains — plus NVIDIA packages when NVIDIA hardware is detected. | `install/03-packages.sh` |
+| 3 | **Installs the package set**: Hyprland and its portals, Quickshell, Kitty, Fish, PipeWire, brightness control, clipboard history, Thunar and its file integrations, the GNOME utility apps it uses, fonts, and the Node/Rust/C++ toolchains — plus NVIDIA packages when NVIDIA hardware is detected. | `install/03-packages.sh` |
 | 4 | **Installs the sign-in surface, then enables system services.** The complete root-owned SDDM theme is staged and atomically published before NetworkManager, Bluetooth, Docker, and SDDM are enabled, so the reboot lands in the Garage login screen. Sets `fish` as your login shell. | `install/04-system-services.sh` |
 | 5 | **Creates the home directory layout** (`~/Documents`, `~/repositories`, the rest of the XDG set). | `install/05-home-layout.sh` |
 | 6 | **Clears the way, then links the configuration.** It moves pre-existing real files at the paths `stow` will claim to `~/.garage-backup/<timestamp>/`, deletes stale links from a checkout that has since moved, then runs `stow --restow --no-folding desktop`; a remaining conflict stops the run with the list rather than leaving your home half-linked. The linked wallpaper set is the 4K production output under `desktop/Wallpaper/`; originals and provenance stay outside Stow under `assets/wallpapers/`. `fc-cache` follows, so the bundled fonts (Phosphor, Plus Jakarta Sans, Geist Mono, linked into `~/.local/share/fonts` by the same pass) are ready at first login. It seeds Hyprlock's all-monitor fallback and builds the Thunar-only GTK module. | `install/06-link-config.sh` |
 | 7 | **Selects the stable Rust toolchain, then builds Garage's authentication modal** from the checksum-pinned `hyprpolkitagent` 0.1.3 source into the user's private prefix. | `install/07-toolchain.sh` |
 | 8 | **Builds and installs the Rust backend.** One release build produces `garage`, `garage-metrics`, `garage-file-index`, `garage-ai-usage`, and `garage-bar-probe`; the executable copies land in `~/.local/lib/garage/bin`, with command symlinks under `~/.local/bin`. | `install/08-backend.sh` |
-| 9 | **Writes the per-user generated files**: `~/.config/swayosd/config.toml`, `~/.config/gtk-3.0/bookmarks`, Thunar's first-run xfconf layout. Mutable or embedding an absolute `$HOME`, they are real files rather than links, so changing columns, geometry, bookmarks, or the OSD does not dirty Garage. | `install/09-per-user-files.sh` |
+| 9 | **Writes the per-user generated files**: `~/.config/gtk-3.0/bookmarks` and Thunar's first-run xfconf layout. Mutable or embedding an absolute `$HOME`, they are real files rather than links, so changing columns, geometry, or bookmarks does not dirty Garage. | `install/09-per-user-files.sh` |
 | 10 | **Picks a window material your GPU can afford** (below); with a discrete GPU it writes nothing at all. | `install/10-window-material.sh` |
-| 11 | **Enables the per-user services** — hypridle, hyprpaper, hyprsunset, the polkit agent, SwayOSD, cliphist, xsettingsd, the Garage shell, background file indexing, the plugin ABI check, and the theme and Night Shift timers — and masks `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's notification daemon. Nothing is *started*: each unit is wanted by `graphical-session.target` or `timers.target` and comes up at your first graphical login. | `install/11-user-services.sh` |
+| 11 | **Enables the per-user services** — hypridle, hyprpaper, hyprsunset, the polkit agent, cliphist, xsettingsd, the Garage shell, background file indexing, the plugin ABI check, and the theme and Night Shift timers — and masks `dunst.service` so D-Bus cannot activate it ahead of the Garage shell's notification daemon. Nothing is *started*: each unit is wanted by `graphical-session.target` or `timers.target` and comes up at your first graphical login. | `install/11-user-services.sh` |
 | 12 | **Installs the Pure Fish prompt** at a pinned tag. | `install/12-shell-prompt.sh` |
 | 13 | **Installs the pacman hooks**: the plugin ABI hook, the root script it runs, and the pinned plugin commits (below), plus the reconciliation stamp hook. The ABI machinery is installed always, even with no plugin source present: it is the part that notices a broken plugin, so it must be in place before the upgrade that breaks one. | `install/13-pacman-hooks.sh` |
 | 14 | **Deploys the optional Hyprland plugins**, if their source is present. | `install/14-plugins.sh` |
@@ -159,9 +149,9 @@ returning to a Hyprland you have used before needs no rebuild at all.
 `~/repositories/glass`, a directory you can write to — anything running as you
 could edit the build files and have root run them at the next upgrade; a
 passwordless `sudo` rule has the same hole ([ARCHITECTURE.md](ARCHITECTURE.md) §6
-owns this reasoning). Once Glass is published and a root-owned clone can be
-verified against its pinned commit, the rebuild moves into a system service; until
-then it is one command, once, after an upgrade that moved the ABI.
+owns this reasoning). Moving the rebuild into a system service would first require
+a root-owned source checkout verified against its pinned commit; until then it is
+one command, once, after an upgrade that moved the ABI.
 
 ### The pinned commits
 
@@ -199,9 +189,8 @@ The whole lifecycle in one command, deliberately **bootstrap plus the lifecycle
 work bootstrap cannot do**:
 
 1. **Pull the checkout.** Fast-forward only. Skipped with a note when the branch
-   has no upstream — every install today (see [The one-liner](#the-one-liner)) —
-   and when the working tree has local changes, because merging across those is the
-   one operation that loses work.
+   has no upstream or when the working tree has local changes, because merging
+   across those is the one operation that loses work.
 2. **Check room and preserve the host.** Update refuses a real run below its
    free-space floor, then makes the complete `pre-update` copy described above.
    A dry run crosses neither write boundary.
@@ -254,8 +243,7 @@ out and back in.
 
 | Gap | Detail |
 | --- | --- |
-| **The one-liner is not live, and `garage update` cannot pull** | The repositories are local-only (see [The one-liner](#the-one-liner)); with no upstream, update says so and converges the machine on the local checkout. |
-| **The Glass plugin source is not available** | With no `~/repositories/glass` checkout the bootstrap warns and skips the plugin deploy — `hyprexpo` with it, since one pass handles both. Hyprland's config guards both loads, so the desktop comes up without them: you lose the glass material and `hyprexpo`, nothing else. |
+| **The Glass plugin source checkout is optional** | With no `~/repositories/glass` checkout the bootstrap warns and skips the plugin deploy — `hyprexpo` with it, since one pass handles both. Hyprland's config guards both loads, so the desktop comes up without them: you lose the glass material and `hyprexpo`, nothing else. |
 | **The GPU verdict is a heuristic** | It reads PCI vendor ids and device names: NVIDIA is always discrete, Intel integrated unless it names itself Arc, an AMD device discrete when it carries a card model number or a known GPU family name. A new AMD part breaking that pattern would be misclassified — one setting either way, not a broken install. Virtual adapters (virtio, QXL) count as integrated, deliberately: software rendering is the last place to run a full-framebuffer blur. |
 | **The bootstrap writes `preferences.toml` directly for the GPU gate** | Every other writer of that file is `garage` itself, as it should be, but the CLI cannot write a preference without also pushing it into a running compositor and there is none during the bootstrap — so this write goes around it, keeps to two keys, and is marked in the source for the render/apply split to remove. |
 | **The plugin ABI hook watches `hyprland` only** | A machine on `hyprland-git` is on its own; the hook will not fire for it. |

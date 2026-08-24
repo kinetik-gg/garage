@@ -8,7 +8,6 @@ hl.on("hyprland.start", function ()
     -- Keep session infrastructure supervised by systemd. The bar lives in
     -- garage-shell now; there is no separate bar unit to start.
     hl.exec_cmd("systemctl --user start garage-shell.service")
-    hl.exec_cmd("systemctl --user start swayosd.service")
     hl.exec_cmd("systemctl --user start hypridle.service")
     hl.exec_cmd("systemctl --user start hyprsunset.service garage-night-shift.timer")
     hl.exec_cmd("systemctl --user start cliphist.service")

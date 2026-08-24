@@ -1,0 +1,12 @@
+{
+  "id": "notifications",
+  "name": "Notifications",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "bell",
+    "surface": "notifications",
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

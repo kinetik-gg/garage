@@ -2,7 +2,7 @@
 //!
 //! Two files, two different staleness policies -- see each function's docs for why. Both
 //! read and write through `serde_json` directly: unlike the two payloads
-//! [`crate::pyjson`] formats for stdout, nothing outside this process ever looks at these
+//! [`garage_core::pyjson`] formats for stdout, nothing outside this process ever looks at these
 //! bytes, so there is no reason to hold them to Python's `ensure_ascii` formatting -- only
 //! to round-trip faithfully, which plain `serde_json` already does (with the
 //! `preserve_order` feature, so a passed-through `subscriptions` array keeps tokscale's own

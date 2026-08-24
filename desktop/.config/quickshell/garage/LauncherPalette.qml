@@ -18,10 +18,23 @@ import "LauncherExtras.js" as LauncherExtras
 // implement hyprland-focus-grab -- the grab that used to be at the foot of this
 // file never fired once -- so the launcher could only be closed from the
 // keyboard until the catcher was added.
-PanelWindow {
+PaletteSurface {
     id: launcher
+    surfaceNamespace: "garage-launcher-host"
+    escapeEnabled: false
+    // The launcher is a monitor-level affordance, not a popover belonging to
+    // the bar edge that opened it. Keep it horizontally centred and place its
+    // top edge one third down the selected monitor.
+    edge: "top"
+    targetAnchor: -1
+    // A top-docked bar contributes an exclusive zone before layer-shell applies
+    // this margin. Remove that zone so the launcher still lands at the same
+    // monitor-relative coordinate on every bar edge.
+    surfaceOffset: effectiveScreen ? Math.max(Theme.windowGutter,
+        Math.round(effectiveScreen.height / 3)
+            - (BarState.position === "top" ? BarState.thickness : 0))
+        : Theme.windowGutter
 
-    signal dismissed()
     signal sessionActionRequested(string action)
     signal shellActionRequested(string action)
 
@@ -31,10 +44,13 @@ PanelWindow {
     // as the pointer crosses a screen edge, and an open launcher that jumps to
     // another monitor when the cursor drifts is the bug this file is fixing
     // wearing a different hat.
-    required property string targetScreenName
-
     property string query: ""
     property int selected: 0
+    // "clip" is the dedicated Super+Shift+V source. The default mode retains
+    // every existing launcher source and also recognises an explicit `clip`
+    // query; only the dedicated mode interprets the whole field as a filter.
+    property string initialMode: "default"
+    readonly property bool clipboardMode: initialMode === "clip"
     // Desktop id of the browser to hand web searches to. Empty means none was
     // found, which the launcher has to say rather than silently doing nothing.
     property string browserId: ""
@@ -52,36 +68,6 @@ PanelWindow {
     readonly property real contentMargin: 14
     readonly property real listGap: 8
 
-    // Where the launcher opens, every time. Both are held here rather than left
-    // to the compositor, so the two surfaces that make up the launcher share
-    // exactly one origin and the list grows downward from it.
-    // A third of the way down the output, measured from the top of the usable
-    // area rather than from the top of the screen -- an overlay surface already
-    // begins below Waybar's exclusive zone, so a margin here is measured from
-    // there. The field is what sits at this height: the list grows downward
-    // underneath it and never moves it.
-    readonly property real spawnTop: {
-        const target = launcher.targetScreen();
-        const available = target ? target.height : 1080;
-        return Math.max(Theme.windowGutter, Math.round(available / 3));
-    }
-    readonly property real spawnLeft: {
-        const target = launcher.targetScreen();
-        const available = target ? target.width : 1920;
-        return Math.max(Theme.windowGutter,
-                        (available - launcher.implicitWidth) / 2);
-    }
-
-    function targetScreen() {
-        for (let index = 0; index < Quickshell.screens.length; ++index) {
-            const candidate = Quickshell.screens[index];
-            if (candidate.name === launcher.targetScreenName)
-                return candidate;
-        }
-        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
-    }
-
-    screen: launcher.targetScreen()
     implicitWidth: 640
 
     // Published once after the model and its parallel action array agree. The
@@ -115,40 +101,15 @@ PanelWindow {
         ? Math.max(launcher.bodyHeight, 150 + launcher.contentMargin * 2)
         : launcher.bodyHeight
     implicitHeight: launcher.surfaceHeight
-    color: "transparent"
-    focusable: true
-    aboveWindows: true
-    exclusiveZone: 0
-    surfaceFormat.opaque: false
     mask: Region { item: panel }
 
-    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
-    PanelMotion {
-        id: motion
-        restingTop: launcher.spawnTop
-        onFinished: launcher.dismissed()
-    }
-
     function requestDismissal() {
-        motion.dismiss();
+        launcher.dismissSurface();
     }
-
-    anchors {
-        top: true
-        left: true
-    }
-
-    // Clamped into the output on both axes, so a drag cannot put the field
-    // somewhere it can be typed into but not seen.
-    margins.left: launcher.spawnLeft
-    margins.top: motion.surfaceTop
-
-    WlrLayershell.layer: WlrLayer.Overlay
     // The fixed host is deliberately not a glass namespace. The content-sized
     // garage-launcher-glass surface below owns the material; keeping the two
     // names distinct also lets an older, already-running shell retain its legacy
     // garage-launcher glass rule while this file waits for a safe reload.
-    WlrLayershell.namespace: "garage-launcher-host"
     // OnDemand, not Exclusive. An exclusive layer keyboard is held at the
     // protocol level no matter where the pointer goes, which takes every
     // keystroke in the session for as long as the launcher is up. On demand is
@@ -156,7 +117,6 @@ PanelWindow {
     // is what makes the query field typeable the moment the bind is pressed and
     // Escape heard without a click first. Leave this alone -- typing here works
     // today, and Exclusive is what it was before.
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     // Kinetik Glass draws against a layer surface's complete logical box; it
     // cannot use the alpha of this fixed-height host to discover the shorter
@@ -166,7 +126,7 @@ PanelWindow {
     PanelWindow {
         id: glassSurface
 
-        screen: launcher.targetScreen()
+        screen: launcher.effectiveScreen
         implicitWidth: launcher.implicitWidth
         implicitHeight: launcher.contentHeight
         visible: launcher.visible
@@ -177,13 +137,25 @@ PanelWindow {
         surfaceFormat.opaque: false
         mask: Region {}
 
-        anchors {
-            top: true
-            left: true
-        }
+        anchors.top: launcher.edge === "top" || launcher.edge === "left"
+            || launcher.edge === "right"
+        anchors.bottom: launcher.edge === "bottom"
+        anchors.left: launcher.edge === "left" || launcher.edge === "top"
+            || launcher.edge === "bottom"
+        anchors.right: launcher.edge === "right"
 
-        margins.left: launcher.spawnLeft
-        margins.top: motion.surfaceTop
+        margins.top: launcher.edge === "top"
+            ? Math.round(launcher.animatedMargin)
+            : (launcher.edge === "left" || launcher.edge === "right"
+                ? launcher.longAxisMargin() : 0)
+        margins.bottom: launcher.edge === "bottom"
+            ? Math.round(launcher.animatedMargin) : 0
+        margins.left: launcher.edge === "left"
+            ? Math.round(launcher.animatedMargin)
+            : (launcher.edge === "top" || launcher.edge === "bottom"
+                ? launcher.longAxisMargin() : 0)
+        margins.right: launcher.edge === "right"
+            ? Math.round(launcher.animatedMargin) : 0
 
         // Top keeps the material below the launcher's interactive Overlay
         // surface. The full-screen dismiss catcher is also transparent, so it
@@ -256,7 +228,8 @@ PanelWindow {
         const needle = text.toLowerCase();
 
         const extras = extraSources.rowsFor(text, NotificationDaemon.dnd,
-            launcher.caffeine, Theme.dark, launcher.maxRows);
+            launcher.caffeine, Theme.dark, launcher.maxRows,
+            launcher.clipboardMode);
         for (const row of extras.rows)
             rows.push(row);
 
@@ -346,7 +319,7 @@ PanelWindow {
             value: row.value, action: row.action, command: row.command,
             pid: row.pid, target: row.target, currency: row.currency,
             path: row.path, durationMs: row.durationMs, label: row.label,
-            timerId: row.timerId
+            timerId: row.timerId, clipId: row.clipId
         }));
 
         // Rewrite every preallocated slot in place. Slots beyond the current
@@ -385,7 +358,8 @@ PanelWindow {
     function scheduleRebuild() {
         geometryCommit.stop();
         launcher.pendingRowCount = launcher.rowCount;
-        extraSources.prepareFiles(launcher.query);
+        if (!launcher.clipboardMode)
+            extraSources.prepareFiles(launcher.query);
         rebuildTimer.restart();
     }
 
@@ -425,8 +399,15 @@ PanelWindow {
 
     onQueryChanged: scheduleRebuild()
     onBrowserResolvedChanged: scheduleRebuild()
+    onInitialModeChanged: {
+        launcher.query = "";
+        noBrowser.visible = false;
+        launcher.scheduleRebuild();
+        input.forceActiveFocus();
+    }
     Component.onCompleted: {
-        extraSources.prepareFiles(query);
+        if (!launcher.clipboardMode)
+            extraSources.prepareFiles(query);
         rebuild();
         // The compositor hands the layer surface the keyboard as it maps; this
         // is what points it at the search field rather than at the window, so
@@ -450,7 +431,10 @@ PanelWindow {
             launcher.shellActionRequested(String(row.action));
             return;
         } else if (row.kind.indexOf("media-") === 0) {
-            Quickshell.execDetached(row.command);
+            if (row.command)
+                Quickshell.execDetached(row.command);
+            else
+                MediaController.dispatch(String(row.action));
         } else if (row.kind.indexOf("clock-") === 0) {
             TimerService.activate(row);
         } else if (row.kind === "file" || row.kind === "directory") {
@@ -461,6 +445,18 @@ PanelWindow {
             // uwsm -T resolves the terminal published by System Preferences;
             // the validated target remains one argv value all the way to ssh.
             Quickshell.execDetached(["uwsm", "app", "-T", "ssh", "--", row.target]);
+        } else if (row.kind === "clip") {
+            const clipId = String(row.clipId || "");
+            if (!/^[0-9]+$/.test(clipId))
+                return;
+            // The database id is the only interpolated value and is passed as
+            // a positional argument after numeric validation. The preview is
+            // never decoded by the shell. Keeping the pipe preserves images
+            // and arbitrary bytes instead of coercing everything through a
+            // QML string clipboard property.
+            Quickshell.execDetached(["sh", "-c",
+                "cliphist decode \"$1\" | wl-copy",
+                "garage-clipboard", clipId]);
         } else if (row.kind === "currency-error") {
             extraSources.retryCurrency(row.currency);
             return;
@@ -474,17 +470,18 @@ PanelWindow {
             Quickshell.execDetached(["xdg-open", row.kind === "url"
                 ? row.url : searchUrl(query.trim())]);
         }
-        launcher.dismissed();
+        launcher.requestDismissal();
     }
 
     ContinuousRectangle {
         id: panel
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: launcher.edge === "bottom" ? undefined : parent.top
+        anchors.bottom: launcher.edge === "bottom" ? parent.bottom : undefined
         height: launcher.contentHeight
         clip: true
-        opacity: motion.opacity
+        opacity: launcher.contentOpacity
         radius: Theme.cornerRadius
         power: Theme.cornerPower
         // Transparent under glass: glassSurface is directly beneath this host,
@@ -579,7 +576,9 @@ PanelWindow {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Search apps, commands, conversions, or the web"
+                        text: launcher.clipboardMode
+                            ? "Search clipboard history"
+                            : "Search apps, commands, conversions, or the web"
                         color: Theme.textDisabled
                         font: input.font
                         visible: input.text === ""
@@ -690,7 +689,7 @@ PanelWindow {
             if (noBrowser.visible)
                 noBrowser.visible = false;
             else
-                launcher.dismissed();
+                launcher.requestDismissal();
         }
     }
 }

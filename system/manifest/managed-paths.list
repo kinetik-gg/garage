@@ -59,13 +59,6 @@ generated .config/xsettingsd/xsettingsd.conf   xsettingsd
 generated .config/qt6ct/qt6ct.conf             qt6ct
 generated .config/qt6ct/colors/vanta.conf      qt6ct
 generated .config/qt6ct/colors/vanta-light.conf qt6ct
-generated .config/rofi/config.rasi             rofi
-generated .config/rofi/apple-dark.rasi         rofi
-generated .config/rofi/apple-light.rasi        rofi
-generated .config/waybar/style.css             waybar
-generated .config/swayosd/style.css            swayosd
-generated .config/swayosd/swayosd-dark.css     swayosd
-generated .config/swayosd/swayosd-light.css    swayosd
 generated .config/kitty/theme.conf             kitty
 generated .config/btop/themes/vanta.theme      btop
 generated .config/micro/settings.json          micro

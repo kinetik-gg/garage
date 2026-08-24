@@ -3,13 +3,13 @@ import QtQuick
 // The bar's tooltip bubble.
 //
 // Declared inside any bar module as a child -- it positions itself under its owner
-// and clamps to the window's edges -- and driven by the module's own hover state:
-// hovered changed to true calls show(), to false hides it. Opens downward, the way
-// every bar tooltip has always read.
+// and clamps along the window's long axis. It opens inward from whichever edge
+// owns the bar.
 Item {
     id: tip
 
     property string text: ""
+    property string edge: BarState.position
     // The module the tip describes; centred under this and shown below it.
     property Item owner: parent
 
@@ -38,13 +38,29 @@ Item {
         readonly property int gutter: BarState.scaled("tooltip")
 
         x: {
-            const centre = tip.owner.width / 2;
-            const raw = centre - width / 2 - tip.owner.x + tip.x;
+            if (tip.edge === "left")
+                return tip.owner.width + 4;
+            if (tip.edge === "right")
+                return -width - 4;
+            const scene = tip.owner.mapToItem(null, tip.owner.width / 2, 0);
+            const raw = scene.x - width / 2;
             const window_ = tip.owner.Window.window;
             const rightLimit = window_ ? window_.width - width - 4 : raw;
-            return Math.max(4, Math.min(raw, rightLimit)) - tip.x;
+            const clamped = Math.max(4, Math.min(raw, rightLimit));
+            return tip.mapFromItem(null, clamped, 0).x;
         }
-        y: tip.owner.height + 4 - tip.y
+        y: {
+            if (tip.edge === "top")
+                return tip.owner.height + 4;
+            if (tip.edge === "bottom")
+                return -height - 4;
+            const scene = tip.owner.mapToItem(null, 0, tip.owner.height / 2);
+            const raw = scene.y - height / 2;
+            const window_ = tip.owner.Window.window;
+            const bottomLimit = window_ ? window_.height - height - 4 : raw;
+            const clamped = Math.max(4, Math.min(raw, bottomLimit));
+            return tip.mapFromItem(null, 0, clamped).y;
+        }
 
         width: label.implicitWidth + gutter * 2
         height: label.implicitHeight + Math.round(gutter * 1.5)

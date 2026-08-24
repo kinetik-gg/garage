@@ -50,6 +50,7 @@ ContinuousRectangle {
             "media-stop": "icons/x.svg",
             "media-skip": "icons/skip-forward.svg",
             "media-mute": "icons/speaker-slash.svg",
+            "clip": "icons/selection.svg",
             "shell-settings": "icons/sliders.svg",
             "shell-dnd": "icons/bell.svg",
             "shell-night": "icons/moon.svg",

@@ -1,0 +1,12 @@
+{
+  "id": "tray",
+  "name": "System Tray",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "caret-down",
+    "inline": true,
+    "defaultAnchor": "right",
+    "vertical": "hide"
+  }
+}

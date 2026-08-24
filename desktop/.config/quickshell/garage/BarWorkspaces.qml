@@ -1,12 +1,10 @@
 import Quickshell
-import Quickshell.Hyprland
-import Quickshell.Io
 import QtQuick
 
 // The workspace indicator, drawn to the old indicator's own spec.
 //
-// Geometry and colour come from the deleted waybar stylesheet, via the spacing
-// table BarState carries: an idle dot is 6x6 at 45% of the foreground, hover
+// Geometry comes from the bar's typed spacing table: an idle dot is 6x6 at 45%
+// of the foreground, hover
 // raises the dot to 65% and paints a soft 8px-radius tint behind the button,
 // and the ACTIVE workspace is a 20x6 stadium at 95% -- a pill, not a dot. The
 // pill's width animates over 180ms; that is the only width in the row that
@@ -14,9 +12,9 @@ import QtQuick
 // right around -- the layout shift this indicator is forbidden to have. Hover
 // is colour-only.
 //
-// Data comes from `hyprctl -j workspaces` and `-j monitors`, the same source
-// the settings backend reads, re-run on a debounce after any Hyprland event
-// that could move a workspace or the focus. Quickshell's own Hyprland
+// Data comes from WorkspaceService, which reads `hyprctl -j workspaces` and
+// `-j monitors` once for the whole shell and projects the result by output.
+// Quickshell's own Hyprland
 // workspace model is a placeholder on this build -- every entry answers
 // id=-1, monitor=null even after an explicit refresh -- so the IPC JSON is
 // what the dots trust. Urgent dots are not drawn: urgency is per window and
@@ -26,10 +24,19 @@ Item {
 
     // The screen this bar instance sits on, handed in by the bar.
     property var barScreen: null
+    property var workspaceService: WorkspaceService
+    property bool vertical: false
     readonly property string screenName: barScreen ? barScreen.name : ""
 
-    property var entries: []
-    property int activeId: -1
+    readonly property int workspaceRevision: workspaceService.revision
+    readonly property var entries: {
+        const currentRevision = workspaces.workspaceRevision;
+        return workspaces.workspaceService.entriesFor(workspaces.screenName);
+    }
+    readonly property int activeId: {
+        const currentRevision = workspaces.workspaceRevision;
+        return workspaces.workspaceService.activeFor(workspaces.screenName);
+    }
 
     // Old spec: the dot itself, and the button box around it -- 6px of padding
     // each side is what the hover tint filled.
@@ -37,11 +44,13 @@ Item {
     readonly property int activePillWidth: 20
     readonly property int buttonPad: 6
 
-    implicitWidth: dotRow.implicitWidth
-    implicitHeight: 24
+    implicitWidth: vertical ? verticalDots.implicitWidth
+        : horizontalDots.implicitWidth
+    implicitHeight: vertical ? verticalDots.implicitHeight
+        : horizontalDots.implicitHeight
     visible: entries.length > 0
 
-    Component.onCompleted: workspaces.refresh()
+    Component.onCompleted: workspaceService.refresh()
 
     // Switching: `hyprctl dispatch hl.dsp.focus({ workspace = N })`. Two
     // dead ends sit behind that spelling, both probed on this compositor:
@@ -51,163 +60,111 @@ Item {
     // `return hl.dispatch( ... )`, where `workspace 21` is a syntax error.
     // The focus-table form is the one the layer answers `ok` to, and the
     // one the generated hypridle config already uses for dpms.
-    Process {
-        id: switchProcess
-
-        command: ["hyprctl", "dispatch", ""]
-    }
-
     function activate(id) {
-        switchProcess.command = ["hyprctl", "dispatch",
-            "hl.dsp.focus({ workspace = " + id + " })"];
-        switchProcess.running = true;
+        workspaceService.activate(id);
     }
 
-    function refresh() {
-        wsProcess.running = true;
-        monProcess.running = true;
-    }
+    component WorkspaceDot: Item {
+        id: dotHolder
 
-    Connections {
-        target: Hyprland
+        required property var modelData
 
-        function onRawEvent(event) {
-            const name = String(event.name || "");
-            if (name.startsWith("workspace") || name === "focusedmon"
-                || name === "openwindow" || name === "closewindow"
-                || name === "movewindow" || name === "urgency")
-                debounce.restart();
-        }
-    }
+        readonly property bool active: workspaces.activeId === modelData.id
+        readonly property bool hovered: dotArea.containsMouse
 
-    // Bursts of events collapse into one refresh 150ms after the last.
-    Timer {
-        id: debounce
+        // The holder tracks the pill, never the pointer: activation is the one
+        // state allowed to reflow the positioner.
+        width: workspaces.vertical ? 24
+            : (active ? workspaces.activePillWidth : workspaces.dotSize)
+                + workspaces.buttonPad * 2
+        height: workspaces.vertical
+            ? (active ? workspaces.activePillWidth : workspaces.dotSize)
+                + workspaces.buttonPad * 2
+            : 24
 
-        interval: 150
-        onTriggered: workspaces.refresh()
-    }
-
-    Process {
-        id: wsProcess
-
-        command: ["hyprctl", "-j", "workspaces"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const all = JSON.parse(text);
-                    if (!Array.isArray(all))
-                        return;
-                    workspaces.entries = all
-                        .filter(candidate => candidate.monitor === workspaces.screenName)
-                        .sort((a, b) => a.id - b.id);
-                } catch (error) {
-                    // A compositor mid-reload owes nobody a parse.
-                }
+        Behavior on width {
+            NumberAnimation {
+                duration: Theme.reduceMotion ? 0 : 180
+                easing.type: Easing.OutCubic
             }
         }
-    }
 
-    Process {
-        id: monProcess
+        Behavior on height {
+            NumberAnimation {
+                duration: Theme.reduceMotion ? 0 : 180
+                easing.type: Easing.OutCubic
+            }
+        }
 
-        command: ["hyprctl", "-j", "monitors"]
+        Rectangle {
+            anchors.fill: parent
+            radius: 8
+            color: Qt.alpha(Theme.text, 0.12)
+            visible: dotHolder.hovered && !dotHolder.active
+        }
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const all = JSON.parse(text);
-                    if (!Array.isArray(all))
-                        return;
-                    const mine = all.find(candidate => candidate.name === workspaces.screenName);
-                    workspaces.activeId = mine && mine.activeWorkspace
-                        ? Number(mine.activeWorkspace.id) : -1;
-                } catch (error) {
-                    // Same contract as the workspaces parse above.
+        Rectangle {
+            anchors.centerIn: parent
+            width: workspaces.vertical ? workspaces.dotSize
+                : (dotHolder.active ? workspaces.activePillWidth
+                    : workspaces.dotSize)
+            height: workspaces.vertical
+                ? (dotHolder.active ? workspaces.activePillWidth
+                    : workspaces.dotSize) : workspaces.dotSize
+            radius: workspaces.dotSize / 2
+            color: dotHolder.active ? Qt.alpha(Theme.text, 0.95)
+                : dotHolder.hovered ? Qt.alpha(Theme.text, 0.65)
+                : Qt.alpha(Theme.text, 0.45)
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: Theme.reduceMotion ? 0 : 180
+                    easing.type: Easing.OutCubic
                 }
             }
+
+            Behavior on height {
+                NumberAnimation {
+                    duration: Theme.reduceMotion ? 0 : 180
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on color {
+                ColorAnimation { duration: Theme.reduceMotion ? 0 : 180 }
+            }
+        }
+
+        MouseArea {
+            id: dotArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: workspaces.activate(dotHolder.modelData.id)
         }
     }
 
     Row {
-        id: dotRow
-
+        id: horizontalDots
         anchors.centerIn: parent
         spacing: BarState.scaled("workspaceGap")
 
         Repeater {
-            model: workspaces.entries
+            model: workspaces.vertical ? [] : workspaces.entries
+            delegate: WorkspaceDot {}
+        }
+    }
 
-            delegate: Item {
-                id: dotHolder
+    Column {
+        id: verticalDots
+        anchors.centerIn: parent
+        spacing: BarState.scaled("workspaceGap")
 
-                required property var modelData
-
-                readonly property bool active: workspaces.activeId === modelData.id
-                readonly property bool hovered: dotArea.containsMouse
-
-                // The holder tracks the pill, never the pointer: activation is
-                // the one state allowed to reflow the row.
-                width: (active ? workspaces.activePillWidth : workspaces.dotSize)
-                    + workspaces.buttonPad * 2
-                height: 24
-
-                Behavior on width {
-                    NumberAnimation {
-                        duration: Theme.reduceMotion ? 0 : 180
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                // The button-box hover tint, extending over the padding. Colour
-                // only -- this is what hover is allowed to do.
-                Rectangle {
-                    x: 0
-                    width: parent.width
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    radius: 8
-                    color: Qt.alpha(Theme.text, 0.12)
-                    visible: dotHolder.hovered && !dotHolder.active
-                }
-
-                // The dot, or the active pill: same element, same 6px height,
-                // same 999-style stadium. 20px wide when active, 6 when not.
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: workspaces.buttonPad
-                    width: dotHolder.active
-                        ? workspaces.activePillWidth : workspaces.dotSize
-                    height: workspaces.dotSize
-                    radius: workspaces.dotSize / 2
-                    color: dotHolder.active ? Qt.alpha(Theme.text, 0.95)
-                        : dotHolder.hovered ? Qt.alpha(Theme.text, 0.65)
-                        : Qt.alpha(Theme.text, 0.45)
-
-                    Behavior on width {
-                        NumberAnimation {
-                            duration: Theme.reduceMotion ? 0 : 180
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.reduceMotion ? 0 : 180 }
-                    }
-                }
-
-                // The hit target: constant, padded, independent of the visual.
-                MouseArea {
-                    id: dotArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: workspaces.activate(dotHolder.modelData.id)
-                }
-            }
+        Repeater {
+            model: workspaces.vertical ? workspaces.entries : []
+            delegate: WorkspaceDot {}
         }
     }
 }

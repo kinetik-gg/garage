@@ -22,6 +22,10 @@ Scope {
     property string fileRequestQuery: ""
     property var fileResults: []
     property bool fileReady: false
+    property var clipboardItems: []
+    property bool clipboardStarted: false
+    property bool clipboardReady: false
+    property string clipboardError: ""
 
     function append(target, rows) {
         if (rows === null)
@@ -142,7 +146,7 @@ Scope {
         if (fileProcess.running || sources.fileWantedQuery === "")
             return;
         sources.fileRequestQuery = sources.fileWantedQuery;
-        fileProcess.command = [Quickshell.env("HOME") + "/.local/bin/garage-file-index",
+        fileProcess.command = [GaragePaths.fileIndex,
             "search", sources.fileRequestQuery, String(8)];
         fileProcess.running = true;
     }
@@ -187,12 +191,53 @@ Scope {
         }));
     }
 
+    function ensureClipboard() {
+        if (sources.clipboardStarted)
+            return;
+        sources.clipboardStarted = true;
+        clipboardProcess.running = true;
+    }
+
+    function finishClipboard(output) {
+        sources.clipboardItems = LauncherExtras.parseClipboardList(output);
+        sources.clipboardReady = true;
+        sources.changed();
+    }
+
+    function clipboardRowsFor(input, limit, dedicated) {
+        const query = dedicated ? String(input || "").trim()
+            : LauncherExtras.clipboardQuery(input);
+        if (query === null)
+            return null;
+        sources.ensureClipboard();
+        if (!sources.clipboardReady)
+            return [{ kind: "status", title: "Loading clipboard history…",
+                subtitle: "cliphist" }];
+        if (sources.clipboardError !== "")
+            return [{ kind: "error", title: "Clipboard history unavailable",
+                subtitle: sources.clipboardError }];
+        if (sources.clipboardItems.length === 0)
+            return [{ kind: "status", title: "Clipboard history is empty",
+                subtitle: "Copy something, then open this mode again" }];
+        const rows = LauncherExtras.clipboardRows(
+            sources.clipboardItems, query, limit);
+        return rows.length > 0 ? rows
+            : [{ kind: "status", title: "No matching clipboard items",
+                subtitle: query }];
+    }
+
     // Returns every launcher-specific row and whether normal app/web searching
     // should stand down for this query. Recognised command syntaxes are exclusive
     // so an emoji or PID search is not followed by a web-search row for itself.
-    function rowsFor(input, dnd, caffeine, dark, limit) {
+    function rowsFor(input, dnd, caffeine, dark, limit, clipboardMode) {
         const rows = [];
         let exclusive = false;
+
+        const clipboard = sources.clipboardRowsFor(input, limit, clipboardMode);
+        if (clipboard !== null) {
+            sources.append(rows, clipboard);
+            return { rows: rows, exclusive: true };
+        }
 
         const unit = LauncherExtras.unitConversion(input);
         if (unit !== null) {
@@ -264,6 +309,23 @@ Scope {
         exclusive = sources.append(rows, LauncherExtras.shellRows(input, dnd, caffeine, dark)) || exclusive;
 
         return { rows: rows, exclusive: exclusive };
+    }
+
+    Process {
+        id: clipboardProcess
+
+        command: ["cliphist", "list"]
+        onExited: exitCode => {
+            if (exitCode === 0)
+                return;
+            sources.clipboardError = "cliphist list exited (" + exitCode + ")";
+            sources.clipboardReady = true;
+            sources.changed();
+        }
+        stdout: StdioCollector {
+            onStreamFinished: sources.finishClipboard(text)
+        }
+        stderr: StdioCollector {}
     }
 
     Process {

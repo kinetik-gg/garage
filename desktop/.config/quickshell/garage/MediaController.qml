@@ -7,9 +7,9 @@ import QtQuick
 
 // The media readout's state, event-driven end to end.
 //
-// Where the waybar module polled `playerctl` and `hyprctl clients` twice a second, this
-// reads the MPRIS bus directly and keeps its browser-title evidence current from
-// Hyprland's own window events. Nothing here wakes up on a timer.
+// The old external module polled a command-line controller and `hyprctl clients` twice
+// a second; this reads the MPRIS bus directly and keeps its browser-title evidence
+// current from Hyprland's own window events. Nothing here wakes up on a timer.
 //
 // The classification order is the old module's source table: Spotify beats YouTube
 // Music, YouTube Music beats plain YouTube, and a browser beats anything generic --
@@ -20,10 +20,7 @@ Singleton {
 
     // -- Players -------------------------------------------------------------
 
-    // playerctld mirrors the selected real player on its own MPRIS name; it is
-    // transport plumbing, not a second listening session.
-    readonly property var players: Mpris.players ? Mpris.players.values.filter(
-        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
+    readonly property var players: Mpris.players ? Mpris.players.values : []
 
     // Whatever is playing, else the first player -- the MediaCard rule, kept identical
     // so the chip and the palettes can never disagree about what is playing.
@@ -50,6 +47,23 @@ Singleton {
             player.togglePlaying();
     }
 
+    function play() {
+        if (player && player.canPlay)
+            player.play();
+    }
+
+    function pause() {
+        if (player && player.canPause)
+            player.pause();
+    }
+
+    function stop() {
+        // MprisPlayer has no separate canStop flag; CanControl is the MPRIS
+        // capability that covers Stop.
+        if (player && player.canControl)
+            player.stop();
+    }
+
     function next() {
         if (player && player.canGoNext)
             player.next();
@@ -58,6 +72,24 @@ Singleton {
     function previous() {
         if (player && player.canGoPrevious)
             player.previous();
+    }
+
+    // One native action seam for launcher and IPC callers. The launcher keeps
+    // "skip" as its user-facing action name; both spellings intentionally
+    // reach the same MPRIS Next call.
+    function dispatch(action) {
+        if (action === "play")
+            media.play();
+        else if (action === "pause")
+            media.pause();
+        else if (action === "stop")
+            media.stop();
+        else if (action === "toggle" || action === "play-pause")
+            media.togglePlaying();
+        else if (action === "skip" || action === "next")
+            media.next();
+        else if (action === "previous")
+            media.previous();
     }
 
     // -- Browser title evidence ----------------------------------------------

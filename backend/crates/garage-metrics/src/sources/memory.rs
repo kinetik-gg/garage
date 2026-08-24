@@ -41,7 +41,7 @@ pub(crate) fn values() -> Result<Memory, Fault> {
         }
     }
     // `values["MemTotal"]` is a direct subscript in the Python: a file without the key
-    // is a KeyError, which bar_svg degrades and stream does not catch.
+    // is a `KeyError`; the stream preserves that distinction as a caught fault.
     let total = total.ok_or_else(|| Fault::key("MemTotal"))?;
     let available = available.or(free).unwrap_or(0);
     Ok(Memory {

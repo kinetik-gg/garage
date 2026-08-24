@@ -4,13 +4,12 @@
 //! Tokscale is optional: this whole module exists to answer "where is it, if anywhere" and
 //! to run it the same two ways the Python does, without ever turning its absence into a
 //! failure the caller has to handle specially. See the crate root docs. Spawning itself
-//! goes through [`crate::exec::run`], the one place in this crate allowed to touch
-//! `std::process::Command` -- see that module's docs.
+//! goes through [`garage_core::process::run`], shared by the leaf data helpers.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::exec;
+use garage_core::process;
 
 /// The one place the Python looks for tokscale before falling back to `PATH`:
 /// `~/.local/share/tokscale/node_modules/.bin/tokscale`. A `Vec` because
@@ -61,14 +60,14 @@ fn which(name: &str, path_env: Option<&str>) -> Option<PathBuf> {
 /// code is never consulted -- `subprocess.run(..., check=False)` never raises on a non-zero
 /// exit, and neither `load_usage()` nor `load_today()` reads `result.returncode`.
 ///
-/// The outer ten-second cap is [`crate::exec::run`]'s `timeout` argument, standing in for
+/// The outer ten-second cap is [`garage_core::process::run`]'s `timeout` argument, standing in for
 /// the Python's own `subprocess.run(..., timeout=10)` -- a safety net around the inner
 /// `/usr/bin/timeout 5`, in case `timeout` itself is what is missing or wedged.
 pub(crate) fn run_tokscale_json(tokscale: &Path, args: &[&str]) -> Option<serde_json::Value> {
     let tokscale_str = tokscale.to_str()?;
     let mut command: Vec<&str> = vec!["/usr/bin/timeout", "5", tokscale_str];
     command.extend_from_slice(args);
-    let output = exec::run(&command, Duration::from_secs(10)).ok()?;
+    let output = process::run(&command, Duration::from_secs(10)).ok()?;
     serde_json::from_str(&output.stdout).ok()
 }
 

@@ -27,7 +27,7 @@ fn set_and_save(world: &World, changes: &[(PreferenceKey, &str)]) -> Vec<String>
     sink
 }
 
-const FACTORY: &str = "[schema]\npreferences_version = 5\n";
+const FACTORY: &str = "[schema]\npreferences_version = 6\n";
 
 #[test]
 fn the_first_change_writes_the_stamp_and_the_change() {
@@ -36,7 +36,7 @@ fn the_first_change_writes_the_stamp_and_the_change() {
     assert!(notes.is_empty());
     assert_eq!(
         world.preferences_file().as_deref(),
-        Some("[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n")
+        Some("[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n")
     );
 }
 
@@ -56,7 +56,7 @@ fn saving_an_unchanged_configuration_writes_the_stamp_alone() {
 fn setting_a_value_back_to_the_default_erases_the_departure() {
     let world = World::stowed("save-back");
     world.plant_preferences(
-        "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n",
+        "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n",
     );
     assert!(set_and_save(&world, &[(PreferenceKey::AccentColor, "\"blue\"")]).is_empty());
     assert_eq!(world.preferences_file().as_deref(), Some(FACTORY));
@@ -91,7 +91,7 @@ fn several_departures_come_out_in_the_shipped_files_order() {
     assert_eq!(
         world.preferences_file().as_deref(),
         Some(
-            "[schema]\npreferences_version = 5\n\n\
+            "[schema]\npreferences_version = 6\n\n\
              [appearance]\naccent_color = \"red\"\n\n\
              [bar]\nheight = 50\n\n\
              [input]\nnatural_scroll = true\n\n\
@@ -132,7 +132,7 @@ fn a_save_replaces_the_file_rather_than_editing_it() {
 fn an_unknown_key_cannot_reach_a_save_at_all() {
     let world = World::stowed("save-unknown");
     world.plant_preferences(
-        "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n\
+        "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n\
          not_a_key = 1\n",
     );
     let mut sink = Vec::new();
@@ -145,7 +145,7 @@ fn an_unknown_key_cannot_reach_a_save_at_all() {
     );
     assert_eq!(
         world.preferences_file().as_deref(),
-        Some("[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n"),
+        Some("[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n"),
         "the file is what the Python writes either way"
     );
 }

@@ -215,7 +215,7 @@ Scope {
                 right: true
             }
 
-            // Overlay surfaces already begin below Waybar's exclusive zone, so the
+            // Overlay surfaces already begin below the Garage bar's exclusive zone, so the
             // gutter is measured from there and not from the top of the screen.
             margins.top: Theme.windowGutter
             margins.right: Theme.windowGutter

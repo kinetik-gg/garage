@@ -107,12 +107,6 @@ shipped!(
 );
 
 shipped!(
-    /// The whole of rofi's palette.
-    ROFI_PALETTE,
-    "rofi-palette.tmpl"
-);
-
-shipped!(
     /// The Qt palette's two header lines. Between them and the body sits the wrapped role
     /// comment, which is computed rather than written -- see [`crate::palette::qt`].
     QT_PALETTE_HEAD,
@@ -123,12 +117,6 @@ shipped!(
     /// The Qt palette's `[ColorScheme]` section and its three positional rows.
     QT_PALETTE_BODY,
     "qt-palette-body.tmpl"
-);
-
-shipped!(
-    /// The whole of swayosd's palette.
-    SWAYOSD_PALETTE,
-    "swayosd-palette.tmpl"
 );
 
 shipped!(
@@ -170,8 +158,6 @@ mod tests {
     use crate::idle::IdleListenerVars;
     use crate::palette::gtk::{Gtk3HeadVars, Gtk4Vars, TokenVars};
     use crate::palette::qt::{QtBodyVars, QtHeadVars};
-    use crate::palette::rofi::RofiVars;
-    use crate::palette::swayosd::SwayosdVars;
     use crate::palette::toolkits::{BtopLineVars, HyprlockVars, KittyVars, XsettingsdVars};
     use crate::region::LocaleExportVars;
     use crate::template::TemplateVars;
@@ -192,10 +178,8 @@ mod tests {
         super::GTK4_PALETTE,
         super::GTK4_PALETTE_LIGHT_TOKEN,
         super::GTK4_PALETTE_DARK_TOKEN,
-        super::ROFI_PALETTE,
         super::QT_PALETTE_HEAD,
         super::QT_PALETTE_BODY,
-        super::SWAYOSD_PALETTE,
         super::KITTY_THEME,
         super::BTOP_THEME_HEAD,
         super::BTOP_THEME_LINE,
@@ -284,12 +268,6 @@ mod tests {
                 super::GTK4_PALETTE_DARK_TOKEN,
             ],
         );
-    }
-
-    #[test]
-    fn rofi_and_swayosd_placeholders_and_variables_agree() {
-        check::<RofiVars>("the rofi palette", &[super::ROFI_PALETTE]);
-        check::<SwayosdVars>("the swayosd palette", &[super::SWAYOSD_PALETTE]);
     }
 
     #[test]

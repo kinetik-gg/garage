@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Services.Mpris
 import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
@@ -7,14 +6,14 @@ import QtQuick.Effects
 import QtQuick.Layouts
 
 // The standalone now-playing palette: artwork, transport, a seek bar and a
-// player switcher, floating beneath the bar's now-playing readout with a spectrum
+// player switcher, opening inward from the bar's media widget with a spectrum
 // running quietly behind it. MediaCard in the control centre is the compact
 // row version of the same Mpris logic; this is the richer surface for
 // reaching for while nothing else is open.
 //
-// The horizontal placement follows MonitorPalette: the bar click supplies a
-// monitor-local X, the surface centres itself on that point, and the result is
-// clamped into the output. A keyboard launch supplies -1 and uses output centre.
+// Placement follows MonitorPalette on every edge: the bar click supplies a
+// long-axis coordinate, the surface centres itself there and clamps into the
+// output. A keyboard launch supplies -1 and uses output centre.
 //
 // The contract mirrors ControlCenterPalette's: targetScreenName, a
 // dismissed() signal, an OnDemand overlay layer surface. holdOpen is new --
@@ -22,7 +21,7 @@ import QtQuick.Layouts
 // panel out from under a seek-bar drag, the same way shell.qml's shared
 // DismissCatcher already stands down for the screenshot capture
 // (`armed: !(... || captureProcess.running)`). Wiring holdOpen into that
-// check is next wave's job; this file only has to raise it truthfully.
+// check reads this property through the active loader.
 //
 // `id: media`, and it may not go back to being `id: palette`. QQuickItem has
 // carried a `palette` property of its own since Qt 6.0, and inside a nested
@@ -39,13 +38,10 @@ import QtQuick.Layouts
 // name, which clashes with nothing) received the click, and so does this one now.
 // Ids in the same document are unaffected, which is why the seek bar always
 // worked and this looked like a stacking problem rather than a naming one.
-PanelWindow {
+PaletteSurface {
     id: media
-
-    required property string targetScreenName
-    required property real targetAnchorX
-
-    signal dismissed()
+    surfaceNamespace: "garage-media"
+    escapeEnabled: false
 
     // True for as long as an in-progress gesture must not be interrupted by
     // an outside click -- currently just the seek bar's drag, but written as
@@ -56,20 +52,10 @@ PanelWindow {
 
     readonly property int contentMargin: 14
 
-    function targetScreen() {
-        for (let index = 0; index < Quickshell.screens.length; ++index) {
-            const candidate = Quickshell.screens[index];
-            if (candidate.name === media.targetScreenName)
-                return candidate;
-        }
-        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
-    }
-
-    // playerctld exposes a proxy player whose identity and metadata mirror the
-    // real player. Keeping it would produce two identical Spotify/browser
-    // segments and send controls through an unnecessary second hop.
-    readonly property var players: Mpris.players ? Mpris.players.values.filter(
-        candidate => !String(candidate.dbusName || "").endsWith(".playerctld")) : []
+    // One native player model shared with the bar, compact card, launcher and
+    // hardware-key actions. This palette may still pin a different entry from
+    // the shared list with its selector below.
+    readonly property var players: MediaController.players
 
     // Pinned by the selector below; falls back to the playing-over-paused
     // rule MediaCard uses -- for the same reason MediaCard uses it, a
@@ -150,46 +136,12 @@ PanelWindow {
 
     onPlayerChanged: media.displayPosition = media.player ? media.player.position : 0
 
-    screen: media.targetScreen()
     implicitWidth: 360
     implicitHeight: Math.max(1, body.implicitHeight + media.contentMargin * 2)
-    color: "transparent"
-    focusable: true
-    aboveWindows: true
-    exclusiveZone: 0
-    surfaceFormat.opaque: false
-
-    readonly property real surfaceLeft: {
-        const target = media.targetScreen();
-        const available = target ? target.width : 1920;
-        const desired = media.targetAnchorX >= 0
-            ? media.targetAnchorX - media.implicitWidth / 2
-            : (available - media.implicitWidth) / 2;
-        return Math.max(Theme.windowGutter, Math.min(desired,
-            available - media.implicitWidth - Theme.windowGutter));
-    }
-
-    // Top-to-bottom entrance, shared with every other palette. See PanelMotion.
-    PanelMotion {
-        id: motion
-        onFinished: media.dismissed()
-    }
 
     function requestDismissal() {
-        motion.dismiss();
+        media.dismissSurface();
     }
-
-    anchors {
-        top: true
-        left: true
-    }
-
-    margins.top: motion.surfaceTop
-    margins.left: media.surfaceLeft
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "garage-media"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     // Reattached automatically as media.player changes identity: Mpris
     // positions do move between events (a seek from another client, a track
@@ -212,7 +164,7 @@ PanelWindow {
 
     ContinuousRectangle {
         id: panel
-        opacity: motion.opacity
+        opacity: media.contentOpacity
         anchors.fill: parent
         radius: Theme.cornerRadius
         power: Theme.cornerPower

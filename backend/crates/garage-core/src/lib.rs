@@ -6,6 +6,8 @@ pub mod error;
 pub mod fs;
 pub mod manifest;
 pub mod paths;
+pub mod process;
+pub mod pyjson;
 pub mod pyrepr;
 pub mod schema;
 pub mod shlex;

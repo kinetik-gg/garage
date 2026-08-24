@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 
 // A glyph button: the bell, the launcher diamond, the control-centre
 // sliders, the session menu. Hover and press paint the old module tints --
@@ -11,9 +12,11 @@ Item {
 
     // The Phosphor (or Nerd Font) codepoint this button draws.
     property string glyph: ""
+    property url iconSource: ""
     // Phosphor for the icon trio; Caskaydia Nerd for the Arch menu logo.
     property string glyphFamily: "Phosphor"
     property int glyphSize: 16
+    property int iconSize: 16
     // The Arch menu button is a fixed square with an optical nudge on its
     // right, exactly as the old stylesheet drew it; 0 keeps the natural
     // glyph-plus-padding sizing for the icon trio.
@@ -49,6 +52,29 @@ Item {
         font.pixelSize: button.glyphSize
         font.weight: Font.DemiBold
         renderType: Text.NativeRendering
+        visible: button.iconSource.toString() === ""
+    }
+
+    Image {
+        id: sourceIcon
+
+        anchors.centerIn: parent
+        width: button.iconSize
+        height: button.iconSize
+        source: button.iconSource
+        sourceSize.width: button.iconSize * 2
+        sourceSize.height: button.iconSize * 2
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: false
+    }
+
+    ColorOverlay {
+        anchors.fill: sourceIcon
+        source: sourceIcon
+        color: Theme.text
+        cached: true
+        visible: button.iconSource.toString() !== ""
     }
 
     MouseArea {

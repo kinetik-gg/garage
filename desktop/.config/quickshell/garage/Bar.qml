@@ -1,235 +1,170 @@
 import Quickshell
-import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 
-// The Garage bar: the waybar replacement, in-process.
-//
-// One PanelWindow per screen, top layer, owning an exclusive zone of exactly the
-// configured height -- which is what lets every overlay surface keep its existing
-// below-the-bar margins without knowing this file exists. Layout mirrors the old
-// fragments: menu, workspaces and media on the left; metric strips, the AI usage
-// chip, the context chips, the tray and the icon trio with the clock on the right.
-//
-// Clicks do not cross a process boundary. A module that opens a surface emits it
-// here with this screen's name and the module's monitor-local anchor X, and the
-// shell -- which instantiates this component -- routes it through the same
-// functions the keybinds have always used.
+// One edge-aware PanelWindow per output, composed from three ordered extension
+// rails. The marker owns order and docking; the registry owns which ids exist.
 Scope {
     id: bar
 
-    // surface names: session | launcher | notifications | controlCenter | media |
-    // monitor:<widget>. anchorX of -1 means centred, as a keybind would open it.
-    signal surfaceRequested(string surface, string screenName, real anchorX)
+    signal surfaceRequested(string surface, string screenName, real anchor)
+
+    readonly property var services: ({
+        barState: BarState,
+        context: BarContext,
+        metrics: MetricsService,
+        media: MediaController,
+        workspaces: WorkspaceService,
+        theme: Theme,
+        paths: GaragePaths
+    })
+
+    Process { id: positionProcess }
+
+    function setPosition(edge) {
+        if (!BarState.validPosition(edge) || positionProcess.running)
+            return;
+        positionProcess.command = [GaragePaths.garage, "set", "bar.position",
+            JSON.stringify(edge)];
+        positionProcess.running = true;
+    }
 
     Variants {
         model: Quickshell.screens
 
-        PanelWindow {
-            id: output
-
+        Scope {
+            id: outputScope
             required property var modelData
-            readonly property string screenName: modelData.name
+            property string loadedEdge: BarState.position
 
-            screen: modelData
-            color: "transparent"
-            aboveWindows: true
-            // Explicit, marker-driven height. Left to its own devices the window
-            // sizes from its contents' implicit measurement, which races the first
-            // layout and lands on a comical ~100px default; the palettes set their
-            // own implicit sizes for the same reason.
-            implicitHeight: BarState.height
-            exclusiveZone: BarState.height
-            focusable: false
-            surfaceFormat.opaque: false
-            anchors {
-                top: true
-                left: true
-                right: true
-            }
+            // Layer-shell anchor and orientation changes are not reliably
+            // atomic. Recreate the output window after an edge change so the
+            // compositor receives a fresh buffer with its final dimensions.
+            LazyLoader {
+                id: outputLoader
+                active: true
 
-            WlrLayershell.layer: WlrLayer.Top
-            WlrLayershell.namespace: "garage-bar"
+                PanelWindow {
+                    id: output
+                    readonly property string edge: outputScope.loadedEdge
+                    readonly property string screenName: outputScope.modelData.name
+                    readonly property bool vertical: edge === "left" || edge === "right"
 
-            // The tint. "blurred" is the translucent body over Hyprland's layer blur
-            // -- the same 42% alpha the stylesheet carried -- and "transparent" is
-            // that body at zero alpha, leaving only the blur behind the bar.
-            Rectangle {
-                anchors.fill: parent
-                color: BarState.background === "transparent"
-                    ? "transparent"
-                    : Qt.rgba(Theme.bodyBase.r, Theme.bodyBase.g, Theme.bodyBase.b, 0.42)
-            }
+                    screen: outputScope.modelData
+                    color: "transparent"
+                    aboveWindows: true
+                    implicitWidth: vertical ? BarState.thickness : 0
+                    implicitHeight: vertical ? 0 : BarState.thickness
+                    exclusiveZone: BarState.thickness
+                    focusable: false
+                    surfaceFormat.opaque: false
 
-            function centreX(item) {
-                if (!item)
-                    return -1;
-                return item.mapToItem(contentRow, item.width / 2, 0).x;
-            }
+                    anchors.top: output.edge !== "bottom"
+                    anchors.bottom: output.edge === "bottom"
+                        || output.edge === "left" || output.edge === "right"
+                    anchors.left: output.edge !== "right"
+                    anchors.right: output.edge === "right"
+                        || output.edge === "top" || output.edge === "bottom"
 
-            Item {
-                id: contentRow
+                    WlrLayershell.layer: WlrLayer.Top
+                    WlrLayershell.namespace: "garage-bar"
 
-                anchors.fill: parent
-                anchors.leftMargin: BarState.scaled("edge")
-                anchors.rightMargin: BarState.scaled("edge")
-
-                Row {
-                    id: left
-
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: BarState.scaled("menuRight")
-
-                    BarIconButton {
-                        glyph: "\uf303"
-                        glyphFamily: "CaskaydiaMono Nerd Font"
-                        glyphSize: 17
-                        square: 21
-                        nudgeRight: 6
-                        onActivated: bar.surfaceRequested(
-                            "session", output.screenName, -1)
+                    Rectangle {
+                        anchors.fill: parent
+                        color: BarState.background === "transparent" ? "transparent"
+                            : Qt.rgba(Theme.bodyBase.r, Theme.bodyBase.g,
+                                Theme.bodyBase.b, 0.42)
                     }
 
-                    BarWorkspaces {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: BarState.indicator
-                        barScreen: output.modelData
+                    Item {
+                        id: content
+                        z: 1
+                        anchors.fill: parent
+                        anchors.leftMargin: output.vertical ? 0 : BarState.scaled("edge")
+                        anchors.rightMargin: output.vertical ? 0 : BarState.scaled("edge")
+                        anchors.topMargin: output.vertical ? BarState.scaled("edge") : 0
+                        anchors.bottomMargin: output.vertical ? BarState.scaled("edge") : 0
+
+                        BarRail {
+                            id: startRail
+                            registry: ExtensionRegistry
+                            services: bar.services
+                            screen: outputScope.modelData
+                            screenName: output.screenName
+                            railRole: "left"
+                            edge: output.edge
+                            extensionIds: BarState.left
+                            anchors.left: output.vertical ? undefined : parent.left
+                            anchors.top: output.vertical ? parent.top : undefined
+                            anchors.verticalCenter: output.vertical ? undefined : parent.verticalCenter
+                            anchors.horizontalCenter: output.vertical ? parent.horizontalCenter : undefined
+                            onSurfaceRequested: (surface, name, anchor) =>
+                                bar.surfaceRequested(surface, name, anchor)
+                        }
+
+                        BarRail {
+                            id: centerRail
+                            registry: ExtensionRegistry
+                            services: bar.services
+                            screen: outputScope.modelData
+                            screenName: output.screenName
+                            railRole: "center"
+                            edge: output.edge
+                            extensionIds: BarState.center
+                            x: output.vertical ? Math.round((parent.width - width) / 2)
+                                : Math.max(startRail.x + startRail.width
+                                    + BarState.scaled("module"),
+                                    Math.min(Math.round((parent.width - width) / 2),
+                                        endRail.x - width - BarState.scaled("module")))
+                            y: output.vertical
+                                ? Math.max(startRail.y + startRail.height
+                                    + BarState.scaled("module"),
+                                    Math.min(Math.round((parent.height - height) / 2),
+                                        endRail.y - height - BarState.scaled("module")))
+                                : Math.round((parent.height - height) / 2)
+                            onSurfaceRequested: (surface, name, anchor) =>
+                                bar.surfaceRequested(surface, name, anchor)
+                        }
+
+                        BarRail {
+                            id: endRail
+                            registry: ExtensionRegistry
+                            services: bar.services
+                            screen: outputScope.modelData
+                            screenName: output.screenName
+                            railRole: "right"
+                            edge: output.edge
+                            extensionIds: BarState.right
+                            anchors.right: output.vertical ? undefined : parent.right
+                            anchors.bottom: output.vertical ? parent.bottom : undefined
+                            anchors.verticalCenter: output.vertical ? undefined : parent.verticalCenter
+                            anchors.horizontalCenter: output.vertical ? parent.horizontalCenter : undefined
+                            onSurfaceRequested: (surface, name, anchor) =>
+                                bar.surfaceRequested(surface, name, anchor)
+                        }
                     }
 
-                    BarMediaChip {
-                        id: mediaChip
-
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: BarState.mediaPlayer && MediaController.visible
-                        onActivated: bar.surfaceRequested(
-                            "media", output.screenName, output.centreX(mediaChip))
+                    BarDragOverlay {
+                        barScreen: outputScope.modelData
+                        edge: output.edge
+                        onEdgeDropped: edge => bar.setPosition(edge)
                     }
                 }
+            }
 
-                Row {
-                    id: right
+            Timer {
+                id: recreateTimer
+                interval: 1
+                onTriggered: outputLoader.active = true
+            }
 
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: BarState.scaled("module")
-
-                    // The metric strips, in BAR_METRICS order, each gated by its own
-                    // switch and fed by the one shared stream.
-                    Repeater {
-                        id: metricRepeater
-
-                        model: [
-                            { key: "cpu", enabled: true },
-                            { key: "memory", enabled: true },
-                            { key: "network", enabled: false },
-                            { key: "temp", enabled: false },
-                            { key: "disk", enabled: false },
-                            { key: "gpu", enabled: false }
-                        ]
-
-                        delegate: BarMetricStrip {
-                            id: stripItem
-
-                            required property var modelData
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            visible: BarState.monitors[modelData.key] === true
-                            name: modelData.key
-                            series: MetricsService.seriesFor(modelData.key)
-                            value: MetricsService.labelFor(modelData.key)
-                            tip: MetricsService.tipFor(modelData.key)
-                            onActivated: bar.surfaceRequested(
-                                "monitor:" + modelData.key,
-                                output.screenName, output.centreX(stripItem))
-                        }
-                    }
-
-                    BarChip {
-                        id: aiChip
-
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: BarState.aiUsage && BarContext.aiGlyph !== ""
-                        label: BarContext.aiGlyph
-                        // \ue6a2 is a Nerd Font codepoint: Phosphor does not
-                        // carry it, and the sans fallback turns it into tofu.
-                        labelFont: "Caskaydia Mono Nerd Font Mono"
-                        labelSize: 16
-                        labelColor: Theme.text
-                        warning: BarContext.aiStale
-                        tip: BarContext.aiTip
-                        onActivated: bar.surfaceRequested(
-                            "aiUsage", output.screenName, -1)
-                    }
-
-                    BarChip {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: BarContext.containersAvailable
-                            && BarContext.containerCount > 0
-                        label: "CTR " + BarContext.containerCount
-                        tip: "Running containers\n"
-                            + BarContext.containerNames.join("\n")
-                    }
-
-                    BarChip {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: BarContext.smbAvailable
-                        label: "SMB " + BarContext.smbConnected
-                        warning: BarContext.smbConnected < BarContext.smbExpected
-                        tip: BarContext.smbConnected === BarContext.smbExpected
-                            ? "All " + BarContext.smbExpected + " SMB shares connected"
-                            : "Connected " + BarContext.smbConnected + " / "
-                                + BarContext.smbExpected + "\nUnavailable\n"
-                                + BarContext.smbMissingLabels.join("\n")
-                    }
-
-                    // The mic dot: dim when idle, accent when something records.
-                    Item {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 10
-                        height: 10
-                        visible: BarContext.micAvailable
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: BarContext.micRecording ? Theme.accent
-                                : Qt.alpha(Theme.text, 0.45)
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: Theme.reduceMotion ? 0 : 180
-                                }
-                            }
-                        }
-                    }
-
-                    BarTray { anchors.verticalCenter: parent.verticalCenter }
-
-                    BarIconButton {
-                        glyph: "\ue0ce"
-                        anchors.verticalCenter: parent.verticalCenter
-                        onActivated: bar.surfaceRequested(
-                            "notifications", output.screenName, -1)
-                    }
-
-                    BarIconButton {
-                        glyph: "\ue30c"
-                        anchors.verticalCenter: parent.verticalCenter
-                        onActivated: bar.surfaceRequested(
-                            "launcher", output.screenName, -1)
-                    }
-
-                    BarIconButton {
-                        glyph: "\ue676"
-                        anchors.verticalCenter: parent.verticalCenter
-                        onActivated: bar.surfaceRequested(
-                            "controlCenter", output.screenName, -1)
-                    }
-
-                    BarClock { anchors.verticalCenter: parent.verticalCenter }
+            Connections {
+                target: BarState
+                function onPositionChanged() {
+                    outputLoader.active = false;
+                    outputScope.loadedEdge = BarState.position;
+                    recreateTimer.restart();
                 }
             }
         }

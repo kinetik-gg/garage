@@ -1,10 +1,8 @@
-//! The tolerant primitives every sensor is built on, and the three pure numeric
-//! helpers that turn a counter delta into something a strip can draw.
+//! The tolerant primitives every sensor is built on.
 //!
 //! Every source in this binary is optional hardware. A missing file is the normal case
 //! on somebody else's machine, not an error, so the readers here return `None` and the
-//! callers decide what a missing number means for their metric. Nothing in this crate
-//! may raise its way out to a traceback in the bar.
+//! callers decide what a missing number means for their metric.
 //!
 //! The distinction to keep straight is between these readers and the direct reads a few
 //! sensors do. [`read_text`] swallows the failure; `Path("/proc/stat").read_text()` in
@@ -16,18 +14,9 @@ use crate::fault::Fault;
 use std::fs;
 use std::path::Path;
 
-/// A mebibyte, the unit every throughput figure in the strips is quoted in.
-pub(crate) const MIB: f64 = 1_048_576.0;
-
 /// The same constant where the Python is multiplying integers rather than dividing
 /// floats -- `int(parts[2]) * MIB` on nvidia-smi's MiB figures, which stays exact.
 pub(crate) const MIB_BYTES: i64 = 1_048_576;
-
-/// The ceiling of the log scale that disk and network throughput are drawn against, in
-/// MiB/s. Linear axes are useless here: idle is 0.01 MiB/s and an `NVMe` burst is 3000, so
-/// a linear graph is a flat line with occasional spikes to the top. 2 GiB/s as the top
-/// of the scale keeps both readable.
-const LOG_CEILING_MIB: f64 = 2048.0;
 
 /// `read_text(path)` -- the file's contents stripped, or nothing.
 ///
@@ -101,26 +90,6 @@ pub(crate) fn as_float(value: i64) -> f64 {
     value as f64
 }
 
-/// A count as a float, for the two places a length becomes part of a coordinate.
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "a bucket length and a history length are bounded by POINTS, which is 120"
-)]
-pub(crate) fn count_as_float(value: usize) -> f64 {
-    value as f64
-}
-
-/// `int(value)` -- truncated toward zero, which is what Python's `int()` does to a float
-/// and what `as` does to one that is already in range.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "`as` saturates at i64's bounds rather than wrapping, and the two callers \
-              pass a graph width and a counter read back out of a state file"
-)]
-pub(crate) fn as_int(value: f64) -> i64 {
-    value as i64
-}
-
 /// Per-second delta, floored at zero.
 ///
 /// Counters reset when an interface goes down or a device is re-plugged, and a reset
@@ -139,30 +108,6 @@ pub(crate) fn rate(current: Option<i64>, previous: Option<i64>, elapsed: f64) ->
     as_float(current.saturating_sub(previous).max(0)) / elapsed
 }
 
-/// Throughput as 0..100 on the log curve the old disk graph used.
-pub(crate) fn log_scale(mib_per_second: f64) -> f64 {
-    (mib_per_second.max(0.0).ln_1p() / LOG_CEILING_MIB.ln_1p() * 100.0).min(100.0)
-}
-
-/// A throughput figure in the four characters a strip can spare for it.
-pub(crate) fn compact_rate(mib_per_second: f64) -> String {
-    if mib_per_second >= 1024.0 {
-        return format!("{:.1}G", mib_per_second / 1024.0);
-    }
-    if mib_per_second >= 1.0 {
-        return format!("{mib_per_second:.1}M");
-    }
-    format!("{:.0}K", mib_per_second * 1024.0)
-}
-
-/// How much time a graph covers, for the tail of the tooltip.
-pub(crate) fn compact_span(seconds: f64) -> String {
-    if seconds < 90.0 {
-        return format!("{seconds:.0}s");
-    }
-    format!("{:.1} min", seconds / 60.0)
-}
-
 #[cfg(test)]
 // Byte-parity tests: a fixture row of the wrong shape is a broken fixture and panicking
 // on it is the report, and a double that is only approximately the Python's is a failure
@@ -173,9 +118,7 @@ pub(crate) fn compact_span(seconds: f64) -> String {
     clippy::cast_precision_loss
 )]
 mod tests {
-    use super::{
-        compact_rate, compact_span, log_scale, rate, read_int, read_text, sorted_children,
-    };
+    use super::{rate, read_int, read_text, sorted_children};
     use crate::scratch::Scratch;
     use std::fs;
     use std::path::Path;
@@ -229,35 +172,5 @@ mod tests {
         assert_eq!(rate(Some(10), None, 2.0), 0.0);
         assert_eq!(rate(Some(400), Some(10), 0.0), 0.0);
         assert_eq!(rate(Some(400), Some(10), -1.0), 0.0);
-    }
-
-    #[test]
-    fn the_log_scale_keeps_idle_and_a_burst_both_on_the_graph() {
-        assert_eq!(log_scale(0.0), 0.0);
-        assert_eq!(log_scale(-5.0), 0.0);
-        assert_eq!(log_scale(2048.0), 100.0);
-        assert_eq!(log_scale(100_000.0), 100.0);
-        // 1 MiB/s is well up the curve where a linear axis would have it invisible.
-        assert!(log_scale(1.0) > 8.0 && log_scale(1.0) < 10.0);
-    }
-
-    #[test]
-    fn compact_rate_switches_unit_at_the_thresholds_the_python_uses() {
-        assert_eq!(compact_rate(0.0), "0K");
-        assert_eq!(compact_rate(0.5), "512K");
-        assert_eq!(compact_rate(0.999), "1023K");
-        assert_eq!(compact_rate(1.0), "1.0M");
-        assert_eq!(compact_rate(999.94), "999.9M");
-        assert_eq!(compact_rate(1023.9), "1023.9M");
-        assert_eq!(compact_rate(1024.0), "1.0G");
-        assert_eq!(compact_rate(24_576.0), "24.0G");
-    }
-
-    #[test]
-    fn compact_span_switches_to_minutes_at_ninety_seconds() {
-        assert_eq!(compact_span(0.0), "0s");
-        assert_eq!(compact_span(89.9), "90s");
-        assert_eq!(compact_span(90.0), "1.5 min");
-        assert_eq!(compact_span(240.0), "4.0 min");
     }
 }

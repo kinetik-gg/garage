@@ -336,21 +336,41 @@ bind(mainMod .. " + L",          "Lock the screen",            "hyprlock")
 
 group = "Media & Hardware"
 
+-- Hardware changes stay in the keybind process; the shell only reads the
+-- resulting device state and presents it. Keeping the mutation before `&&`
+-- also means a failed write never raises a misleading OSD.
+local function with_osd(command, event)
+    local monitor = '"$(hyprctl activeworkspace -j | jq -r .monitor)"'
+    return command .. " && qs ipc --config garage call osd " .. event .. " " .. monitor
+end
+
 -- Audio
-bind("XF86AudioRaiseVolume", "Raise the volume",          "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --output-volume +5 --max-volume 100", { locked = true, repeating = true })
-bind("XF86AudioLowerVolume", "Lower the volume",          "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --output-volume -5",                  { locked = true, repeating = true })
-bind("XF86AudioMute",        "Mute or unmute the output", "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --output-volume mute-toggle",         { locked = true })
-bind("XF86AudioMicMute",     "Mute or unmute the microphone", "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --input-volume mute-toggle",      { locked = true })
+bind("XF86AudioRaiseVolume", "Raise the volume", with_osd(
+    "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+", "output"),
+    { locked = true, repeating = true })
+bind("XF86AudioLowerVolume", "Lower the volume", with_osd(
+    "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-", "output"),
+    { locked = true, repeating = true })
+bind("XF86AudioMute", "Mute or unmute the output", with_osd(
+    "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", "output"),
+    { locked = true })
+bind("XF86AudioMicMute", "Mute or unmute the microphone", with_osd(
+    "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", "microphone"),
+    { locked = true })
 
 -- Media
-bind("XF86AudioPlay",  "Play or pause playback",  "playerctl play-pause", { locked = true })
-bind("XF86AudioPause", "Play or pause playback",  "playerctl play-pause", { locked = true })
-bind("XF86AudioNext",  "Skip to the next track",  "playerctl next",       { locked = true })
-bind("XF86AudioPrev",  "Go to the previous track", "playerctl previous",  { locked = true })
+bind("XF86AudioPlay",  "Play or pause playback",  "qs ipc --config garage call shell mediaAction toggle",   { locked = true })
+bind("XF86AudioPause", "Play or pause playback",  "qs ipc --config garage call shell mediaAction toggle",   { locked = true })
+bind("XF86AudioNext",  "Skip to the next track",  "qs ipc --config garage call shell mediaAction next",     { locked = true })
+bind("XF86AudioPrev",  "Go to the previous track", "qs ipc --config garage call shell mediaAction previous", { locked = true })
 
 -- Brightness
-bind("XF86MonBrightnessUp",   "Increase display brightness", "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --brightness +5", { locked = true, repeating = true })
-bind("XF86MonBrightnessDown", "Decrease display brightness", "swayosd-client --monitor $(hyprctl activeworkspace -j | jq -r .monitor) --brightness -5", { locked = true, repeating = true })
+bind("XF86MonBrightnessUp", "Increase display brightness", with_osd(
+    "brightnessctl --class=backlight --quiet set +5%", "brightness"),
+    { locked = true, repeating = true })
+bind("XF86MonBrightnessDown", "Decrease display brightness", with_osd(
+    "brightnessctl --class=backlight --quiet --min-value=5% set 5%-", "brightness"),
+    { locked = true, repeating = true })
 
 -------------------
 ---- UTILITIES ----
@@ -374,7 +394,7 @@ bind(mainMod .. " + Escape",       "Open the session menu",              "qs ipc
 bind(mainMod .. " + SHIFT + W", "Choose a wallpaper", "qs ipc --config garage call shell preferencesOn wallpaper")
 
 -- Clipboard
-bind(mainMod .. " + SHIFT + V", "Paste from clipboard history", "bash -c 'cliphist list | rofi -normal-window -dmenu -p \"\" | cliphist decode | wl-copy'")
+bind(mainMod .. " + SHIFT + V", "Paste from clipboard history", "qs ipc --config garage call shell launcherClip")
 
 -- Notifications
 bind(mainMod .. " + A",             "Toggle Notification Center",     (os.getenv("HOME") or "") .. "/.local/bin/garage-panel-toggle notifications")

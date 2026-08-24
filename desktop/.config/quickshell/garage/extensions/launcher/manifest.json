@@ -1,0 +1,12 @@
+{
+  "id": "launcher",
+  "name": "Launcher",
+  "version": "1.0.0",
+  "provides": ["bar-widget"],
+  "bar-widget": {
+    "icon": "magnifying-glass",
+    "surface": "launcher",
+    "defaultAnchor": "right",
+    "vertical": "show"
+  }
+}

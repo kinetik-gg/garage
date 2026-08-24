@@ -74,7 +74,7 @@ Scope {
             // keystrokes it is being typed into.
             focusable: false
             aboveWindows: true
-            // Ignore rather than zero: a surface that respects Waybar's
+            // Ignore rather than zero: a surface that respects the bar's
             // exclusive zone stops below the bar, and a click on the bar would
             // then not dismiss. With Ignore the surface is handed the whole
             // output -- measured at the monitor origin, full height -- so no

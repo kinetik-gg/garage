@@ -11,7 +11,7 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use crate::exec::{run, RunError};
+use garage_core::process::{run, RunError};
 
 const ENGINES: [&str; 2] = ["podman", "docker"];
 pub(crate) const TIMEOUT: Duration = Duration::from_secs(3);

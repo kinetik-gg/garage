@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 
 // The bar's clock: date and time from the region marker, and a month-grid popup
-// on hover where waybar's calendar tooltip used to be.
+// on hover without expanding the bar's permanent footprint.
 //
 // The format halves are the schema's enums mapped onto Qt patterns -- no strftime
 // parsing anywhere. The calendar is hand-built rather than Controls.MonthGrid,

@@ -1,21 +1,8 @@
-//! `render_bar_layout()`: the bar's whole layout state, as one watched marker.
+//! `render_bar_layout()`: publish marker v2 for the shell-native bar.
 //!
-//! The Quickshell bar reads its shape -- height, spacing scale, background, and which
-//! widgets are switched on -- from this single file instead of from generated fragments:
-//! [`crate::fs::marker::write_marker`] keeps the inode, so the shell's `FileView` watch
-//! fires and the bar re-lays itself out live. The write *is* the apply; nothing is
-//! signalled and nothing is reloaded.
-//!
-//! This deliberately carries *values*, not module definitions: what a widget's contents
-//! look like is the shell's business, and what the values are is the schema's. One flat
-//! document per consumer concern also means one writer per concern -- this file owns
-//! every key the `[bar]` section decides plus `workspaces.indicator`, exactly the set the
-//! old `BarStyle`/`BarWidgets`/`WorkspaceIndicator` routes moved, so a key cannot land in
-//! a fragment its route does not republish.
-//!
-//! Written alongside the waybar fragments until the waybar cut-over removes them; after
-//! that this is the bar's only rendered state beside the clock format marker
-//! (`render_region()`'s).
+//! The document contains values and ordered extension ids, never QML definitions. It is
+//! written through `write_marker()` so Quickshell's watch remains attached to the same
+//! inode; the marker write is the complete apply mechanism.
 
 use garage_core::fs::marker::write_marker;
 use garage_core::schema::Preferences;
@@ -24,35 +11,26 @@ use garage_core::toml_emit::{json_dumps, Value};
 use crate::cx::RenderCx;
 use crate::error::RenderError;
 
-/// The metric strips the bar can carry, in display order. Mirrors
-/// [`crate::bar::widgets`]'s own list; the two must agree because both decide what
-/// `monitors` may name.
-pub(crate) const BAR_METRICS: &[&str] = &["cpu", "memory", "network", "temp", "disk", "gpu"];
+const MARKER_VERSION: i64 = 2;
 
-/// Whether `bar.monitor_<name>` is on, for one of [`BAR_METRICS`]' names.
-fn monitor_enabled(bar: &garage_core::schema::prefs::Bar, name: &str) -> bool {
-    match name {
-        "cpu" => bar.monitor_cpu,
-        "memory" => bar.monitor_memory,
-        "network" => bar.monitor_network,
-        "temp" => bar.monitor_temp,
-        "disk" => bar.monitor_disk,
-        "gpu" => bar.monitor_gpu,
-        // Unreachable from BAR_METRICS itself; a name outside that fixed list carries no
-        // preference and is treated as switched off rather than panicking.
-        _ => false,
-    }
+fn widget_ids(text: &str) -> Value {
+    Value::Array(
+        text.lines()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(|id| Value::Str(id.to_owned()))
+            .collect(),
+    )
 }
 
-/// The marker's whole value, in key order. Split from the writer so the shape can be
-/// asserted without writing a file.
 fn bar_layout_value(prefs: &Preferences) -> Value {
     let bar = &prefs.bar;
-    let monitors = BAR_METRICS
-        .iter()
-        .map(|&name| (name.to_owned(), Value::Bool(monitor_enabled(bar, name))))
-        .collect::<Vec<_>>();
     Value::Table(vec![
+        ("version".to_owned(), Value::Int(MARKER_VERSION)),
+        (
+            "position".to_owned(),
+            Value::Str(bar.position.as_str().to_owned()),
+        ),
         ("height".to_owned(), Value::Int(bar.height.get())),
         (
             "padding_scale".to_owned(),
@@ -63,20 +41,20 @@ fn bar_layout_value(prefs: &Preferences) -> Value {
             Value::Str(bar.background.as_str().to_owned()),
         ),
         (
-            "indicator".to_owned(),
-            Value::Bool(prefs.workspaces.indicator),
+            "max_group_widgets".to_owned(),
+            Value::Int(bar.max_group_widgets.get()),
         ),
-        ("media_player".to_owned(), Value::Bool(bar.media_player)),
-        ("ai_usage".to_owned(), Value::Bool(bar.ai_usage)),
-        ("monitors".to_owned(), Value::Table(monitors)),
+        ("left".to_owned(), widget_ids(&bar.widgets_left)),
+        ("center".to_owned(), widget_ids(&bar.widgets_center)),
+        ("right".to_owned(), widget_ids(&bar.widgets_right)),
     ])
 }
 
-/// Write the bar's layout marker (`bar-layout.json`).
+/// Write `bar-layout.json` marker v2 in place.
 ///
 /// # Errors
 ///
-/// [`RenderError::Marker`] if the marker could not be written in place.
+/// [`RenderError::Marker`] if the watched marker cannot be written.
 pub fn render_bar_layout(cx: &RenderCx<'_>) -> Result<(), RenderError> {
     let text = format!("{}\n", json_dumps(&bar_layout_value(cx.prefs()), 2));
     write_marker(&cx.paths().markers.bar_layout, &text)?;
@@ -103,8 +81,7 @@ mod tests {
     fn prefs_from(departures: &str) -> Preferences {
         let table: toml::Table = departures.parse().expect("fixture toml parses");
         let defaults = Defaults::compiled().expect("shipped defaults parse");
-        let mut notes = Notes::new();
-        Preferences::coerce_from(&table, &defaults, &mut notes)
+        Preferences::coerce_from(&table, &defaults, &mut Notes::new())
     }
 
     struct NoMonitors;
@@ -121,9 +98,9 @@ mod tests {
         }
     }
 
-    fn scratch_paths(label: &str) -> Paths {
+    fn scratch_paths() -> Paths {
         let home = std::env::temp_dir().join(format!(
-            "garage-render-bar-layout-{label}-{}-{:?}",
+            "garage-render-layout-v2-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -135,73 +112,31 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_defaults_produce_the_pinned_document() {
-        let prefs = prefs_from("");
-        assert_eq!(
-            format!("{}\n", json_dumps(&bar_layout_value(&prefs), 2)),
-            concat!(
-                "{\n",
-                "  \"height\": 43,\n",
-                "  \"padding_scale\": 1.2,\n",
-                "  \"background\": \"transparent\",\n",
-                "  \"indicator\": true,\n",
-                "  \"media_player\": true,\n",
-                "  \"ai_usage\": true,\n",
-                "  \"monitors\": {\n",
-                "    \"cpu\": true,\n",
-                "    \"memory\": true,\n",
-                "    \"network\": true,\n",
-                "    \"temp\": false,\n",
-                "    \"disk\": false,\n",
-                "    \"gpu\": false\n",
-                "  }\n",
-                "}\n"
-            )
-        );
+    fn shipped_defaults_produce_marker_v2() {
+        let text = json_dumps(&bar_layout_value(&prefs_from("")), 2);
+        assert!(text.contains("\"version\": 2"));
+        assert!(text.contains("\"position\": \"top\""));
+        assert!(text.contains("\"left\": [\n    \"menu\",\n    \"workspaces\"\n  ]"));
+        assert!(text.contains("\"center\": [\n    \"media\"\n  ]"));
+        assert!(text.contains("\"max_group_widgets\": 6"));
     }
 
     #[test]
-    fn every_key_the_bar_section_decides_is_carried() {
-        let prefs = prefs_from(
-            "[bar]\nheight = 55\npadding_scale = 1.75\nbackground = \"blurred\"\n\
-             media_player = false\nai_usage = false\nmonitor_temp = true\n\
-             [workspaces]\nindicator = false\n",
-        );
-        assert_eq!(
-            format!("{}\n", json_dumps(&bar_layout_value(&prefs), 2)),
-            concat!(
-                "{\n",
-                "  \"height\": 55,\n",
-                "  \"padding_scale\": 1.75,\n",
-                "  \"background\": \"blurred\",\n",
-                "  \"indicator\": false,\n",
-                "  \"media_player\": false,\n",
-                "  \"ai_usage\": false,\n",
-                "  \"monitors\": {\n",
-                "    \"cpu\": true,\n",
-                "    \"memory\": true,\n",
-                "    \"network\": true,\n",
-                "    \"temp\": true,\n",
-                "    \"disk\": false,\n",
-                "    \"gpu\": false\n",
-                "  }\n",
-                "}\n"
-            )
-        );
+    fn blank_lines_are_not_extension_ids() {
+        let prefs = prefs_from("[bar]\nwidgets_left = \"menu\\n\\nworkspaces\\n\"\n");
+        let text = json_dumps(&bar_layout_value(&prefs), 2);
+        assert!(!text.contains("\"\""));
     }
 
     #[test]
-    fn the_marker_is_written_and_reread_identically() {
+    fn marker_is_written_and_reread_identically() {
         let prefs = prefs_from("");
-        let paths = scratch_paths("write");
+        let paths = scratch_paths();
         let monitors = NoMonitors;
         let lua = LuaAccepts;
         let cx = RenderCx::new(&prefs, &paths, &monitors, &lua);
-
-        render_bar_layout(&cx).expect("render_bar_layout writes the marker");
-
-        let written =
-            std::fs::read_to_string(&paths.markers.bar_layout).expect("the marker was written");
+        render_bar_layout(&cx).expect("marker writes");
+        let written = std::fs::read_to_string(&paths.markers.bar_layout).expect("marker reads");
         assert_eq!(
             written,
             format!("{}\n", json_dumps(&bar_layout_value(&prefs), 2))

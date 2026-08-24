@@ -11,11 +11,18 @@ use super::{Migration, Outcome};
 use crate::ApplyError;
 
 /// Every one-way transformation, in the only order in which it may run.
-pub const REGISTRY: &[Migration] = &[Migration {
-    id: "001-python-backend-residue",
-    summary: "remove the deleted Python backend's bytecode residue",
-    run: python_backend_residue,
-}];
+pub const REGISTRY: &[Migration] = &[
+    Migration {
+        id: "001-python-backend-residue",
+        summary: "remove the deleted Python backend's bytecode residue",
+        run: python_backend_residue,
+    },
+    Migration {
+        id: "002-waybar-residue",
+        summary: "remove links left by the retired Waybar surface",
+        run: super::waybar::waybar_residue,
+    },
+];
 
 #[derive(Debug)]
 struct Target {
@@ -230,7 +237,12 @@ mod tests {
                 Some(Status::Failed(detail))
                     if detail == "refusing to remove ~/.config/waybar/__pycache__: expected a directory or symlink"
             ));
-            assert!(!world.paths.migrations.exists());
+            let stamp = fs::read_to_string(&world.paths.migrations)
+                .expect("the independent 002 migration is stamped");
+            assert!(
+                !stamp.contains("\"id\": \"001-python-backend-residue\""),
+                "the refused 001 migration stays eligible for the next loop"
+            );
         }
         assert!(
             valid.is_dir(),

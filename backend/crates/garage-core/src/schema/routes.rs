@@ -66,18 +66,13 @@ pub enum Route {
     /// The workspace plan, which is the one part of this section the
     /// compositor cares about.
     Workspaces,
-    /// Only the bar is affected -- the workspaces, their rules and their keys
-    /// are untouched -- so this is the one workspaces key that does not
-    /// disturb the compositor.
-    WorkspaceIndicator,
-    /// The bar's stylesheet. Both bar routes end at the same reload and
-    /// neither touches the compositor: the bar is a layer surface with its own
-    /// config and its own stylesheet, and nothing in Hyprland reads either.
-    /// They stay apart because one writes stylesheet state while the other
-    /// writes module-layout state.
+    /// The bar's chrome: edge, spacing scale, background. Both bar routes end
+    /// at the same marker write and neither touches the compositor -- the bar
+    /// is a layer surface of the shell's own process -- and they stay apart
+    /// because one says what the bar looks like while the other says what is
+    /// in it.
     BarStyle,
-    /// The bar's module list. Media spans two module fragments, but still has
-    /// nothing to do with CSS.
+    /// The bar's three widget lists and the fold cap, published whole.
     BarWidgets,
 }
 
@@ -230,9 +225,7 @@ impl Route {
             // FileView watch is the reload. Nothing touches the compositor --
             // the bar is a layer surface of the shell's own process, so there
             // is no signal step left to have.
-            Self::WorkspaceIndicator | Self::BarStyle | Self::BarWidgets => {
-                &[Step::Apply(A::BarLayout)]
-            }
+            Self::BarStyle | Self::BarWidgets => &[Step::Apply(A::BarLayout)],
         }
     }
 }
@@ -273,7 +266,7 @@ mod tests {
     /// Every route, in the Python's table order. Not derived from the key
     /// table: the checks below are about the routes themselves, and one of
     /// them is that no key is the only reason a route exists.
-    const ROUTES: [Route; 22] = [
+    const ROUTES: [Route; 21] = [
         Route::Wallpaper,
         Route::WallpaperLight,
         Route::WallpaperDark,
@@ -293,7 +286,6 @@ mod tests {
         Route::Locale,
         Route::Region,
         Route::Workspaces,
-        Route::WorkspaceIndicator,
         Route::BarStyle,
         Route::BarWidgets,
     ];

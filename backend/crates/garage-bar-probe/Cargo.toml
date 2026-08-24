@@ -13,4 +13,3 @@ workspace = true
 [dependencies]
 garage-core = { path = "../garage-core" }
 serde_json = "1.0.145"
-thiserror = "2.0.20"

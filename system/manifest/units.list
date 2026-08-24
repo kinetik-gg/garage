@@ -12,12 +12,10 @@
 #   oneshot   Type=oneshot: it runs, says its piece and exits, so "inactive" is
 #             its healthy steady state and only "enabled" means anything.
 
-waybar.service               running   # + ExecStartPre=garage render-bar
 hyprpaper.service            running   # + ExecStartPre=garage render-wallpaper
 hypridle.service             running   # + ExecStartPre=garage render-idle
 hyprsunset.service           running
 hyprpolkitagent.service      running   # drop-in points at ~/.local/lib/garage
-swayosd.service              running
 cliphist.service             running
 cliphist-image.service       running
 xsettingsd.service           running

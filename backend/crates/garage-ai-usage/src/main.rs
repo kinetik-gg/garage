@@ -2,21 +2,18 @@
 //! `desktop/.local/bin/garage-ai-usage`.
 //!
 //! Modes:
-//!   `--bar`    Waybar custom-module payload (return-type json). The text is one Phosphor
-//!              glyph; every figure is in the tooltip.
+//!   `--bar`    Shell-native bar payload: availability, glyph, tip, and cache freshness.
 //!   `--json`   Popover payload: subscriptions usage + today's token/cost totals.
 //!   `--probe`  Locate the tokscale CLI; exit 0 + path, or exit 1 + reason.
 //!
-//! Tokscale is optional. When it cannot be found, `--bar` prints an empty text (so
-//! `hide-empty-text` hides the module) and exits 0, `--probe` exits nonzero with a reason,
-//! and `--json` reports `{"available": false}`. Absence is a normal state, never an error
-//! exit -- see [`output::build_bar_output`] and [`output::build_json_output`].
+//! Tokscale is optional. When it cannot be found, `--bar` reports an unavailable native
+//! payload and exits 0, `--probe` exits nonzero with a reason, and `--json` reports
+//! `{"available": false}`. Absence is a normal state, never an error exit -- see
+//! [`output::build_bar_output`] and [`output::build_json_output`].
 #![forbid(unsafe_code)]
 
 mod cache;
-mod exec;
 mod output;
-mod pyjson;
 mod shape;
 mod timeutil;
 mod tokscale;
@@ -43,13 +40,13 @@ fn main() -> ExitCode {
         "--json" => {
             let value =
                 output::build_json_output(tokscale_path.as_deref(), &paths, fetched_at_now());
-            println!("{}", pyjson::to_python_json(&value));
+            println!("{}", garage_core::pyjson::dumps(&value));
             0
         }
         "--bar" => {
             let value =
                 output::build_bar_output(tokscale_path.as_deref(), &paths, epoch_seconds_now());
-            println!("{}", pyjson::to_python_json(&value));
+            println!("{}", garage_core::pyjson::dumps(&value));
             0
         }
         _ => {

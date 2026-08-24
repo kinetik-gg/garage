@@ -13,10 +13,11 @@
 //!           that ratio as "utilization" would be a fabrication: a GPU can sit at
 //!           max clock doing nothing.
 
-use crate::exec;
 use crate::files::{as_float, read_int, read_text, sorted_children, MIB_BYTES};
 use crate::json::{object, Value};
+use garage_core::process;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// Where a GPU stops being an aperture carved out of system RAM and starts being a card
 /// with its own memory. There is no sysfs flag for this -- an APU and a dGPU are both PCI
@@ -81,24 +82,26 @@ pub(crate) fn discover() -> Vec<Gpu> {
     gpus
 }
 
-/// The GPU the bar's single strip follows.
-pub(crate) fn primary(gpus: &[Gpu]) -> Option<&Gpu> {
-    gpus.first()
-}
-
 /// Everything nvidia-smi will say in one call, one card per line.
 ///
 /// A line that does not split into exactly five fields, or whose numbers do not parse,
 /// is skipped rather than failing the whole call: a machine with one working card and
 /// one in a bad state should still draw the working one.
 fn nvidia() -> Vec<Gpu> {
-    let Some(output) = exec::run(&[
-        "nvidia-smi",
-        "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
-        "--format=csv,noheader,nounits",
-    ]) else {
+    let Ok(output) = process::run(
+        &[
+            "nvidia-smi",
+            "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
+            "--format=csv,noheader,nounits",
+        ],
+        Duration::from_secs(2),
+    ) else {
         return Vec::new();
     };
+    if output.status != 0 {
+        return Vec::new();
+    }
+    let output = output.stdout;
     if output.is_empty() {
         return Vec::new();
     }

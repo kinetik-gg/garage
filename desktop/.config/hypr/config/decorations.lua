@@ -125,7 +125,7 @@ if GLASS_AVAILABLE then
             -- process that has not reloaded yet. The replacement host is named
             -- garage-launcher-host and is intentionally absent; its shorter
             -- garage-launcher-glass backing owns the material after reload.
-            layer_namespaces = "garage-screenshot=pill,garage-launcher,garage-launcher-glass,garage-session-menu,garage-session-confirmation,garage-notification-center,garage-control-center,garage-monitor,garage-media,garage-ai-usage",
+            layer_namespaces = "garage-screenshot=pill,garage-launcher,garage-launcher-glass,garage-session-menu,garage-session-confirmation,garage-notification-center,garage-control-center,garage-monitor,garage-media,garage-ai-usage,garage-osd=pill",
             layer_rounding = ROUNDING,
         },
     }})

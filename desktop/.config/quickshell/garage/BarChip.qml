@@ -35,7 +35,7 @@ Item {
 
         anchors.centerIn: parent
         text: chip.label
-        color: chip.warning ? "#e01b24" : chip.labelColor
+        color: chip.warning ? Theme.accentPalette.red : chip.labelColor
         font.family: chip.labelFont
         font.pixelSize: chip.labelSize
         font.weight: Font.DemiBold

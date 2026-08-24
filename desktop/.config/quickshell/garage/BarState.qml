@@ -5,10 +5,9 @@ import QtQuick
 
 // The bar's rendered state, pushed from two watched markers.
 //
-// garage writes ~/.local/state/garage/generated/bar-layout.json on every [bar] and
-// workspaces.indicator change, and clock-format.json on every region change -- both with
-// write_marker, so this file's watches survive. There is no reload signal anywhere in
-// the chain: the write is the apply, exactly as it is for Theme.
+// Marker v2 carries composition as three ordered extension-id rails. It is data,
+// not QML: the registry decides which ids exist, and an unknown id is skipped.
+// garage writes both marker files with write_marker, so these watches survive.
 //
 // Every value falls back to the shipped defaults when a marker has not landed yet --
 // which is only possible before garage's first render -- so an absent file means the
@@ -18,14 +17,19 @@ QtObject {
 
     // -- Layout marker -------------------------------------------------------
 
+    property string position: "top"
     property int height: 43
     property real paddingScale: 1.2
     property string background: "transparent"
-    property bool indicator: true
-    property bool mediaPlayer: true
-    property bool aiUsage: true
-    property var monitors: ({ cpu: true, memory: true, network: false,
-        temp: false, disk: false, gpu: false })
+    property int maxGroupWidgets: 6
+    property var left: ["menu", "workspaces"]
+    property var center: ["media"]
+    property var right: ["system", "tray", "notifications", "launcher",
+        "control-center", "clock"]
+
+    readonly property bool vertical: position === "left" || position === "right"
+    readonly property bool horizontal: !vertical
+    readonly property int thickness: height
 
     // -- Clock marker --------------------------------------------------------
 
@@ -38,7 +42,7 @@ QtObject {
     // documents: text() assigns FileView properties as a side effect, so a binding built
     // on it does not reliably re-evaluate on change.
     property FileView layoutFile: FileView {
-        path: Quickshell.env("HOME") + "/.local/state/garage/generated/bar-layout.json"
+        path: GaragePaths.barLayout
         printErrors: false
         watchChanges: true
         onFileChanged: reload()
@@ -47,20 +51,22 @@ QtObject {
                 const object = JSON.parse(String(text()));
                 if (object === null || typeof object !== "object")
                     return;
+                if (BarState.validPosition(object.position))
+                    position = object.position;
                 if (typeof object.height === "number")
                     height = object.height;
                 if (typeof object.padding_scale === "number")
                     paddingScale = object.padding_scale;
                 if (typeof object.background === "string")
                     background = object.background;
-                if (typeof object.indicator === "boolean")
-                    indicator = object.indicator;
-                if (typeof object.media_player === "boolean")
-                    mediaPlayer = object.media_player;
-                if (typeof object.ai_usage === "boolean")
-                    aiUsage = object.ai_usage;
-                if (object.monitors !== null && typeof object.monitors === "object")
-                    monitors = object.monitors;
+                if (typeof object.max_group_widgets === "number")
+                    maxGroupWidgets = object.max_group_widgets;
+                if (Array.isArray(object.left))
+                    left = BarState.extensionIds(object.left);
+                if (Array.isArray(object.center))
+                    center = BarState.extensionIds(object.center);
+                if (Array.isArray(object.right))
+                    right = BarState.extensionIds(object.right);
             } catch (error) {
                 // A truncated read is re-read on the next change; nothing to log.
             }
@@ -68,7 +74,7 @@ QtObject {
     }
 
     property FileView clockFile: FileView {
-        path: Quickshell.env("HOME") + "/.local/state/garage/generated/clock-format.json"
+        path: GaragePaths.clockFormat
         printErrors: false
         watchChanges: true
         onFileChanged: reload()
@@ -99,7 +105,7 @@ QtObject {
     // every notch of the slider.
     readonly property var paddingTable: ({
         edge: 18, menuRight: 13, workspaceGap: 5,
-        module: 12, image: 8, icon: 10, tray: 8
+        module: 12, image: 8, icon: 10, tray: 8, tooltip: 8
     })
 
     function roundHalfEven(value) {
@@ -111,6 +117,22 @@ QtObject {
     }
 
     function scaled(name) {
-        return roundHalfEven(paddingTable[name] * paddingScale);
+        const base = paddingTable[name];
+        return typeof base === "number" ? roundHalfEven(base * paddingScale) : 0;
+    }
+
+    function validPosition(value) {
+        return value === "top" || value === "bottom"
+            || value === "left" || value === "right";
+    }
+
+    function extensionIds(value) {
+        const ids = [];
+        for (const candidate of value) {
+            const id = String(candidate || "").trim();
+            if (id !== "")
+                ids.push(id);
+        }
+        return ids;
     }
 }
