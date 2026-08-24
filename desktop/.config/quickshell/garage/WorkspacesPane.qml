@@ -12,6 +12,18 @@ Flickable {
     // attached, ids included. Recomputing it here would be a second allocator to
     // disagree with the one that writes the compositor's rules.
     readonly property var plan: controller.snapshot.workspaces || { max: 10, displays: [] }
+
+    // Which bar rail holds the indicator, "" when it is off. The switch below
+    // removes it from whichever rail has it and turns it back on into the left
+    // one, so toggling here never duplicates a widget the Menu Bar pane moved.
+    readonly property string indicatorGroup: {
+        const groups = ["left", "center", "right"];
+        for (let index = 0; index < groups.length; ++index) {
+            if (pane.controller.barList(groups[index]).indexOf("workspaces") !== -1)
+                return groups[index];
+        }
+        return "";
+    }
     readonly property bool shared: controller.preference("workspaces", "mode", "per-display") === "shared"
 
     readonly property var countLabels: {
@@ -55,9 +67,14 @@ Flickable {
                 title: "Show in Menu Bar"
                 description: "Hiding the indicator leaves the workspaces and their shortcuts alone."
                 SettingsSwitch {
-                    checked: pane.controller.preference("workspaces", "indicator", true)
-                    onToggled: value => pane.controller.setPreference(
-                        "workspaces", "indicator", value)
+                    checked: pane.indicatorGroup !== ""
+                    onToggled: value => {
+                        if (value && pane.indicatorGroup === "")
+                            pane.controller.barListSetGroup("workspaces", "", "left");
+                        else if (!value && pane.indicatorGroup !== "")
+                            pane.controller.barListSetGroup(
+                                "workspaces", pane.indicatorGroup, "");
+                    }
                 }
             }
         }

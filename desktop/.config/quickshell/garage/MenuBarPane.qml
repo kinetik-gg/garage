@@ -1,7 +1,6 @@
-import Quickshell
-import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 
 Flickable {
     id: pane
@@ -10,24 +9,103 @@ Flickable {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
-    readonly property string aiUsageHelper: Quickshell.env("HOME") + "/.local/bin/garage-ai-usage"
+    readonly property string background: pane.controller.preference(
+        "bar", "background", "transparent")
+    readonly property string position: pane.controller.preference("bar", "position", "top")
 
-    // Probed once when the pane is built. Loader.setSource recreates this pane
-    // on every visit to the section (see PreferencesPalette), so there is no
-    // stale state to refresh -- and whether the tokscale CLI exists does not
-    // change while Preferences is sitting open.
-    property bool aiUsageProbing: true
-    property bool aiUsageAvailable: false
+    // Anchor options in the order the segmented control shows them: right is
+    // the default home for a widget, and left sits last because it is meant
+    // for structural pieces like the menu, not the next thing installed.
+    readonly property var anchorGroups: ["right", "center", "", "left"]
 
-    readonly property string background: pane.controller.preference("bar", "background", "blurred")
+    // One row per widget the bar can draw: every stored id in rail order, then
+    // the discovered extensions that are not placed anywhere. Ids that no
+    // longer resolve to an extension stay listed rather than being dropped --
+    // a stored id nobody can see or remove would otherwise be stuck in the
+    // preference forever. An id stored in two rails lists once; the bar draws
+    // rails left to right, so the first rail is the one shown here.
+    readonly property var widgetRows: {
+        const discovered = ExtensionRegistry.barWidgets || [];
+        const byId = {};
+        for (let index = 0; index < discovered.length; ++index)
+            byId[discovered[index].id] = discovered[index];
+        const rows = [];
+        const seen = {};
+        const groups = ["left", "center", "right"];
+        for (let at = 0; at < groups.length; ++at) {
+            const list = pane.controller.barList(groups[at]);
+            for (let index = 0; index < list.length; ++index) {
+                const id = list[index];
+                if (seen[id])
+                    continue;
+                seen[id] = true;
+                rows.push({
+                    id: id,
+                    name: byId[id] !== undefined ? byId[id].name : id,
+                    group: groups[at],
+                    index: index,
+                    count: list.length,
+                    known: byId[id] !== undefined
+                });
+            }
+        }
+        for (let index = 0; index < discovered.length; ++index) {
+            const extension = discovered[index];
+            if (!seen[extension.id])
+                rows.push({ id: extension.id, name: extension.name,
+                    group: "", index: -1, count: 0, known: true });
+        }
+        return rows;
+    }
 
-    Process {
-        id: aiUsageProbe
-        command: [pane.aiUsageHelper, "--probe"]
-        running: true
-        onExited: exitCode => {
-            pane.aiUsageAvailable = exitCode === 0;
-            pane.aiUsageProbing = false;
+    // The nudge arrows beside each anchored widget. One glyph, flipped for
+    // down: the icon set ships arrow-up only, and a mirrored copy would be
+    // one more file to keep in step with it.
+    component ReorderButton: ContinuousRectangle {
+        id: nudge
+        property bool down: false
+        property bool enabled: true
+        signal clicked()
+
+        width: 28
+        height: 32
+        radius: Theme.controlRadius
+        color: nudgePointer.containsMouse && nudge.enabled ? Theme.hoverStrong : Theme.hover
+        borderWidth: 1
+        borderColor: Theme.border
+        opacity: nudge.enabled ? 1 : 0.35
+
+        Image {
+            id: nudgeGlyph
+            anchors.centerIn: parent
+            width: 13
+            height: 13
+            source: "icons/arrow-up.svg"
+            sourceSize.width: 26
+            sourceSize.height: 26
+            smooth: true
+            antialiasing: true
+            mipmap: true
+            visible: false
+        }
+
+        // The svg ships its own colour, so it needs an overlay to be
+        // recoloured at all.
+        ColorOverlay {
+            anchors.fill: nudgeGlyph
+            source: nudgeGlyph
+            rotation: nudge.down ? 180 : 0
+            color: Theme.text
+            cached: true
+        }
+
+        MouseArea {
+            id: nudgePointer
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: nudge.enabled
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: nudge.clicked()
         }
     }
 
@@ -35,6 +113,22 @@ Flickable {
         id: content
         width: pane.width
         spacing: 22
+
+        SettingsGroup {
+            title: "POSITION"
+
+            SettingsRow {
+                title: "Screen Edge"
+                description: "Dragging the bar's background to another edge moves it too."
+                SettingsSegmented {
+                    model: ["Top", "Bottom", "Left", "Right"]
+                    currentIndex: Math.max(0,
+                        ["top", "bottom", "left", "right"].indexOf(pane.position))
+                    onActivated: index => pane.controller.setPreference(
+                        "bar", "position", ["top", "bottom", "left", "right"][index])
+                }
+            }
+        }
 
         SettingsGroup {
             title: "APPEARANCE"
@@ -55,12 +149,12 @@ Flickable {
 
             SettingsRow {
                 title: "Height"
-                description: Math.round(pane.controller.preference("bar", "height", 44)) + " px"
+                description: Math.round(pane.controller.preference("bar", "height", 43)) + " px"
                 SettingsSlider {
                     from: 30
                     to: 60
                     stepSize: 1
-                    value: pane.controller.preference("bar", "height", 44)
+                    value: pane.controller.preference("bar", "height", 43)
                     onCommitted: next => pane.controller.setPreference(
                         "bar", "height", Math.round(next))
                 }
@@ -69,96 +163,93 @@ Flickable {
             SettingsRow {
                 title: "Padding"
                 description: Number(pane.controller.preference(
-                    "bar", "padding_scale", 1.0)).toFixed(2) + "×"
+                    "bar", "padding_scale", 1.2)).toFixed(2) + "×"
                 SettingsSlider {
                     from: 1.0
                     to: 2.0
                     stepSize: 0.05
-                    value: pane.controller.preference("bar", "padding_scale", 1.0)
+                    value: pane.controller.preference("bar", "padding_scale", 1.2)
                     onCommitted: next => pane.controller.setPreference(
                         "bar", "padding_scale", next)
                 }
             }
         }
 
-        // The workspaces indicator toggle lives on the Workspaces pane, next to
-        // the settings that decide what it counts and labels -- it is not
-        // duplicated here even though it is also a bar widget.
+        // The rows come from what is actually installed, not a shipped list:
+        // an extension dropped into an extensions root shows up here on its
+        // own, with nothing in the backend knowing its name.
         SettingsGroup {
             title: "WIDGETS"
 
             SettingsRow {
-                title: "CPU"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_cpu", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_cpu", value)
-                }
-            }
-
-            SettingsRow {
-                title: "Memory"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_memory", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_memory", value)
-                }
-            }
-
-            SettingsRow {
-                title: "Network"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_network", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_network", value)
-                }
-            }
-
-            SettingsRow {
-                title: "Temperature"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_temp", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_temp", value)
-                }
-            }
-
-            SettingsRow {
-                title: "Disk"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_disk", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_disk", value)
-                }
-            }
-
-            SettingsRow {
-                title: "GPU"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "monitor_gpu", true)
-                    onToggled: value => pane.controller.setPreference("bar", "monitor_gpu", value)
+                title: "Widgets per Section"
+                description: "A section holding more than "
+                    + Math.round(pane.controller.preference("bar", "max_group_widgets", 6))
+                    + " widgets folds the rest behind a chevron."
+                SettingsSlider {
+                    from: 2
+                    to: 16
+                    stepSize: 1
+                    value: pane.controller.preference("bar", "max_group_widgets", 6)
+                    onCommitted: next => pane.controller.setPreference(
+                        "bar", "max_group_widgets", Math.round(next))
                 }
             }
 
             MenuSeparator { Layout.fillWidth: true }
 
-            // Disabled rather than hidden when tokscale is missing: the
-            // preference the switch writes is still real (garage-ai-usage
-            // itself reports {"available": false} and the bar module hides
-            // its own text either way), and a control the pane quietly drops
-            // would leave a stored "on" nobody can see or change here again
-            // once tokscale is installed and the widget starts drawing.
-            SettingsRow {
-                title: "AI Usage"
-                description: pane.aiUsageProbing ? "Checking for tokscale…"
-                    : (pane.aiUsageAvailable ? "" : "Install tokscale to enable.")
-                SettingsSwitch {
-                    enabled: pane.aiUsageAvailable
-                    checked: pane.controller.preference("bar", "ai_usage", true)
-                    onToggled: value => pane.controller.setPreference("bar", "ai_usage", value)
-                }
-            }
+            Repeater {
+                model: pane.widgetRows
 
-            SettingsRow {
-                title: "Media Player"
-                SettingsSwitch {
-                    checked: pane.controller.preference("bar", "media_player", true)
-                    onToggled: value => pane.controller.setPreference("bar", "media_player", value)
+                SettingsRow {
+                    id: entry
+                    required property var modelData
+                    title: entry.modelData.name
+                    rowEnabled: entry.modelData.known
+                    description: !entry.modelData.known
+                        ? "Nothing installed provides this widget."
+                        : entry.modelData.group === "left"
+                            ? "Left is for structural widgets; most belong on the right."
+                            : ""
+
+                    Row {
+                        spacing: 6
+
+                        ReorderButton {
+                            visible: entry.modelData.known && entry.modelData.group !== ""
+                            enabled: entry.modelData.index > 0
+                            onClicked: pane.controller.barListMove(
+                                entry.modelData.id, entry.modelData.group, -1)
+                        }
+
+                        ReorderButton {
+                            down: true
+                            visible: entry.modelData.known && entry.modelData.group !== ""
+                            enabled: entry.modelData.index < entry.modelData.count - 1
+                            onClicked: pane.controller.barListMove(
+                                entry.modelData.id, entry.modelData.group, 1)
+                        }
+
+                        SettingsSegmented {
+                            visible: entry.modelData.known
+                            implicitWidth: 236
+                            model: ["Right", "Center", "Off", "Left"]
+                            currentIndex: pane.anchorGroups.indexOf(entry.modelData.group)
+                            onActivated: index => {
+                                const target = pane.anchorGroups[index];
+                                if (target !== entry.modelData.group)
+                                    pane.controller.barListSetGroup(
+                                        entry.modelData.id, entry.modelData.group, target);
+                            }
+                        }
+
+                        SettingsButton {
+                            visible: !entry.modelData.known
+                            text: "Remove"
+                            onClicked: pane.controller.barListSetGroup(
+                                entry.modelData.id, entry.modelData.group, "")
+                        }
+                    }
                 }
             }
         }

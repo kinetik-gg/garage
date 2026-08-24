@@ -13,7 +13,13 @@ Scope {
     onInitialSectionChanged: showSection(initialSection)
     onCurrentSectionChanged: paneLoader.setSource(sourceFor(currentSection), { "controller": controller })
 
-    Component.onCompleted: showSection(initialSection)
+    Component.onCompleted: {
+        showSection(initialSection);
+        // The controller outlives this window now, so ask for a fresh snapshot
+        // on open -- displays and audio can change while nothing is watching.
+        if (controller.ready)
+            controller.refresh();
+    }
     signal dismissed()
 
     readonly property var categories: [
@@ -61,7 +67,11 @@ Scope {
             currentSection = section;
     }
 
-    PreferencesController { id: controller }
+    // The shared controller singleton, aliased so the bindings below read as
+    // they always have. This window and the control centre used to each build
+    // a private copy; both consume the one instance now, so a tile and a pane
+    // share the same optimistic snapshot instead of racing to refresh it.
+    readonly property var controller: PreferencesController
 
     // A real toplevel rather than a layer surface, so the compositor can move,
     // stack and focus it like any other window. It also picks up the window
@@ -204,7 +214,9 @@ Scope {
                     }
 
                     WallpaperPicker {
-                        controller: controller
+                        // Qualified: unqualified, the name would resolve to the
+                        // picker's own controller property, not the singleton.
+                        controller: preferences.controller
                         targetScreenName: preferences.targetScreenName
                         parentWindow: window
                         targetKey: controller.wallpaperPickerKey

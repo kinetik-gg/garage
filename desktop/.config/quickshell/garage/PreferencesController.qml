@@ -1,13 +1,17 @@
+pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
 
-Scope {
+// One preferences backend for the whole shell. The settings window and the
+// control centre used to each instantiate a private copy, which meant two
+// optimistic snapshots and two command queues that could disagree about what
+// was set -- the queue below only serializes writes that actually share it.
+Singleton {
     id: controller
 
-    readonly property string helper: Quickshell.env("HOME") + "/.local/bin/garage"
-    readonly property string indexHelper: Quickshell.env("HOME")
-        + "/.local/bin/garage-file-index"
+    readonly property string helper: GaragePaths.garage
+    readonly property string indexHelper: GaragePaths.fileIndex
     property var snapshot: ({
         preferences: { appearance: {}, input: {}, lock: {} },
         displays: [], audio: { outputs: [], inputs: [] },
@@ -122,6 +126,77 @@ Scope {
             return;
         controller.setPreference("indexing", "directories",
             current.concat([value]).join("\n"));
+    }
+
+    // -- Bar composition -----------------------------------------------------
+    // Each bar rail is one \n-joined scalar, edited read-modify-write here.
+    // Every rewrite goes through setPreference, so it rides the serialized
+    // command queue above -- the Menu Bar pane and the Workspaces pane cannot
+    // interleave the halves of a move into each other's writes.
+
+    // Mirrors of the schema defaults, so a toggle before the first snapshot
+    // lands edits the rails the bar is actually drawing, not an empty list.
+    readonly property var barRailDefaults: ({
+        left: "menu\nworkspaces",
+        center: "media",
+        right: "system\ntray\nnotifications\nlauncher\ncontrol-center\nclock"
+    })
+    readonly property var barGroups: ["left", "center", "right"]
+
+    function barList(group) {
+        if (barGroups.indexOf(group) === -1)
+            return [];
+        const fallback = barRailDefaults[group] !== undefined
+            ? barRailDefaults[group] : "";
+        return String(controller.preference("bar", "widgets_" + group, fallback))
+            .split("\n").map(item => item.trim()).filter(Boolean);
+    }
+
+    function barListToggle(id, group) {
+        if (barGroups.indexOf(group) === -1)
+            return;
+        const list = controller.barList(group);
+        const at = list.indexOf(id);
+        if (at === -1)
+            list.push(id);
+        else
+            list.splice(at, 1);
+        controller.setPreference("bar", "widgets_" + group, list.join("\n"));
+    }
+
+    function barListMove(id, group, delta) {
+        if (barGroups.indexOf(group) === -1)
+            return;
+        const list = controller.barList(group);
+        const at = list.indexOf(id);
+        const destination = at + delta;
+        if (at === -1 || destination < 0 || destination >= list.length)
+            return;
+        list.splice(at, 1);
+        list.splice(destination, 0, id);
+        controller.setPreference("bar", "widgets_" + group, list.join("\n"));
+    }
+
+    // An empty destination means unanchored. Inspect every live rail rather
+    // than trusting the row's source label: this also repairs an id inherited
+    // in two rails, removing every duplicate while preserving its position if
+    // it is already in the requested destination.
+    function barListSetGroup(id, from, to) {
+        if (from === to)
+            return;
+        if (to !== "" && barGroups.indexOf(to) === -1)
+            return;
+        for (const group of barGroups) {
+            const current = controller.barList(group);
+            const at = current.indexOf(id);
+            const next = current.filter(candidate => candidate !== id);
+            if (group === to) {
+                const destination = at === -1 ? next.length : Math.min(at, next.length);
+                next.splice(destination, 0, id);
+            }
+            if (next.join("\n") !== current.join("\n"))
+                controller.setPreference("bar", "widgets_" + group, next.join("\n"));
+        }
     }
 
     function refreshIndexStatus() {
