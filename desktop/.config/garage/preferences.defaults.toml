@@ -3,7 +3,7 @@
 # new set reuses an old name -- corner_radius normal, which used to mean what
 # large means now -- would re-fire on every load and walk the setting away.
 [schema]
-preferences_version = 5
+preferences_version = 6
 
 [appearance]
 # The desktop picture belongs to the appearance, so light and dark each keep
@@ -40,11 +40,9 @@ glass_clarity = 0.75
 glass_highlight = 0.12
 
 [bar]
-# The menu bar's height in pixels, and the multiplier over the spacing inside it.
-# Neither can live in ~/.config/waybar/config.jsonc: waybar gives an option named
-# in that file to that file, so an option it names could never be overridden from
-# the generated fragment. height, modules-left, modules-center and modules-right
-# are all published from ~/.local/state/garage/generated instead.
+# The bar's size on its thin axis, in pixels: height when it docks top or
+# bottom, width on a side. Below thirty the workspace dots and the widget icons
+# stop fitting; above sixty it is a panel rather than a bar.
 height = 43
 # 1.0 is the spacing PADDING_TABLE ships; the default is a little looser because
 # those values were drawn for a shorter bar.
@@ -53,22 +51,21 @@ padding_scale = 1.2
 # behind it. blurred: the same layer plus a light or dark tint from the palette,
 # which is what frosts it.
 background = "transparent"
-# One switch per metric strip. Each one is a garage-metrics widget, drawn as an
-# SVG the bar shows through its image module. The three that are on are the three
-# every machine has; temperature, disk and GPU depend on hardware that may not be
-# there, and a strip drawing a flat line is worse than no strip.
-monitor_cpu = true
-monitor_memory = true
-monitor_network = true
-monitor_temp = false
-monitor_disk = false
-monitor_gpu = false
-# The AI token-usage readout. Safe to leave on: it prints nothing at all when the
-# tokscale CLI is not installed, and the module hides itself on an empty text.
-ai_usage = true
-# The now-playing readout immediately after the workspace indicator. It hides
-# itself when no player is running.
-media_player = true
+# Which screen edge the bar docks to. Dragging the bar sets this same key, so a
+# drop and a typed `garage set` cannot disagree about where the bar is.
+position = "top"
+# The three rails, one extension id per line. One id per line keeps the editable
+# layer a scalar (the preference schema's leaf contract) while the UI still
+# presents a real list, and the ids are deliberately unchecked: which extensions
+# exist is the shell registry's to know, so an id it cannot find is skipped
+# rather than refused, and a third-party widget needs no schema change. The
+# right rail is where widgets belong; left is available but crowds the menu.
+widgets_left = "menu\nworkspaces"
+widgets_center = "media"
+widgets_right = "system\ntray\nnotifications\nlauncher\ncontrol-center\nclock"
+# Past this many widgets a rail folds the excess behind a chevron. Six keeps the
+# shipped right rail from ever folding.
+max_group_widgets = 6
 
 [general]
 terminal = ""
@@ -125,9 +122,6 @@ counts = ""
 # the two modes answer different questions and switching between them must not
 # rewrite the other one's answer.
 shared_count = 8
-# Whether the menu bar shows the workspace indicator at all. Only the bar is
-# affected -- the workspaces, their rules and their keys are untouched.
-indicator = true
 
 [region]
 # Empty means "no override": the session keeps whatever LANG the system locale

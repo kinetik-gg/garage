@@ -13,7 +13,7 @@
     {
      "argv": [],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\nWhat `garage repair --reset` would do:\n  1. copy the file to ~/.config/garage/preferences.toml.bak-<timestamp>, a name\n     that is never reused -- an existing backup is never overwritten\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 5) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\nWhat `garage repair --reset` would do:\n  1. copy the file to ~/.config/garage/preferences.toml.bak-<timestamp>, a name\n     that is never reused -- an existing backup is never overwritten\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 6) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
      "error": ""
     }
    ],
@@ -26,7 +26,7 @@
   },
   {
    "name": "preview-parses",
-   "initial": "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"teal\"\n",
+   "initial": "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"teal\"\n",
    "has_initial": true,
    "neighbours": {
     "displays.toml": "primary = \"DP-1\"\n",
@@ -37,14 +37,14 @@
     {
      "argv": [],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     parses as TOML\n  size      69 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\nWhat `garage repair --reset` would do:\n  1. copy the file to ~/.config/garage/preferences.toml.bak-<timestamp>, a name\n     that is never reused -- an existing backup is never overwritten\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 5) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     parses as TOML\n  size      69 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\nWhat `garage repair --reset` would do:\n  1. copy the file to ~/.config/garage/preferences.toml.bak-<timestamp>, a name\n     that is never reused -- an existing backup is never overwritten\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 6) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
      "error": ""
     }
    ],
    "tree_after": {
     "displays.toml": "primary = \"DP-1\"\n",
     "keybindings.toml": "[overrides]\n",
-    "preferences.toml": "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"teal\"\n",
+    "preferences.toml": "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"teal\"\n",
     "workspace-blocks.toml": "[block]\n"
    }
   },
@@ -61,7 +61,7 @@
     {
      "argv": [],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does not exist (which is what a fresh install looks like)\n\nWhat `garage repair --reset` would do:\n  1. nothing to back up, because there is no file yet\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 5) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does not exist (which is what a fresh install looks like)\n\nWhat `garage repair --reset` would do:\n  1. nothing to back up, because there is no file yet\n  2. write a fresh preferences.toml carrying the schema stamp\n     (preferences_version = 6) and nothing else, which is factory state: the\n     file holds your departures from the shipped defaults, so no departures\n     means every setting follows what Garage ships\n  3. load it back and report whether the result is healthy\n\nNothing else is touched. displays.toml, keybindings.toml and\nworkspace-blocks.toml are records rather than settings and each has its own\nway back already: an unconfirmed display layout reverts itself after 15s,\nthe rescue shortcuts in config/binds.lua never read keybindings.toml, and a\nworkspace block that cannot be read is handed out again.\n\nNothing has been changed. Re-run as `garage repair --reset` to act.\n",
      "error": ""
     }
    ],
@@ -86,14 +86,14 @@
       "--reset"
      ],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed  (49 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 5)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed  (49 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 6)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
      "error": ""
     }
    ],
    "tree_after": {
     "displays.toml": "primary = \"DP-1\"\n",
     "keybindings.toml": "[overrides]\n",
-    "preferences.toml": "[schema]\npreferences_version = 5\n",
+    "preferences.toml": "[schema]\npreferences_version = 6\n",
     "preferences.toml.bak-fixed": "[appearance\naccent_color = \"teal\nnot toml at all\n",
     "workspace-blocks.toml": "[block]\n"
    }
@@ -113,7 +113,7 @@
       "--reset"
      ],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed  (49 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 5)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does NOT parse: Expected ']' at the end of a table declaration (at line 1, column 12)\n  size      49 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed  (49 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 6)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
      "error": ""
     },
     {
@@ -121,16 +121,16 @@
       "--reset"
      ],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     parses as TOML\n  size      33 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed-2  (33 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 5)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed-2\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     parses as TOML\n  size      33 byte(s)\n  modified  2026-08-14T00:42:45+0700\n\n  backup    ~/.config/garage/preferences.toml.bak-fixed-2  (33 byte(s))\n  written   fresh preferences.toml, schema stamp only (preferences_version = 6)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nYour old file is kept at\n  ~/.config/garage/preferences.toml.bak-fixed-2\nNothing reads it now, so anything worth keeping can be copied out by hand.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
      "error": ""
     }
    ],
    "tree_after": {
     "displays.toml": "primary = \"DP-1\"\n",
     "keybindings.toml": "[overrides]\n",
-    "preferences.toml": "[schema]\npreferences_version = 5\n",
+    "preferences.toml": "[schema]\npreferences_version = 6\n",
     "preferences.toml.bak-fixed": "[appearance\naccent_color = \"teal\nnot toml at all\n",
-    "preferences.toml.bak-fixed-2": "[schema]\npreferences_version = 5\n",
+    "preferences.toml.bak-fixed-2": "[schema]\npreferences_version = 6\n",
     "workspace-blocks.toml": "[block]\n"
    }
   },
@@ -149,14 +149,14 @@
       "--reset"
      ],
      "status": 0,
-     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does not exist (which is what a fresh install looks like)\n\n  backup    none needed; there was no file to keep\n  written   fresh preferences.toml, schema stamp only (preferences_version = 5)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
+     "stdout": "Garage repair -- preferences.toml only\n\n  file      ~/.config/garage/preferences.toml\n  state     does not exist (which is what a fresh install looks like)\n\n  backup    none needed; there was no file to keep\n  written   fresh preferences.toml, schema stamp only (preferences_version = 6)\n  after     loads with every value in range\n\nEvery setting is back at the shipped default.\nRun `garage apply` to move this session onto the defaults, or log out and back in.\n",
      "error": ""
     }
    ],
    "tree_after": {
     "displays.toml": "primary = \"DP-1\"\n",
     "keybindings.toml": "[overrides]\n",
-    "preferences.toml": "[schema]\npreferences_version = 5\n",
+    "preferences.toml": "[schema]\npreferences_version = 6\n",
     "workspace-blocks.toml": "[block]\n"
    }
   },

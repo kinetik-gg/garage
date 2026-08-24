@@ -185,7 +185,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(&paths.host.preferences).expect("the file was written"),
-            "[schema]\npreferences_version = 5\n\n[appearance]\ntheme_mode = \"light\"\n"
+            "[schema]\npreferences_version = 6\n\n[appearance]\ntheme_mode = \"light\"\n"
         );
         // Route::Theme is apply_theme_if_scheme_moved, and nothing has ever been pushed on
         // this scratch machine, so the gate is open and the palette is pushed for real.
@@ -213,7 +213,7 @@ mod tests {
         .expect("a refused value is corrected rather than refused");
         assert_eq!(
             fs::read_to_string(&paths.host.preferences).expect("the file was written"),
-            "[schema]\npreferences_version = 5\n"
+            "[schema]\npreferences_version = 6\n"
         );
         drop(fs::remove_dir_all(&home));
     }

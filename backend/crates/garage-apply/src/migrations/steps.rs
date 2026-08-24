@@ -11,11 +11,18 @@ use super::{Migration, Outcome};
 use crate::ApplyError;
 
 /// Every one-way transformation, in the only order in which it may run.
-pub const REGISTRY: &[Migration] = &[Migration {
-    id: "001-python-backend-residue",
-    summary: "remove the deleted Python backend's bytecode residue",
-    run: python_backend_residue,
-}];
+pub const REGISTRY: &[Migration] = &[
+    Migration {
+        id: "001-python-backend-residue",
+        summary: "remove the deleted Python backend's bytecode residue",
+        run: python_backend_residue,
+    },
+    Migration {
+        id: "002-waybar-residue",
+        summary: "remove links left by the retired Waybar surface",
+        run: super::waybar::waybar_residue,
+    },
+];
 
 #[derive(Debug)]
 struct Target {

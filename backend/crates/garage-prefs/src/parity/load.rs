@@ -31,10 +31,10 @@ fn load_rewriting(label: &str, planted: &str, expected: &str) -> Vec<String> {
 }
 
 /// The stamp and nothing else: a machine sitting on factory state.
-const FACTORY: &str = "[schema]\npreferences_version = 5\n";
+const FACTORY: &str = "[schema]\npreferences_version = 6\n";
 /// The stamp and one departure, which is what one changed setting costs.
 const ONE_DEPARTURE: &str =
-    "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n";
+    "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n";
 
 #[test]
 fn a_fresh_install_is_not_given_a_file() {
@@ -117,7 +117,7 @@ fn a_v4_file_that_is_already_departures_only_keeps_its_old_stamp() {
 fn a_hand_written_file_keeps_its_comments() {
     let notes = load_leaving_it_alone(
         "v5-comments",
-        "# hand written, keep me\n[schema]\npreferences_version = 5\n\n\
+        "# hand written, keep me\n[schema]\npreferences_version = 6\n\n\
          [appearance]\n# why red\naccent_color = \"red\"\n",
     );
     assert!(notes.is_empty());
@@ -171,7 +171,7 @@ fn an_unknown_key_is_reported_and_dropped_at_migration_time() {
 fn an_unknown_key_in_a_current_file_is_left_where_it_is() {
     let notes = load_leaving_it_alone(
         "v5-unknown-key",
-        "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n\
+        "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n\
          not_a_key = 1\n",
     );
     assert!(notes.is_empty());
@@ -449,7 +449,7 @@ mod divergences {
     /// which is the `a_section_that_is_not_a_table_is_dropped_whole` case above.
     #[test]
     fn a_stamped_section_that_is_not_a_table_does_not_crash_the_load() {
-        let planted = "appearance = \"hi\"\n\n[schema]\npreferences_version = 5\n";
+        let planted = "appearance = \"hi\"\n\n[schema]\npreferences_version = 6\n";
         let (notes, after) = load("section-scalar-v5", Some(planted));
         assert!(notes.is_empty());
         assert_eq!(after.as_deref(), Some(planted));

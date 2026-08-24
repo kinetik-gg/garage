@@ -469,7 +469,7 @@ pub(crate) mod tests {
     fn factory_state_is_the_stamp_and_nothing_else() {
         assert_eq!(
             factory_preferences().expect("the stamp emits"),
-            "[schema]\npreferences_version = 5\n"
+            "[schema]\npreferences_version = 6\n"
         );
     }
 }

@@ -120,7 +120,7 @@ mod tests {
     fn plant_checkout(checkout: &Path) -> PathBuf {
         let shipped = checkout.join("desktop/.config/garage/preferences.defaults.toml");
         fs::create_dir_all(shipped.parent().expect("defaults parent")).expect("defaults parent");
-        fs::write(&shipped, "[schema]\npreferences_version = 5\n").expect("shipped defaults");
+        fs::write(&shipped, "[schema]\npreferences_version = 6\n").expect("shipped defaults");
         fs::write(checkout.join("desktop/.stow-local-ignore"), "").expect("checkout marker");
         shipped
     }

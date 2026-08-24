@@ -23,6 +23,7 @@
 
 mod state;
 mod steps;
+mod waybar;
 
 use garage_core::paths::Paths;
 use serde::{Deserialize, Serialize};

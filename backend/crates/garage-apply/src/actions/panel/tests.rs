@@ -99,8 +99,8 @@ fn invalid_panel_and_widget_requests_are_refused_before_session_queries() {
     for (value, message) in [
         (json!({"panel": "weather"}), "Unknown panel: weather"),
         (
-            json!({"panel": "monitor", "widget": "battery"}),
-            "Unknown monitor widget: battery",
+            json!({"panel": "monitor", "widget": 7}),
+            "panel.toggle requires widget to be a string",
         ),
         (
             json!({"panel": "media", "widget": "cpu"}),
@@ -113,4 +113,20 @@ fn invalid_panel_and_widget_requests_are_refused_before_session_queries() {
         assert_eq!(error.to_string(), message);
         assert!(world.trace().is_empty());
     }
+}
+
+#[test]
+fn monitor_accepts_extension_owned_widget_ids() {
+    let world = World::plain("panel-extension-widget", session_script(CURSOR));
+    action(
+        &world.paths,
+        world.runner(),
+        "panel.toggle",
+        Some(&json!({"panel": "monitor", "widget": "third-party-sensor"})),
+    )
+    .expect("the extension registry, not the backend, owns widget ids");
+    assert_eq!(
+        qs_calls(&world),
+        ["qs -c garage ipc call shell monitorOn DP-2 -1"]
+    );
 }

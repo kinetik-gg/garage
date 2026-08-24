@@ -1,8 +1,8 @@
 //! `panel.toggle`: turn a keybind into the corresponding Quickshell IPC call.
 //!
 //! This is the Rust home of `garage-panel-toggle`'s shell body. The action accepts
-//! `{"panel": NAME, "widget": OPTIONAL_METRIC}`; the widget names which monitoring strip
-//! was asked for but does not steer the dashboard, exactly as before.
+//! `{"panel": NAME, "widget": OPTIONAL_WIDGET_ID}`; any string id is accepted for the
+//! monitor panel so third-party extensions are not coupled to a backend enumeration.
 //!
 //! Since the bar moved into the shell, a bar click no longer passes through here at all:
 //! it calls the same shell functions in-process with its own anchor coordinates. What
@@ -18,8 +18,6 @@ use super::hyprland::output_at_cursor;
 use crate::command::run;
 use crate::cx::SessionCx;
 use crate::error::ApplyError;
-
-const METRICS: [&str; 6] = ["cpu", "memory", "network", "temp", "disk", "gpu"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Panel {
@@ -104,13 +102,10 @@ fn validate_widget(panel: Panel, widget: Option<&Value>) -> Result<(), ApplyErro
             panel.name()
         )));
     }
-    let name = value
+    value
         .as_str()
         .ok_or_else(|| setting("panel.toggle requires widget to be a string"))?;
-    if name.is_empty() || METRICS.contains(&name) {
-        return Ok(());
-    }
-    Err(setting(&format!("Unknown monitor widget: {name}")))
+    Ok(())
 }
 
 fn setting(message: &str) -> ApplyError {

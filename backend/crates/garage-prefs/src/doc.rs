@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn the_stamp_is_not_a_section() {
-        let document = table("[schema]\npreferences_version = 5\n[appearance]\nborder_size = 1\n");
+        let document = table("[schema]\npreferences_version = 6\n[appearance]\nborder_size = 1\n");
         let sections = preference_sections(&document);
         assert!(!sections.contains_key("schema"));
         assert_eq!(sections.len(), 1);
@@ -358,7 +358,7 @@ mod tests {
         let document = preference_document(&toml::Table::new(), defaults.values(), Some(&mut sink));
         assert_eq!(
             emit_document(&document).unwrap(),
-            "[schema]\npreferences_version = 5\n"
+            "[schema]\npreferences_version = 6\n"
         );
         assert!(sink.is_empty());
     }
@@ -370,7 +370,7 @@ mod tests {
         let document = preference_document(&stored, defaults.values(), None);
         assert_eq!(
             emit_document(&document).unwrap(),
-            "[schema]\npreferences_version = 5\n\n[appearance]\naccent_color = \"red\"\n"
+            "[schema]\npreferences_version = 6\n\n[appearance]\naccent_color = \"red\"\n"
         );
     }
 

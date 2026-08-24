@@ -1,4 +1,4 @@
-//! The three migrations, and the stamp that drives all of them.
+//! The preference migrations, and the stamp that drives all of them.
 //!
 //! One version number lives in `preferences.toml`, and three separate things read it. The
 //! file move ([`migrate_config_root`](crate::config_root::migrate_config_root)) has to
@@ -23,8 +23,18 @@ use crate::pyvalue::py_equal_table;
 /// the coercion there, whenever a stored value changes meaning rather than just changing
 /// range -- or, as v5 did, whenever the file's own shape changes and an existing one has to
 /// be rewritten to match.
-pub const PREFERENCES_VERSION: i64 = 5;
+pub const PREFERENCES_VERSION: i64 = 6;
 
+const LEGACY_BAR_KEYS: [&str; 8] = [
+    "monitor_cpu",
+    "monitor_memory",
+    "monitor_network",
+    "monitor_temp",
+    "monitor_disk",
+    "monitor_gpu",
+    "ai_usage",
+    "media_player",
+];
 /// How the old three corner radii map onto the new three: every old corner keeps its px, so
 /// a migrated desktop looks exactly as it did. Applied once, gated on the schema version,
 /// because "normal" appears on both sides and would otherwise walk a setting from normal to
@@ -101,6 +111,9 @@ pub fn migrate_preference_values(stored: &mut toml::Table) {
             split_wallpapers(appearance);
         }
     }
+    if version < 6 {
+        migrate_bar_layout(stored);
+    }
     if let Some(schema) = stored
         .entry("schema".to_owned())
         .or_insert_with(|| toml::Value::Table(toml::Table::new()))
@@ -113,6 +126,75 @@ pub fn migrate_preference_values(stored: &mut toml::Table) {
     }
 }
 
+/// v6 replaces fixed per-widget switches with three ordered extension-id rails.
+///
+/// Only the two legacy switches that still have a one-to-one extension affect the new
+/// lists: `workspaces.indicator` and `bar.media_player`. Metrics, AI, containers, SMB,
+/// microphone, and volume are now one `system` extension, so their individual switches
+/// are withdrawn together. Values equal to the new defaults are omitted so the migrated
+/// file remains departures-only.
+fn migrate_bar_layout(stored: &mut toml::Table) {
+    let indicator = remove_bool(stored, "workspaces", "indicator").unwrap_or(true);
+    let media = stored
+        .get_mut("bar")
+        .and_then(toml::Value::as_table_mut)
+        .and_then(|bar| {
+            let value = bar.get("media_player").and_then(toml::Value::as_bool);
+            for key in LEGACY_BAR_KEYS {
+                bar.remove(key);
+            }
+            value
+        })
+        .unwrap_or(true);
+
+    let Some(bar) = table_mut(stored, "bar") else {
+        return;
+    };
+    if !indicator {
+        bar.insert(
+            "widgets_left".to_owned(),
+            toml::Value::String("menu".to_owned()),
+        );
+    }
+    if !media {
+        bar.insert(
+            "widgets_center".to_owned(),
+            toml::Value::String(String::new()),
+        );
+    }
+    if bar.is_empty() {
+        stored.remove("bar");
+    }
+    remove_empty_section(stored, "workspaces");
+}
+
+fn remove_bool(stored: &mut toml::Table, section: &str, key: &str) -> Option<bool> {
+    stored
+        .get_mut(section)
+        .and_then(toml::Value::as_table_mut)
+        .and_then(|table| table.remove(key))
+        .and_then(|value| value.as_bool())
+}
+
+fn table_mut<'a>(stored: &'a mut toml::Table, section: &str) -> Option<&'a mut toml::Table> {
+    let value = stored
+        .entry(section.to_owned())
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if !value.is_table() {
+        *value = toml::Value::Table(toml::Table::new());
+    }
+    value.as_table_mut()
+}
+
+fn remove_empty_section(stored: &mut toml::Table, section: &str) {
+    let empty = stored
+        .get(section)
+        .and_then(toml::Value::as_table)
+        .is_some_and(toml::Table::is_empty);
+    if empty {
+        stored.remove(section);
+    }
+}
 /// v2's rename, applied to whatever the file happens to hold.
 ///
 /// The lookup is on `str(value)`, so a stored value that is not a string cannot match a
@@ -299,7 +381,7 @@ mod tests {
         let stored = migrated("[appearance]\ncorner_radius = \"small\"\n");
         assert_eq!(
             stored,
-            table("[appearance]\ncorner_radius = \"normal\"\n[schema]\npreferences_version = 5\n")
+            table("[appearance]\ncorner_radius = \"normal\"\n[schema]\npreferences_version = 6\n")
         );
         // Stamped past the rename, so it does not fire again -- which is what stops the
         // setting walking from normal to large on every load.
@@ -370,8 +452,32 @@ mod tests {
 
     #[test]
     fn a_current_file_is_returned_untouched() {
-        let text = "[schema]\npreferences_version = 5\n[appearance]\ncorner_radius = \"small\"\n";
+        let text = "[schema]\npreferences_version = 6\n[appearance]\ncorner_radius = \"small\"\n";
         assert_eq!(migrated(text), table(text));
+    }
+
+    #[test]
+    fn v6_turns_legacy_visibility_departures_into_widget_rails() {
+        let stored = migrated(
+            "[schema]\npreferences_version = 5\n[bar]\nmedia_player = false\n\
+             monitor_cpu = false\nai_usage = false\n[workspaces]\nindicator = false\n",
+        );
+        assert_eq!(
+            stored,
+            table(
+                "[schema]\npreferences_version = 6\n[bar]\n\
+                 widgets_left = \"menu\"\nwidgets_center = \"\"\n"
+            )
+        );
+    }
+
+    #[test]
+    fn v6_drops_legacy_defaults_without_pinining_new_lists() {
+        let stored = migrated(
+            "[schema]\npreferences_version = 5\n[bar]\nmonitor_temp = false\n\
+             media_player = true\n[workspaces]\nindicator = true\n",
+        );
+        assert_eq!(stored, table("[schema]\npreferences_version = 6\n"));
     }
 
     #[test]

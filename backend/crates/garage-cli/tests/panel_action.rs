@@ -30,8 +30,8 @@ fn invalid_panels_and_widgets_use_the_standard_action_refusal_envelope(
 ) -> Result<(), Box<dyn std::error::Error>> {
     refusal(r#"{"panel":"weather"}"#, "Unknown panel: weather")?;
     refusal(
-        r#"{"panel":"monitor","widget":"battery"}"#,
-        "Unknown monitor widget: battery",
+        r#"{"panel":"monitor","widget":7}"#,
+        "panel.toggle requires widget to be a string",
     )?;
     Ok(())
 }
