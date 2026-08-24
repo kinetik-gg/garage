@@ -35,6 +35,8 @@ const LEGACY_BAR_KEYS: [&str; 8] = [
     "ai_usage",
     "media_player",
 ];
+const V6_RIGHT_WITHOUT_AI: &str =
+    "system\ntray\nnotifications\nlauncher\ncontrol-center\nmicrophone\nclock";
 /// How the old three corner radii map onto the new three: every old corner keeps its px, so
 /// a migrated desktop looks exactly as it did. Applied once, gated on the schema version,
 /// because "normal" appears on both sides and would otherwise walk a setting from normal to
@@ -56,7 +58,6 @@ const WALLPAPER_SPLIT: [(&str, &str); 3] = [
 const SCHEMES: [&str; 2] = ["light", "dark"];
 
 /// The stamp a stored `preferences.toml` carries, or 1 if it carries none.
-///
 /// A hand-mangled stamp is treated as older than current rather than fatal: refusing the
 /// file here would leave the whole UI read-only. A bool is not an int for this purpose --
 /// Python has to say so explicitly, since `True` *is* an `int` there; `as_integer()` answers
@@ -72,11 +73,9 @@ pub fn schema_version(stored: &toml::Table) -> i64 {
 }
 
 /// The value steps of the migration, in memory, on the raw stored table.
-///
 /// Raw rather than merged on purpose. The corner radius rename reuses "normal" for what used
 /// to be called "small", so the value alone cannot say which scale wrote it -- only the
 /// absence of the version stamp can, and merging the defaults in first would supply one.
-///
 /// Each step is gated on the version that introduced it rather than on "older than current".
 /// A single "not current yet" gate replays every step whenever the stamp is bumped, which is
 /// precisely how the corner radius walked from normal to large the first time a later
@@ -128,13 +127,13 @@ pub fn migrate_preference_values(stored: &mut toml::Table) {
 
 /// v6 replaces fixed per-widget switches with three ordered extension-id rails.
 ///
-/// Only the two legacy switches that still have a one-to-one extension affect the new
-/// lists: `workspaces.indicator` and `bar.media_player`. Metrics, AI, containers, SMB,
-/// microphone, and volume are now one `system` extension, so their individual switches
-/// are withdrawn together. Values equal to the new defaults are omitted so the migrated
-/// file remains departures-only.
+/// The three legacy switches with a direct extension counterpart affect the new lists:
+/// `workspaces.indicator`, `bar.media_player`, and `bar.ai_usage`. The remaining fixed
+/// widget switches are withdrawn. Values equal to the new defaults stay omitted so the
+/// migrated file remains departures-only.
 fn migrate_bar_layout(stored: &mut toml::Table) {
     let indicator = remove_bool(stored, "workspaces", "indicator").unwrap_or(true);
+    let ai_usage = remove_bool(stored, "bar", "ai_usage").unwrap_or(true);
     let media = stored
         .get_mut("bar")
         .and_then(toml::Value::as_table_mut)
@@ -160,6 +159,12 @@ fn migrate_bar_layout(stored: &mut toml::Table) {
         bar.insert(
             "widgets_center".to_owned(),
             toml::Value::String(String::new()),
+        );
+    }
+    if !ai_usage {
+        bar.insert(
+            "widgets_right".to_owned(),
+            toml::Value::String(V6_RIGHT_WITHOUT_AI.to_owned()),
         );
     }
     if bar.is_empty() {
@@ -359,8 +364,6 @@ mod tests {
         );
     }
 
-    /// A hand-mangled stamp is older than current rather than fatal, and a bool is not an
-    /// int however much Python's type system says otherwise.
     #[test]
     fn a_mangled_stamp_reads_as_version_one() {
         for text in [
@@ -394,7 +397,6 @@ mod tests {
         );
     }
 
-    /// The lookup is `str(value)`, so nothing that is not a spelling can match one.
     #[test]
     fn a_corner_radius_that_is_not_a_spelling_is_left_alone() {
         let stored = migrated("[appearance]\ncorner_radius = 7\n");
@@ -429,7 +431,6 @@ mod tests {
         }
     }
 
-    /// A deliberate choice outranks the value it was split from.
     #[test]
     fn a_half_that_is_already_set_survives_the_split() {
         let stored = migrated(
@@ -466,7 +467,8 @@ mod tests {
             stored,
             table(
                 "[schema]\npreferences_version = 6\n[bar]\n\
-                 widgets_left = \"menu\"\nwidgets_center = \"\"\n"
+                 widgets_left = \"menu\"\nwidgets_center = \"\"\n\
+                 widgets_right = \"system\\ntray\\nnotifications\\nlauncher\\ncontrol-center\\nmicrophone\\nclock\"\n"
             )
         );
     }
@@ -475,7 +477,7 @@ mod tests {
     fn v6_drops_legacy_defaults_without_pinining_new_lists() {
         let stored = migrated(
             "[schema]\npreferences_version = 5\n[bar]\nmonitor_temp = false\n\
-             media_player = true\n[workspaces]\nindicator = true\n",
+             ai_usage = true\nmedia_player = true\n[workspaces]\nindicator = true\n",
         );
         assert_eq!(stored, table("[schema]\npreferences_version = 6\n"));
     }
@@ -490,8 +492,6 @@ mod tests {
         );
     }
 
-    /// The Python raises `TypeError` here and takes the process with it; see the parity
-    /// gap on `migrate_preference_values`.
     #[test]
     fn a_top_level_schema_that_is_not_a_table_is_left_without_a_stamp() {
         let stored = migrated("schema = 5\n[appearance]\naccent_color = \"red\"\n");

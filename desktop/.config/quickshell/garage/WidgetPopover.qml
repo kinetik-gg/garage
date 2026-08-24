@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import Quickshell
 import QtQuick
 
@@ -13,6 +15,11 @@ Scope {
     property var content: null
     property var properties: ({})
     property bool open: false
+    readonly property string surfaceNamespace: {
+        const id = String(manifest.id || "").trim();
+        return id !== "" ? "garage-extension-" + id
+            : "garage-extension-popup";
+    }
 
     function show(nextContent, nextProperties) {
         if (open) {
@@ -45,6 +52,7 @@ Scope {
             targetScreen: popover.bar.screen
             edge: popover.bar.edge
             targetAnchor: popover.bar.anchorPosition()
+            surfaceNamespace: popover.surfaceNamespace
             implicitWidth: Math.max(240, contentHost.hostedItem
                 ? contentHost.hostedItem.implicitWidth : 0)
             implicitHeight: Math.max(120, contentHost.hostedItem

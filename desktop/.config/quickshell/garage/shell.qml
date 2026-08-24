@@ -30,6 +30,8 @@ ShellRoot {
     // Monitor-local click position for the variable-width media label. A keybind
     // has no bar click and leaves this negative for output-centred placement.
     property real mediaAnchorX: -1
+    property string aiUsageScreenName: ""
+    property real aiUsageAnchor: -1
 
     // Declarative routing table for every transient panel. The compatibility
     // function names below are deliberately thin shims over this table so IPC
@@ -72,14 +74,20 @@ ShellRoot {
             setScreen: value => shell.mediaScreenName = value,
             setAnchor: value => shell.mediaAnchorX = value,
             anchor: "axis", catches: true, screenshot: true, animated: true
+        },
+        "ai-usage": {
+            panel: aiUsagePaletteLoader, screen: () => shell.aiUsageScreenName,
+            setScreen: value => shell.aiUsageScreenName = value,
+            setAnchor: value => shell.aiUsageAnchor = value,
+            anchor: "axis", catches: true, screenshot: true, animated: true
         }
     })
 
     // Which transient surface is on screen, by name, or "" for none.
     //
     // The transient surfaces -- the launcher, the session menu, the notification
-    // centre, the control centre and the two panels the bar's widgets open
-    // (the system dashboard and the now-playing panel) -- are
+    // centre, the control centre and the three bar-detail panels (system,
+    // now-playing, and AI usage) -- are
     // layer overlays that hold the keyboard or the pointer for as long as they are
     // up, so no two of them can usefully be on screen together. Holding that as
     // one name rather than a boolean per loader is what makes it true by
@@ -165,9 +173,8 @@ ShellRoot {
             controlCenter: "control-center",
             monitorPalette: "system",
             mediaPalette: "media",
-            aiPalette: "system",
-            aiUsage: "system",
-            "ai-usage": "system"
+            aiPalette: "ai-usage",
+            aiUsage: "ai-usage"
         };
         if (String(name).startsWith("monitor:"))
             return "system";
@@ -433,8 +440,7 @@ ShellRoot {
         shell.surfaceOn("media", screenName, anchorX);
     }
     function aiUsageOn(screenName: string): void {
-        // The retired standalone AI panel now lives in the system dashboard.
-        shell.surfaceOn("system", screenName, -1);
+        shell.surfaceOn("ai-usage", screenName, -1);
     }
 
 // Click-outside dismissal for the launcher, the two centres and the three
@@ -530,7 +536,7 @@ DismissCatcher {
     // catcher's `armed` expression above stands down for the whole time
     // captureProcess is running -- which is correct, slurp's own clicks are not
     // the user clicking away -- so for those six minutes click-outside dismissal
-    // was dead shell-wide: the launcher, both centres and both bar panels
+    // was dead shell-wide: the launcher, both centres and all three bar panels
     // could only be closed with Escape, and nothing on screen said why. One
     // forgotten selection disables a gesture in six unrelated surfaces.
     //
@@ -628,7 +634,7 @@ DismissCatcher {
         }
     }
 
-    // The two panels the bar's own modules open, on the same shape as the two
+    // The three bar-detail panels, on the same shape as the two
     // centres above: one loader each, bound to activeSurface, and a dismissed()
     // that clears the name it was activated by. Media and system receive a
     // monitor-local coordinate from the bar click and
@@ -654,6 +660,18 @@ DismissCatcher {
             targetAnchor: shell.mediaAnchorX
             edge: BarState.position
             onDismissed: shell.closeSurface("media")
+        }
+    }
+
+    LazyLoader {
+        id: aiUsagePaletteLoader
+        active: shell.activeSurface === "ai-usage"
+
+        ExtensionPopupSurface {
+            extensionId: "ai-usage"
+            targetScreenName: shell.aiUsageScreenName
+            targetAnchor: shell.aiUsageAnchor
+            onDismissed: shell.closeSurface("ai-usage")
         }
     }
 
@@ -711,7 +729,7 @@ DismissCatcher {
         property bool controlCenterVisible: controlCenterLoader.active
         property bool monitorVisible: monitorPaletteLoader.active
         property bool mediaVisible: mediaPaletteLoader.active
-        property bool aiUsageVisible: monitorPaletteLoader.active
+        property bool aiUsageVisible: aiUsagePaletteLoader.active
 
 
         function launcherOn(screenName: string): void {
@@ -891,12 +909,12 @@ DismissCatcher {
         }
 
         function aiUsage(): void {
-            shell.surfaceOn("system", shell.focusedScreenName(), -1);
+            shell.surfaceOn("ai-usage", shell.focusedScreenName(), -1);
         }
 
 
         function closeAiUsage(): void {
-            shell.requestCloseSurface("system");
+            shell.requestCloseSurface("ai-usage");
         }
     }
 

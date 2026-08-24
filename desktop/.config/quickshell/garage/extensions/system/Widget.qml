@@ -2,9 +2,9 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 import "../.." as Garage
 
-// One monitor glyph and one badge. The badge is deliberately reserved for
-// privacy and connectivity: microphone recording wins over an SMB shortfall;
-// telemetry, AI and containers remain detail in the panel and tooltip.
+// One monitor glyph and one connectivity badge. System telemetry, containers,
+// and SMB belong here; microphone privacy and AI quota state are independently
+// placeable extensions and must not be folded back into this widget.
 Item {
     id: systemWidget
 
@@ -15,7 +15,6 @@ Item {
 
     readonly property var context: services.context
     readonly property var theme: bar.theme
-    readonly property bool micRecording: context.micAvailable && context.micRecording
     readonly property bool smbShort: context.smbAvailable
         && context.smbConnected < context.smbExpected
 
@@ -68,10 +67,8 @@ Item {
             width: 7
             height: 7
             radius: 4
-            visible: systemWidget.micRecording || systemWidget.smbShort
-            color: systemWidget.micRecording
-                ? systemWidget.theme.accent
-                : systemWidget.theme.accentPalette.red
+            visible: systemWidget.smbShort
+            color: systemWidget.theme.accentPalette.red
             border.width: 1
             border.color: systemWidget.theme.bodyBase
         }
@@ -91,16 +88,11 @@ Item {
         owner: systemWidget
         text: {
             const lines = [];
-            if (systemWidget.micRecording)
-                lines.push("Microphone in use");
             if (systemWidget.smbShort)
                 lines.push("SMB " + systemWidget.context.smbConnected + " / "
                     + systemWidget.context.smbExpected);
             if (systemWidget.context.containerCount > 0)
                 lines.push(systemWidget.context.containerCount + " containers running");
-            if (systemWidget.context.aiAvailable && systemWidget.context.aiGlyph !== "")
-                lines.push("AI " + systemWidget.context.aiGlyph
-                    + (systemWidget.context.aiStale ? " (cached)" : ""));
             return lines.length > 0 ? lines.join("\n") : "System";
         }
         opacity: pointer.containsMouse ? 1 : 0
