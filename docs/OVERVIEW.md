@@ -68,13 +68,16 @@ Placement follows what kind of thing is changing:
 | Pixels drawn by the compositor | Glass |
 | A value or a decision (what the value *should* be) | The settings schema |
 | How something is presented on screen | Quickshell (the shell) |
+| A discoverable component in the bar | A Quickshell extension manifest and, for inline content, its `Widget.qml` |
 | A static, non-configurable opinion | A baseline config |
 | Something that happens at install or update time | The lifecycle layer |
 
 If a change is about what happens when the material renders, it's Glass. If
 it's about what a setting's value is or how it's decided, it's the schema. If
-it's about how that value is shown to the user, it's the shell. If it's an
-opinion that isn't meant to be a setting at all, it's a baseline config. If
+it's about how that value is shown to the user, it's the shell. An independently
+discoverable bar component belongs under the shell's `extensions/` tree; the
+backend stores only its opaque composition id. If it's an opinion that isn't
+meant to be a setting at all, it's a baseline config. If
 it's about getting the machine into a new state — install, upgrade, migrate —
 it's lifecycle.
 

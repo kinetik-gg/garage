@@ -7,7 +7,7 @@
 #
 # Glass is a first-party repository the user develops in; the deploy script
 # treats it as read-only and verifies it sits on the pinned commit. Garage's
-# repositories are local-only today, so a missing checkout is the normal case
+# plugin source checkouts are optional, so a missing checkout is a normal case
 # and must not be fatal: hyprland.lua guards both plugin loads, so the desktop
 # comes up without them.
 #

@@ -25,7 +25,6 @@ _darcs
 ^/\.config/gtk-3\.0/gtk\.css$
 ^/\.config/gtk-4\.0/gtk\.css$
 ^/\.config/rofi/config\.rasi$
-^/\.config/waybar/style\.css$
 ^/\.config/swayosd/style\.css$
 ^/\.config/kitty/theme\.conf$
 ^/\.config/micro/settings\.json$

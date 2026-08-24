@@ -22,8 +22,9 @@ for garage_binary in "${garage_binaries[@]}"; do
 done
 
 # Backend commands always link to the installed binaries. Stow no longer owns
-# these names because desktop/.local/bin does not ship them.
-for garage_binary in garage garage-metrics garage-file-index garage-ai-usage garage-waybar-module garage-bar-probe; do
+# these names because desktop/.local/bin does not ship them. Reusing the array
+# keeps the install and link lists from drifting apart.
+for garage_binary in "${garage_binaries[@]}"; do
     run ln -sfn "$garage_bin_dir/$garage_binary" "$HOME/.local/bin/$garage_binary"
 done
 

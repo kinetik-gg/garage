@@ -48,7 +48,6 @@ hyprpolkitagent
 hyprsunset
 
 # The shell surfaces: bar, launcher, terminal, login shell
-waybar                          critical
 quickshell                      critical
 rofi
 kitty                           critical

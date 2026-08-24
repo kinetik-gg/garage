@@ -199,3 +199,30 @@ every rendered surface. Until all three exist, no current-theme state belongs in
 | **The snapshot pattern** (`make_snapshot()`, and the `*_snapshot()` functions it calls) | Each live-read helper is assembled fresh on every call and isolates recoverable failures behind fallback shapes — a settings load failure uses `Defaults::compiled()` with an `error` string rather than taking down every other panel's data alongside it. Read-only but for one: `workspaces_snapshot()` reaches `per_display_groups()` → `workspace_blocks()` → `save_workspace_blocks()`, so a plain `garage snapshot` writes `workspace-blocks.toml` when it meets a connector for the first time. There is one allocator, and reading it means running it. |
 | **`coerce_from()`'s leniency policy** | Every bad value is coerced to its shipped default and reported, never rejected. A single error here used to take the whole product down — every render failed, and the one screen that could have fixed the bad value (`set` loads before it writes) went read-only too. |
 | **`Paths::mimeapps_override`** | Deliberately not `~/.config/mimeapps.list`: that path is a stow symlink, and every writer of it (including `xdg-mime`) renames a temp file over it, which replaces the symlink with a plain file and cuts it loose from the repo. The desktop-prefixed override file that `set_default_app()` writes wins by XDG spec precedence while the tracked file stays exactly as checked in. |
+
+## 10. Bar extensions
+
+The backend owns bar composition but deliberately does not know the extension catalog. The three
+`bar.widgets_*` preference strings are newline-separated opaque ids. `render_bar_layout()` trims
+them into the watched `bar-layout.json` marker without validating ids, and `write_marker()` keeps
+the inode stable so the running shell sees every settings change. This makes a temporarily missing
+or newer extension a presentation concern rather than a settings-load failure.
+
+The shell discovers extensions from two roots. Shipped packages live below the Garage Quickshell
+configuration in `extensions/<id>/`; user packages live in
+`~/.local/share/garage/extensions/<id>/` and win on an id collision. Each directory has a
+`manifest.json` declaring its id, version, capabilities in `provides`, and a `bar-widget` contract.
+Unknown composition ids are skipped. A bare icon name resolves to the shipped Phosphor set; a path
+is confined to the extension directory. Inline QML is opt-in because the host-owned icon delegate
+is the stable default.
+
+Extension QML receives a narrow facade rather than reaching into shell singletons: bar geometry,
+screen and theme state, typed spacing, surface/popup openers, the validated manifest, and service
+objects. Third-party live data enters through an optional manifest probe. The registry owns one
+NDJSON process per probe id for the shell lifetime, independent of monitor count. First-party
+collectors use the same service facade and expose availability and error state, so a missing binary
+degrades visibly without becoming a respawn loop.
+
+The host, not an extension, owns edge docking, the left/center/right rails, overflow folding, drag
+drop-zones, popup placement, and the surface table. That boundary keeps extension packages portable
+across horizontal and vertical bars while preserving compatibility IPC shims for existing callers.
