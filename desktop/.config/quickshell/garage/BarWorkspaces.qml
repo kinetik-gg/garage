@@ -43,6 +43,26 @@ Item {
 
     Component.onCompleted: workspaces.refresh()
 
+    // Switching: `hyprctl dispatch hl.dsp.focus({ workspace = N })`. Two
+    // dead ends sit behind that spelling, both probed on this compositor:
+    // Quickshell's own Hyprland.dispatch("workspace N") returns silently
+    // without switching, and the classic raw form dies in Hyprland 0.56+'s
+    // Lua dispatch layer -- hyprctl wraps its argument in
+    // `return hl.dispatch( ... )`, where `workspace 21` is a syntax error.
+    // The focus-table form is the one the layer answers `ok` to, and the
+    // one the generated hypridle config already uses for dpms.
+    Process {
+        id: switchProcess
+
+        command: ["hyprctl", "dispatch", ""]
+    }
+
+    function activate(id) {
+        switchProcess.command = ["hyprctl", "dispatch",
+            "hl.dsp.focus({ workspace = " + id + " })"];
+        switchProcess.running = true;
+    }
+
     function refresh() {
         wsProcess.running = true;
         monProcess.running = true;
@@ -185,7 +205,7 @@ Item {
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Hyprland.dispatch("workspace " + dotHolder.modelData.id)
+                    onClicked: workspaces.activate(dotHolder.modelData.id)
                 }
             }
         }
