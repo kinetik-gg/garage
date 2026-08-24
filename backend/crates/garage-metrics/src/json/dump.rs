@@ -13,6 +13,7 @@
 //! anybody running `--once` in a terminal.
 
 use super::{Object, Value};
+use garage_core::pyjson::write_string;
 use garage_core::pyrepr::py_float_repr;
 use std::fmt::Write as _;
 
@@ -32,7 +33,7 @@ fn write_value(out: &mut String, value: &Value) {
             let _ = write!(out, "{number}");
         }
         Value::Float(number) => out.push_str(&float(*number)),
-        Value::Str(text) => write_string(out, text),
+        Value::Str(text) => write_string(text, out),
         Value::List(items) => write_list(out, items),
         Value::Object(fields) => write_object(out, fields),
     }
@@ -76,7 +77,7 @@ fn write_object(out: &mut String, fields: &Object) {
         if index > 0 {
             out.push_str(", ");
         }
-        write_string(out, key);
+        write_string(key, out);
         out.push_str(": ");
         write_value(out, value);
     }
@@ -93,39 +94,6 @@ fn write_object(out: &mut String, fields: &Object) {
 /// disk widgets build carries `↓`, `↑` or `°`, and each has to come out as a six-byte
 /// `\u` escape rather than its raw UTF-8 -- two files with the same meaning and
 /// different bytes is exactly what the parity harness exists to catch.
-fn write_string(out: &mut String, text: &str) {
-    out.push('"');
-    for ch in text.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\u{8}' => out.push_str("\\b"),
-            '\u{c}' => out.push_str("\\f"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            _ if (ch as u32) < 0x20 || (ch as u32) > 0x7e => escape_unicode(out, ch),
-            _ => out.push(ch),
-        }
-    }
-    out.push('"');
-}
-
-fn escape_unicode(out: &mut String, ch: char) {
-    let code_point = ch as u32;
-    if code_point < 0x1_0000 {
-        let _ = write!(out, "\\u{code_point:04x}");
-        return;
-    }
-    let offset = code_point - 0x1_0000;
-    let _ = write!(
-        out,
-        "\\u{:04x}\\u{:04x}",
-        0xd800 + (offset >> 10),
-        0xdc00 + (offset & 0x3ff)
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use super::dumps;
@@ -168,7 +136,11 @@ mod tests {
     #[test]
     fn the_arrows_and_degree_signs_in_a_tooltip_are_escaped() {
         // Exactly what `network`'s tooltip_parts holds.
-        let value = Value::strings(["\u{2193} 0.00 MiB/s", "\u{2191} 0.00 MiB/s", "37\u{b0}C"]);
+        let value = Value::List(vec![
+            Value::str("\u{2193} 0.00 MiB/s"),
+            Value::str("\u{2191} 0.00 MiB/s"),
+            Value::str("37\u{b0}C"),
+        ]);
         assert_eq!(
             dumps(&value),
             "[\"\\u2193 0.00 MiB/s\", \"\\u2191 0.00 MiB/s\", \"37\\u00b0C\"]"

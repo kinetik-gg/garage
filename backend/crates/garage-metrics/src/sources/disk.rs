@@ -1,8 +1,9 @@
 //! Disk: which block device is "the disk", and what its sysfs stat line says.
 
-use crate::exec;
 use crate::files::{as_float, read_int, read_text, sorted_children};
+use garage_core::process;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// The patterns the fallback sweep tries, in order. Real disks first, then the names a
 /// VM or an SD-card boot uses.
@@ -38,7 +39,15 @@ pub(crate) fn detect_block_device() -> Option<String> {
 
 /// What findmnt says, resolved from a partition to the disk it sits on.
 fn from_findmnt() -> Option<String> {
-    let source = exec::run(&["findmnt", "--noheadings", "--output", "SOURCE", "/"])?;
+    let output = process::run(
+        &["findmnt", "--noheadings", "--output", "SOURCE", "/"],
+        Duration::from_secs(2),
+    )
+    .ok()?;
+    if output.status != 0 {
+        return None;
+    }
+    let source = output.stdout;
     if source.is_empty() {
         return None;
     }

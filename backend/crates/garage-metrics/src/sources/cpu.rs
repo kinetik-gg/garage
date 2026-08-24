@@ -26,7 +26,7 @@ pub(crate) fn counters() -> Result<Counters, Fault> {
 }
 
 /// One `cpuN` line's two totals. `fields[3] + fields[4]` indexes past the `cpu` label,
-/// so a truncated line is an `IndexError` -- which `bar_svg` catches and `stream` does
+/// so a truncated line is an `IndexError` -- which the stream's fault boundary does
 /// not, exactly as in the Python.
 fn fields(line: &str) -> Result<Counters, Fault> {
     let mut total = 0_i64;

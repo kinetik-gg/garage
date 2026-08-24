@@ -8,7 +8,7 @@
 
 use std::time::Duration;
 
-use crate::exec::{run, RunError};
+use garage_core::process::{run, RunError};
 
 const TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -24,36 +24,47 @@ pub(crate) fn probe() -> Result<Microphone, RunError> {
     Ok(parse(&output.stdout))
 }
 
-/// Split into per-source sections and read `Name:` / `State:` / `Description:`.
+/// Split into per-source sections and keep each description paired with its source.
 fn parse(text: &str) -> Microphone {
-    let mut names = Vec::<String>::new();
-    let mut states = Vec::<String>::new();
-    let mut descriptions = Vec::<String>::new();
-    for line in text.lines() {
-        if let Some(name) = field(line, "Name:") {
-            names.push(name);
-        } else if let Some(state) = field(line, "State:") {
-            states.push(state);
-        } else if let Some(description) = field(line, "Description:") {
-            descriptions.push(description);
-        }
-    }
-    let recording_sources: Vec<usize> = names
-        .iter()
-        .enumerate()
-        .filter(|(index, name)| {
-            !name.ends_with(".monitor")
-                && states.get(*index).is_some_and(|state| state == "RUNNING")
-        })
-        .map(|(index, _)| index)
+    let recording_sources: Vec<Source> = text
+        .split("Source #")
+        .filter_map(source)
+        .filter(Source::recording)
         .collect();
     Microphone {
         recording: !recording_sources.is_empty(),
         descriptions: recording_sources
-            .iter()
-            .filter_map(|index| descriptions.get(*index).cloned())
+            .into_iter()
+            .filter_map(|source| source.description)
             .collect(),
     }
+}
+
+#[derive(Debug, Default)]
+struct Source {
+    name: String,
+    state: String,
+    description: Option<String>,
+}
+
+impl Source {
+    fn recording(&self) -> bool {
+        !self.name.ends_with(".monitor") && self.state == "RUNNING"
+    }
+}
+
+fn source(section: &str) -> Option<Source> {
+    let mut source = Source::default();
+    for line in section.lines() {
+        if let Some(name) = field(line, "Name:") {
+            source.name = name;
+        } else if let Some(state) = field(line, "State:") {
+            source.state = state;
+        } else if let Some(description) = field(line, "Description:") {
+            source.description = Some(description);
+        }
+    }
+    (!source.name.is_empty()).then_some(source)
 }
 
 fn field(line: &str, key: &str) -> Option<String> {
@@ -101,5 +112,14 @@ mod tests {
             field("\t\tState:   RUNNING ", "State:")
         );
         assert_eq!(None, field("", "State:"));
+    }
+
+    #[test]
+    fn a_missing_description_cannot_shift_the_next_sources_label() {
+        let sample = "Source #1\n State: RUNNING\n Name: first\n\
+                      Source #2\n State: RUNNING\n Name: second\n Description: Second mic\n";
+        let found = parse(sample);
+        assert!(found.recording);
+        assert_eq!(found.descriptions, ["Second mic"]);
     }
 }

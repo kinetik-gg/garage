@@ -10,8 +10,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use garage_core::paths::Paths;
-
-use crate::exec::{run, RunError};
+use garage_core::process::{run, RunError};
 
 const TIMEOUT: Duration = Duration::from_secs(3);
 const HELPER_RELATIVE: &str = ".local/libexec/ensure-smb-mounted";

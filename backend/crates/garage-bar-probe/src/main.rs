@@ -23,7 +23,6 @@
 #![forbid(unsafe_code)]
 
 mod containers;
-mod exec;
 mod microphone;
 mod smb;
 mod stream;

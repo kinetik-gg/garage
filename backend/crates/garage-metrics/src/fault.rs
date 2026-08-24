@@ -9,9 +9,7 @@
 //! reproducing the tooltip, so [`Fault`] holds enough to rebuild each one rather than
 //! a Rust error's own phrasing.
 //!
-//! The second is that the two modes do not catch the same set. `bar_svg` catches
-//! `(OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError)`, which is
-//! everything a sensor can raise, and degrades the widget. `stream` catches only
+//! The stream catches only
 //! `(OSError, ValueError)`, so a `KeyError` from a `/proc/meminfo` with no `MemTotal`
 //! line, or an `IndexError` from a truncated `/proc/stat`, ends the stream with a
 //! traceback rather than an error object on the wire. That is not obviously deliberate
@@ -20,11 +18,11 @@
 //! [`Kind::caught_by_stream`] is where the two lists differ.
 //!
 //! `subprocess.SubprocessError` has no variant here, and its absence is the finding
-//! rather than an omission. It is in `bar_svg`'s `except` tuple, but the only two
+//! rather than an omission. It remains in the stream's caught-fault set, but the only two
 //! subprocesses in the script both go through the `run()` helper, which catches
 //! `(OSError, subprocess.SubprocessError)` itself and returns `None`. So no
 //! `SubprocessError` can ever reach that `except` -- a timed-out `nvidia-smi` is a
-//! machine with no GPU for one tick, and never an exception. [`crate::exec::run`] folds
+//! machine with no GPU for one tick, and never an exception. [`garage_core::process::run`] folds
 //! it the same way, and there is nothing left to represent.
 
 use garage_core::pyrepr::py_str_repr;
