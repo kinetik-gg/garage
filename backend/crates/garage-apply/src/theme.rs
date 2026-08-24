@@ -17,7 +17,7 @@
 //!
 //! From there: GTK4 and libadwaita follow the portal setting live (`gsettings`), GTK3 and
 //! `XWayland` apps re-theme when `xsettingsd` rereads its config (`reload-or-restart`), and
-//! kitty and swayosd are each signalled to reread their own generated files.
+//! kitty is signalled to reread its generated file.
 //!
 //! `apply_theme()` is render-then-push in one call: `render_theme()` followed by
 //! `push_theme()`. `apply_theme_if_scheme_moved()` is the actual `Route::Theme` step, and the
@@ -46,9 +46,9 @@ use crate::wallpaper::{apply_wallpaper, Moved};
 ///
 /// [`ApplyError::Marker`] if the scheme marker could not be written, or whatever
 /// [`apply_wallpaper`] refuses once the picture has been decided to have moved. Every signal
-/// below it is unchecked, exactly as the Python's seven bare `run()` calls are: a desktop
-/// half-way onto a new palette is better than one left on the old one because `swayosd` was
-/// not installed.
+/// below it is unchecked, exactly as the Python's bare `run()` calls were: a desktop
+/// half-way onto a new palette is better than one left on the old one because a live
+/// application refused its refresh signal.
 pub(crate) fn push_theme(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
     let scheme = resolve_theme(cx.render().prefs());
     let names = look(scheme);
@@ -108,12 +108,8 @@ pub(crate) fn push_theme(cx: &mut SessionCx<'_>) -> Result<(), ApplyError> {
         ],
     ));
 
-    // Kitty rereads its whole config on SIGUSR1; the shell's bar reads Theme's markers.
+    // Kitty rereads its whole config on SIGUSR1; shell surfaces read Theme's markers.
     drop(run(cx, &["pkill", "-USR1", "-x", "kitty"]));
-    drop(run(
-        cx,
-        &["systemctl", "--user", "try-restart", "swayosd.service"],
-    ));
     Ok(())
 }
 
@@ -177,14 +173,13 @@ mod tests {
     use super::{apply_theme_if_scheme_moved, push_theme};
     use crate::testing::{Script, World};
 
-    /// The six signals every push issues, in order, after the wallpaper decision.
-    const SIGNALS: [&str; 6] = [
+    /// The five signals every push issues, in order, after the wallpaper decision.
+    const SIGNALS: [&str; 5] = [
         "gsettings set org.gnome.desktop.interface color-scheme prefer-dark",
         "gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-dark",
         "gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark",
         "systemctl --user reload-or-restart xsettingsd.service",
         "pkill -USR1 -x kitty",
-        "systemctl --user try-restart swayosd.service",
     ];
 
     #[test]

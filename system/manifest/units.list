@@ -16,7 +16,6 @@ hyprpaper.service            running   # + ExecStartPre=garage render-wallpaper
 hypridle.service             running   # + ExecStartPre=garage render-idle
 hyprsunset.service           running
 hyprpolkitagent.service      running   # drop-in points at ~/.local/lib/garage
-swayosd.service              running
 cliphist.service             running
 cliphist-image.service       running
 xsettingsd.service           running

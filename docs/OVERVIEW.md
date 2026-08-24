@@ -16,7 +16,7 @@ Garage
     |
     +-- Lifecycle: bootstrap.sh, updates, migrations
     +-- Settings: one schema, host preferences, generated state
-    +-- Quickshell: the shell (bar, launcher, control panels)
+    +-- Quickshell: the shell (bar, launcher, control panels, hardware OSD)
     +-- Baseline configs: the static, opinionated defaults for everything
         Hyprland, Kitty, and the rest ship with
 ```

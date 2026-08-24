@@ -49,16 +49,14 @@ hyprsunset
 
 # The shell surfaces: bar, launcher, terminal, login shell
 quickshell                      critical
-rofi
 kitty                           critical
 fish                            critical
 fisher
 
 # On-screen feedback, clipboard and media keys
-swayosd
+brightnessctl
 cliphist
 wl-clipboard
-playerctl
 
 # Screenshot and annotation
 grim

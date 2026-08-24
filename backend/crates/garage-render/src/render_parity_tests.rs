@@ -255,7 +255,7 @@ fn a_marker_rewrite_preserves_its_inode_and_the_lua_install_replaces_it() {
 /// `testdata/theme_fixtures.json` is the second fixture file, dumped the same way from the
 /// same backend and kept apart from the first only because it is keyed differently: the
 /// toolkit files depend on the resolved scheme and on nothing else, so a matrix over accents,
-/// radii and glass modes would carry thirty-four identical copies of twenty-one files. It is
+/// radii and glass modes would carry thirty-four identical copies of fifteen files. It is
 /// therefore two sections. `"toolkits"` holds every file `render_toolkits()` writes, once per
 /// appearance; `"scenarios"` holds the thirty-four-case matrix for the outputs that *do* vary
 /// -- the resolved scheme and the marker `render_theme()` publishes -- with each case's
@@ -318,7 +318,7 @@ fn every_toolkit_file_matches_the_python_backend_byte_for_byte() {
 
         let files = expected.as_object().expect("a toolkits entry is an object");
         assert!(
-            files.len() >= 21,
+            files.len() >= 15,
             "{name}: the toolkit set should not shrink"
         );
         for (relative, contents) in files {

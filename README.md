@@ -65,11 +65,9 @@ managed links with `stow --target="$HOME" --delete desktop`.
 - Fish shell with the Pure prompt
 - Thunar file explorer, with Garage chrome, split view, archive/media actions,
   recursive search, and background thumbnailing
-- Rofi launcher
 - Quickshell shell: the status bar, launcher, notification center, control
-  panels, and settings UI — the bar runs inside the shell, not as a separate
-  program
-- SwayOSD volume and brightness feedback
+  panels, settings UI, and volume/brightness OSD — these surfaces run inside
+  the shell, not as separate programs
 - A Rust backend behind it all: the `garage` CLI plus the `garage-metrics`,
   `garage-file-index`, `garage-ai-usage`, and `garage-bar-probe` helpers, built
   from `backend/` at install time into `~/.local/lib/garage/bin`

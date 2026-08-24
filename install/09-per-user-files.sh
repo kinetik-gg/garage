@@ -5,9 +5,9 @@
 # ---------------------------------------------------------------------------
 # Per-user generated files
 #
-# These two carry an absolute $HOME inside them, so they cannot be tracked. They
-# are written as real files directly into ~/.config, after stow, and only when
-# absent -- your edits survive a re-run. Older bootstraps wrote them into the
+# The GTK bookmark list carries an absolute $HOME, so it cannot be tracked. It
+# is written as a real file directly into ~/.config, after stow, and only when
+# absent -- your edits survive a re-run. Older bootstraps wrote it into the
 # repository tree and relied on a stow link; such a link is replaced here.
 # ---------------------------------------------------------------------------
 
@@ -22,15 +22,6 @@ needs_real_file() {
     fi
     return 1
 }
-
-swayosd_config="$HOME/.config/swayosd/config.toml"
-if needs_real_file "$swayosd_config"; then
-    sed "s|@HOME@|${HOME}|g" "$repo_dir/templates/swayosd-config.toml" |
-        write_file "$swayosd_config"
-    record "wrote ~/.config/swayosd/config.toml"
-else
-    info "keeping the existing ~/.config/swayosd/config.toml"
-fi
 
 gtk_bookmarks="$HOME/.config/gtk-3.0/bookmarks"
 if needs_real_file "$gtk_bookmarks"; then

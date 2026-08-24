@@ -2,7 +2,7 @@
 //!
 //! One visual identity, one table: every colour the desktop draws with is named here once,
 //! per appearance, and every toolkit config that carries colour is rendered from it by
-//! `render_toolkits()` -- GTK3, GTK4, Qt, rofi, swayosd, waybar, kitty, btop and hyprlock.
+//! `render_toolkits()` -- GTK3, GTK4, Qt, kitty, btop and hyprlock.
 //! Nothing downstream holds a hex of its own. Before this table the same identity was
 //! maintained by hand in thirteen files across six languages, and it had already drifted:
 //! the Qt dark palette shared exactly two colours with the GTK dark palette it was supposed
