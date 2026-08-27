@@ -29,16 +29,22 @@ Item {
     readonly property var extension: registry.lookup(extensionId)
     readonly property var manifest: extension ? extension.manifest : ({})
     readonly property var probe: ProbeHost.lookup(extensionId)
+    readonly property bool structurallyVisible: extension !== null
+        && (!vertical || extension.widget.vertical !== "hide")
+    // Keep the host alive while an asynchronous widget has no content. Folding the
+    // child's effective visibility back into this parent's visibility creates a
+    // deadlock: Qt propagates a hidden parent to its children, so a child cannot
+    // become effectively visible when its service later publishes data.
+    readonly property bool contentVisible: !widgetLoader.item
+        || widgetLoader.item.visible
 
     signal surfaceRequested(string surface, string screenName, real anchor)
 
-    visible: extension !== null && (!vertical
-        || extension.widget.vertical !== "hide")
-        && (!widgetLoader.item || widgetLoader.item.visible)
-    implicitWidth: visible ? (vertical ? thickness
+    visible: structurallyVisible
+    implicitWidth: structurallyVisible && contentVisible ? (vertical ? thickness
         : Math.max(thickness, widgetLoader.item
             ? widgetLoader.item.implicitWidth : thickness)) : 0
-    implicitHeight: visible ? (vertical ? Math.max(thickness,
+    implicitHeight: structurallyVisible && contentVisible ? (vertical ? Math.max(thickness,
         widgetLoader.item ? widgetLoader.item.implicitHeight : thickness)
         : thickness) : 0
     width: implicitWidth
