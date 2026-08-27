@@ -18,10 +18,10 @@
 # optional. Everything in this file is installed; only the flagged ones are
 # additionally asserted present by the doctor.
 #
-# NOT here: the NVIDIA set (nvidia-open, nvidia-utils, egl-wayland,
-# libva-nvidia-driver). Those are appended by bootstrap.sh only when lspci sees
-# an NVIDIA device, which is a decision about the machine rather than a fact
-# about Garage, so it stays in bootstrap logic instead of becoming a flag here.
+# NOT here: the machine-specific Vulkan and NVIDIA packages. Bootstrap selects
+# vulkan-intel, vulkan-radeon, the NVIDIA driver set, or vulkan-swrast from the
+# PCI inventory. That is a decision about the machine rather than a fact about
+# Garage, so it stays in bootstrap logic instead of becoming a flag here.
 
 # Build tooling and the linker that puts the configuration in place
 base-devel
@@ -100,6 +100,7 @@ fastfetch
 micro
 qt6ct
 qt6-wayland
+qt6-5compat                     critical
 xsettingsd
 
 # Scripting runtimes the backend and its helpers call
