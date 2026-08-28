@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Runs as root inside the disposable Arch Linux build container.
+
+set -euo pipefail
+
+profile_dir=/tmp/garage-archiso-profile
+
+finish() {
+    chown -R "$HOST_UID:$HOST_GID" /build /out
+}
+trap finish EXIT
+
+pacman -Syu --needed --noconfirm archiso
+
+# /build is a dedicated generated work tree mounted by iso/build. Reusing an
+# old pacstrap tree can silently retain files removed from a newer profile.
+find /build -mindepth 1 -delete
+
+cp -a /usr/share/archiso/configs/releng "$profile_dir"
+cp -a /garage/iso/profile/. "$profile_dir/"
+cp -a /garage/iso/airootfs/. "$profile_dir/airootfs/"
+install -Dm0644 /bundle/garage.bundle "$profile_dir/airootfs/opt/garage-installer/garage.bundle"
+install -Dm0644 /bundle/source-commit "$profile_dir/airootfs/opt/garage-installer/source-commit"
+printf '%s\n' "$GARAGE_ISO_VARIANT" >"$profile_dir/airootfs/opt/garage-installer/variant"
+
+if [[ $GARAGE_ISO_VARIANT == offline ]]; then
+    bash /garage/iso/prepare-offline "$profile_dir"
+fi
+
+# Keep upstream's rescue entries, but identify the image honestly everywhere a
+# user chooses it.
+if [[ $GARAGE_ISO_VARIANT == offline ]]; then
+    installer_name='Garage offline installer'
+else
+    installer_name='Garage netinstall'
+fi
+find "$profile_dir/syslinux" "$profile_dir/efiboot" "$profile_dir/grub" \
+    -type f \( -name '*.cfg' -o -name '*.conf' \) \
+    -exec sed -i \
+        -e "s/Arch Linux install medium/$installer_name/g" \
+        -e 's/MENU TITLE Arch Linux/MENU TITLE Garage/g' {} +
+
+# Archinstall is already in releng. Git is needed in the installed base so the
+# embedded, revision-pinned bundle can become the user's normal checkout.
+grep -qxF git "$profile_dir/packages.x86_64" || printf '%s\n' git >>"$profile_dir/packages.x86_64"
+
+mkarchiso -v -w /build -o /out "$profile_dir"

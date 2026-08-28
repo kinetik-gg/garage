@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# Classification: QEMU process choreography (STAYS SHELL). This is a focused
+# boot smoke; assertions remain plain text and do not model product state.
+
+set -euo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+out_dir="${GARAGE_ISO_OUT_DIR:-$repo_dir/out/iso}"
+iso_path="${1-}"
+
+if [[ -z $iso_path ]]; then
+    iso_path="$(find "$out_dir" -maxdepth 1 -type f -name 'garage-*.iso' -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
+fi
+if [[ -z $iso_path || ! -f $iso_path ]]; then
+    printf 'No Garage ISO found. Run ./iso/build first.\n' >&2
+    exit 1
+fi
+
+if [[ ${iso_path##*/} == garage-offline-* ]]; then
+    expected_banner='Garage offline installer is ready'
+    network_args=(-nic none)
+else
+    expected_banner='Garage netinstall is ready'
+    network_args=(-nic "user,model=virtio-net-pci")
+fi
+
+for command in bsdtar qemu-system-x86_64 timeout xorriso; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+        printf 'Missing boot-smoke dependency: %s\n' "$command" >&2
+        exit 1
+    fi
+done
+
+smoke_dir="$(mktemp -d)"
+cleanup() {
+    rm -rf -- "$smoke_dir"
+}
+trap cleanup EXIT
+
+bsdtar -xf "$iso_path" -C "$smoke_dir" \
+    arch/boot/x86_64/vmlinuz-linux \
+    arch/boot/x86_64/initramfs-linux.img
+
+iso_label="$(xorriso -indev "$iso_path" -pvd_info 2>/dev/null | sed -n 's/^Volume Id[[:space:]]*:[[:space:]]*//p')"
+if [[ -z $iso_label ]]; then
+    printf 'Could not read the ISO volume label from %s\n' "$iso_path" >&2
+    exit 1
+fi
+
+set +e
+timeout --signal=TERM 75 qemu-system-x86_64 \
+    -enable-kvm \
+    -machine q35,accel=kvm \
+    -cpu host \
+    -m 2048 \
+    -smp 2 \
+    -kernel "$smoke_dir/arch/boot/x86_64/vmlinuz-linux" \
+    -initrd "$smoke_dir/arch/boot/x86_64/initramfs-linux.img" \
+    -append "archisobasedir=arch archisolabel=$iso_label console=ttyS0,115200n8" \
+    -drive "file=$iso_path,media=cdrom,readonly=on" \
+    "${network_args[@]}" \
+    -display none \
+    -serial "file:$smoke_dir/serial.log" \
+    -monitor none \
+    -no-reboot \
+    >"$smoke_dir/qemu.log" 2>&1
+qemu_status=$?
+set -e
+
+if ! grep -Fq "$expected_banner" "$smoke_dir/serial.log"; then
+    tail -n 120 "$smoke_dir/serial.log" >&2
+    printf 'Garage installer banner did not appear (QEMU status %s).\n' "$qemu_status" >&2
+    exit 1
+fi
+
+printf 'Garage installer reached its live boot entry point (%s).\n' "$expected_banner"

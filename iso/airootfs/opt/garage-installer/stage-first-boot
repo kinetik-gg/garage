@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Run by Archinstall inside the completed target system.
+
+set -euo pipefail
+
+wheel_members="$(getent group wheel | cut -d: -f4)"
+IFS=',' read -r -a administrators <<<"$wheel_members"
+
+if ((${#administrators[@]} != 1)) || [[ -z ${administrators[0]} ]]; then
+    printf 'Garage requires exactly one administrator account; wheel contains: %s\n' "${wheel_members:-none}" >&2
+    exit 1
+fi
+
+desktop_user="${administrators[0]}"
+desktop_home="$(getent passwd "$desktop_user" | cut -d: -f6)"
+if [[ -z $desktop_home || ! -d $desktop_home ]]; then
+    printf 'Garage could not resolve the home for %s.\n' "$desktop_user" >&2
+    exit 1
+fi
+
+repo_dir="$desktop_home/repositories/garage"
+if [[ -e $repo_dir ]]; then
+    printf '%s already exists in the new system.\n' "$repo_dir" >&2
+    exit 1
+fi
+
+install -d -o "$desktop_user" -g "$desktop_user" "$desktop_home/repositories"
+git clone --branch main /opt/garage-installer/garage.bundle "$repo_dir"
+git -C "$repo_dir" remote set-url origin https://github.com/kinetik-gg/garage.git
+chown -R "$desktop_user:$desktop_user" "$repo_dir"
+
+if [[ -d /opt/garage-offline ]]; then
+    install -d -o "$desktop_user" -g "$desktop_user" \
+        "$desktop_home/.cargo" "$desktop_home/.rustup"
+    tar --extract --file /opt/garage-offline/cargo.tar \
+        --directory "$desktop_home/.cargo"
+    tar --extract --file /opt/garage-offline/rustup.tar \
+        --directory "$desktop_home/.rustup"
+    chown -R "$desktop_user:$desktop_user" \
+        "$desktop_home/.cargo" "$desktop_home/.rustup"
+fi
+
+install -Dm0755 /opt/garage-installer/garage-first-boot /usr/local/lib/garage/first-boot
+install -Dm0644 /opt/garage-installer/garage-first-boot-profile.sh /etc/profile.d/garage-first-boot.sh
+printf '%s\n' "$desktop_user" >/etc/garage-installer-user
+
+state_dir="$desktop_home/.local/state/garage-installer"
+install -d -o "$desktop_user" -g "$desktop_user" "$state_dir"
+install -o "$desktop_user" -g "$desktop_user" -m 0644 /dev/null "$state_dir/pending"
+
+rm -f /opt/garage-installer/garage.bundle
+
+printf 'Garage will continue when %s first logs in on a TTY.\n' "$desktop_user"

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Launch Garage's guided netinstall from the live environment.
+
+set -u
+
+variant="$(cat /opt/garage-installer/variant 2>/dev/null || printf 'netinstall')"
+archinstall_args=(
+    --config /opt/garage-installer/config.json
+    --plugin /opt/garage-installer/plugin.py
+    --skip-version-check
+)
+if [[ $variant == offline ]]; then
+    title='Garage offline installer'
+    connection_note='Everything needed for installation is on this image. A network connection is optional.'
+    archinstall_args+=(--offline --no-pkg-lookups)
+else
+    title='Garage netinstall'
+    connection_note='The installation downloads current Arch and Garage dependencies. It needs a working network connection.'
+fi
+
+clear
+printf '%s is ready\n\n' "$title"
+cat <<'BANNER'
+
+This installer lays down minimal Arch, then schedules Garage's own bootstrap
+for the first real TTY login. You will choose the disk, locale, bootloader, and
+one administrator account in Archinstall.
+BANNER
+printf '\n%s\n' "$connection_note"
+
+while true; do
+    printf '\nPress Enter to begin, or type shell for a recovery shell: '
+    IFS= read -r answer
+    if [[ $answer == shell ]]; then
+        exec zsh
+    fi
+
+    archinstall "${archinstall_args[@]}"
+    status=$?
+
+    printf '\nArchinstall exited with status %s.\n' "$status"
+    printf 'Press Enter to reopen it, or type shell for a recovery shell: '
+    IFS= read -r answer
+    if [[ $answer == shell ]]; then
+        exec zsh
+    fi
+done

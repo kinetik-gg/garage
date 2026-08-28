@@ -5,11 +5,11 @@
 Garage installs a whole desktop onto a machine that has none — Hyprland, display
 manager, session, bar, shell, toolchains — driven from a bare TTY. The target is a
 **freshly installed, minimal Arch system with no desktop environment**: the state
-right after `pacstrap`, a bootloader, and `useradd`. Prerequisites, in full:
+right after `pacstrap`, a bootloader, and `useradd`. Garage's netinstall image can
+create that base system, or you can provide it yourself. Prerequisites, in full:
 
-- A booting, minimal Arch install. Installing Arch stays your job — Garage is not a
-  distribution and ships no ISO.
-- A working network connection.
+- The Garage netinstall image, or a booting minimal Arch installation.
+- A working network connection, unless you are using the offline image.
 - A normal user account that can use `sudo`. Do not run the bootstrap as root.
 - **No** desktop environment, display manager, or AUR helper already set up.
 
@@ -41,6 +41,23 @@ Managed paths move to `~/.garage-backup/<timestamp>/` rather than being deleted;
 packages and enabled services are not reverted.
 
 ## Installing
+
+### From the netinstall image
+
+Boot either Garage image and follow the guided installer. Netinstall downloads
+the current package set; the larger offline image carries the frozen package
+closure and build inputs on the installation medium. Both use Archinstall for
+the disk, locale, bootloader, and account choices, then embed the matching
+Garage source revision into the new system. Create exactly one administrator
+account.
+
+After Archinstall finishes, reboot without the installation medium and log in
+on `tty1`. Garage's bootstrap starts in that real user session and asks for your
+sudo password as needed. This second stage is deliberate: a chroot has no
+systemd user manager, while Garage validates that user-session boundary before
+changing the machine.
+
+Local image build and VM smoke instructions are in [`iso/README.md`](../iso/README.md).
 
 ### From a clone
 

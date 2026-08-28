@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+#
+# Classification: repository/toolchain materialization (STAYS SHELL). Pacman,
+# rustup, Cargo, curl, and Git own their formats; this script resolves their
+# immutable inputs and assembles the payload consumed by the installer.
+
+set -euo pipefail
+
+profile_dir=${1:?profile directory is required}
+payload_dir="$profile_dir/airootfs/opt/garage-offline"
+repo_dir="$payload_dir/repo/x86_64"
+resolver_db=/tmp/garage-offline-pacman-db
+resolver_log=/tmp/garage-offline-pacman.log
+hyprpolkit_version=0.1.3
+hyprpolkit_sha256=a8fa714b92d47331f056b608cb731dd1f5cc3845a9109cb22c6e6eb55b4eac84
+
+install -d "$repo_dir" "$resolver_db" /offline-cache /offline-toolchain
+pacman -S --needed --noconfirm curl git rustup
+pacman -Sy \
+    --dbpath "$resolver_db" \
+    --cachedir /offline-cache \
+    --logfile "$resolver_log" \
+    --noconfirm
+
+mapfile -t garage_packages < <(
+    awk '{ sub(/#.*/, ""); if (NF) print $1 }' /garage/system/manifest/packages.list
+)
+mapfile -t releng_packages < <(
+    awk '{ sub(/#.*/, ""); if (NF) print $1 }' /usr/share/archiso/configs/releng/packages.x86_64
+)
+targets=(
+    "${releng_packages[@]}"
+    "${garage_packages[@]}"
+    vulkan-intel
+    vulkan-radeon
+    nvidia-open
+    nvidia-utils
+    egl-wayland
+    libva-nvidia-driver
+    vulkan-swrast
+)
+
+printf 'Resolving the offline pacman repository...\n'
+mapfile -t package_files < <(
+    pacman -Sp \
+        --dbpath "$resolver_db" \
+        --cachedir /offline-cache \
+        --print-format '%f' \
+        "${targets[@]}" |
+        sort -u
+)
+if ((${#package_files[@]} == 0)); then
+    printf 'Offline package resolution returned no files.\n' >&2
+    exit 1
+fi
+
+pacman -Sw \
+    --dbpath "$resolver_db" \
+    --cachedir /offline-cache \
+    --logfile "$resolver_log" \
+    --noconfirm \
+    "${targets[@]}"
+
+for package_file in "${package_files[@]}"; do
+    install -m 0644 "/offline-cache/$package_file" "$repo_dir/$package_file"
+    if [[ -f /offline-cache/$package_file.sig ]]; then
+        install -m 0644 "/offline-cache/$package_file.sig" "$repo_dir/$package_file.sig"
+    fi
+done
+repo-add "$repo_dir/garage-offline.db.tar.zst" "$repo_dir"/*.pkg.tar.zst
+
+pacman -Sp \
+    --dbpath "$resolver_db" \
+    --cachedir /offline-cache \
+    --print-format '%n %v' \
+    "${targets[@]}" |
+    sort -u >"$payload_dir/packages.txt"
+
+printf 'Preparing the offline Rust toolchain and Cargo registry...\n'
+export RUSTUP_HOME=/offline-toolchain/rustup
+export CARGO_HOME=/offline-toolchain/cargo
+rustup toolchain install stable --profile default --component rustfmt,clippy
+cargo fetch --locked --manifest-path /garage/backend/Cargo.toml
+# ArchISO deliberately normalizes files copied through airootfs to 0644 unless
+# profiledef.sh names them individually. Archives preserve the executable bits
+# on the Rust tools without maintaining a brittle per-file permission list.
+tar --create --file "$payload_dir/rustup.tar" --directory "$RUSTUP_HOME" .
+tar --create --file "$payload_dir/cargo.tar" --directory "$CARGO_HOME" .
+
+hyprpolkit_archive="$payload_dir/hyprpolkitagent-$hyprpolkit_version.tar.gz"
+if [[ ! -f /offline-toolchain/hyprpolkitagent-$hyprpolkit_version.tar.gz ]]; then
+    curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
+        --connect-timeout 20 --silent --show-error \
+        --output "/offline-toolchain/hyprpolkitagent-$hyprpolkit_version.tar.gz" \
+        "https://codeload.github.com/hyprwm/hyprpolkitagent/tar.gz/refs/tags/v$hyprpolkit_version"
+fi
+printf '%s  %s\n' \
+    "$hyprpolkit_sha256" \
+    "/offline-toolchain/hyprpolkitagent-$hyprpolkit_version.tar.gz" |
+    sha256sum --check --status
+install -m 0644 \
+    "/offline-toolchain/hyprpolkitagent-$hyprpolkit_version.tar.gz" \
+    "$hyprpolkit_archive"
+
+git clone --quiet --depth 1 --branch v4.18.0 \
+    https://github.com/pure-fish/pure.git "$payload_dir/pure"
+install -m 0644 /etc/pacman.conf "$payload_dir/pacman.conf.online"
+install -m 0644 /garage/iso/offline/pacman.conf \
+    "$profile_dir/airootfs/etc/pacman.conf"
+
+package_bytes="$(du -cb "$repo_dir"/*.pkg.tar.zst | tail -n1 | cut -f1)"
+printf 'Offline repository: %s packages, %s bytes.\n' \
+    "${#package_files[@]}" "$package_bytes"

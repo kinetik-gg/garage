@@ -9,9 +9,14 @@ scratch=$(mktemp -d /tmp/garage-hyprpolkitagent.XXXXXX)
 trap 'rm -rf -- "$scratch"' EXIT HUP INT TERM
 
 archive="$scratch/hyprpolkitagent-$version.tar.gz"
-curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
-    --connect-timeout 20 --silent --show-error --output "$archive" \
-    "https://codeload.github.com/hyprwm/hyprpolkitagent/tar.gz/refs/tags/v$version"
+offline_archive=${GARAGE_OFFLINE_ROOT:-}/hyprpolkitagent-$version.tar.gz
+if [ -n "${GARAGE_OFFLINE_ROOT:-}" ] && [ -f "$offline_archive" ]; then
+    cp "$offline_archive" "$archive"
+else
+    curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
+        --connect-timeout 20 --silent --show-error --output "$archive" \
+        "https://codeload.github.com/hyprwm/hyprpolkitagent/tar.gz/refs/tags/v$version"
+fi
 printf '%s  %s\n' "$archive_sha256" "$archive" | sha256sum --check --status
 tar -xzf "$archive" -C "$scratch"
 install -m 0644 "$script_dir/main.qml" \
