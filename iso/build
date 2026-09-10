@@ -8,6 +8,7 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 variant="${1:-netinstall}"
+source_ref="${2:-HEAD}"
 cache_dir="${GARAGE_ISO_CACHE_DIR:-$repo_dir/.cache/iso}"
 pacman_cache="${GARAGE_ISO_PACMAN_CACHE:-$cache_dir/pacman}"
 offline_package_cache="${GARAGE_ISO_OFFLINE_PACKAGE_CACHE:-$cache_dir/offline-packages}"
@@ -15,15 +16,16 @@ offline_toolchain_cache="${GARAGE_ISO_OFFLINE_TOOLCHAIN_CACHE:-$cache_dir/offlin
 work_dir="${GARAGE_ISO_WORK_DIR:-$cache_dir/work}"
 out_dir="${GARAGE_ISO_OUT_DIR:-$repo_dir/out/iso}"
 container_image="${GARAGE_ISO_CONTAINER_IMAGE:-archlinux:latest}"
-bundle_dir="$cache_dir/payload"
-bundle_path="$bundle_dir/garage.bundle"
-next_bundle_path="$bundle_path.next.$BASHPID"
-source_commit="$(git -C "$repo_dir" rev-parse --verify HEAD)"
+
+if (($# > 2)); then
+    printf 'Usage: %s [netinstall|offline] [git-ref]\n' "${0##*/}" >&2
+    exit 2
+fi
 
 case "$variant" in
     netinstall | offline) ;;
     *)
-        printf 'Usage: %s [netinstall|offline]\n' "${0##*/}" >&2
+        printf 'Usage: %s [netinstall|offline] [git-ref]\n' "${0##*/}" >&2
         exit 2
         ;;
 esac
@@ -33,30 +35,44 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ $(git -C "$repo_dir" branch --show-current) != main ]]; then
-    printf 'Garage ISO builds currently require the main branch.\n' >&2
-    exit 1
-fi
+source_commit="$(git -C "$repo_dir" rev-parse --verify --end-of-options "$source_ref^{commit}")"
+source_epoch="$(git -C "$repo_dir" show -s --format=%ct "$source_commit")"
 
 mkdir -p -- \
+    "$cache_dir" \
     "$pacman_cache" \
     "$offline_package_cache" \
     "$offline_toolchain_cache" \
     "$work_dir" \
-    "$out_dir" \
-    "$bundle_dir"
+    "$out_dir"
+
+# Resolve the ref once, then materialize both inputs from the same object graph.
+# Never mount the invoking checkout: its profile, package list, scripts, or lock
+# file may contain staged/unstaged edits even when the embedded bundle is clean.
+snapshot_dir="$(mktemp -d "$cache_dir/source.XXXXXX")"
+cleanup() {
+    rm -rf -- "$snapshot_dir"
+}
+trap cleanup EXIT
+bundle_dir="$snapshot_dir/payload"
+source_dir="$snapshot_dir/source"
+mkdir -p -- "$bundle_dir" "$source_dir"
+git init --quiet --bare "$snapshot_dir/git"
+git --git-dir="$snapshot_dir/git" fetch --quiet --no-tags \
+    "$repo_dir" "$source_commit:refs/heads/main"
+git --git-dir="$snapshot_dir/git" symbolic-ref HEAD refs/heads/main
+git --git-dir="$snapshot_dir/git" archive HEAD | tar -xf - -C "$source_dir"
 
 printf 'Building Garage %s from committed revision %s\n' "$variant" "$source_commit"
-git -C "$repo_dir" bundle create --quiet "$next_bundle_path" HEAD main
-mv -f -- "$next_bundle_path" "$bundle_path"
+git --git-dir="$snapshot_dir/git" bundle create --quiet "$bundle_dir/garage.bundle" HEAD main
 printf '%s\n' "$source_commit" >"$bundle_dir/source-commit"
 
 docker run --rm --privileged \
     --env HOST_UID="$(id -u)" \
     --env HOST_GID="$(id -g)" \
     --env GARAGE_ISO_VARIANT="$variant" \
-    --env SOURCE_DATE_EPOCH="$(git -C "$repo_dir" show -s --format=%ct HEAD)" \
-    --volume "$repo_dir:/garage:ro" \
+    --env SOURCE_DATE_EPOCH="$source_epoch" \
+    --volume "$source_dir:/garage:ro" \
     --volume "$pacman_cache:/var/cache/pacman/pkg" \
     --volume "$offline_package_cache:/offline-cache" \
     --volume "$offline_toolchain_cache:/offline-toolchain" \

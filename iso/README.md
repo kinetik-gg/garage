@@ -16,6 +16,8 @@ container, so the host does not need to be Arch Linux.
 ```sh
 ./iso/build netinstall
 ./iso/build offline
+# A tag or commit can be selected explicitly, including from a detached checkout:
+./iso/build offline '<git-ref>'
 ```
 
 Finished images are written to `out/iso/`. Build work and package/toolchain
@@ -23,10 +25,16 @@ caches live under `.cache/iso/` and are reused by later builds. Set
 `GARAGE_ISO_PACMAN_CACHE`, `GARAGE_ISO_OFFLINE_PACKAGE_CACHE`, or
 `GARAGE_ISO_OFFLINE_TOOLCHAIN_CACHE` to reuse caches elsewhere.
 
-The build embeds committed `HEAD`, not the working tree. This keeps local
-changes and credentials out of an image and makes the source revision
-traceable. Build or commit the revision you intend to test before distributing
-the ISO.
+The build resolves the selected ref (default `HEAD`) once. Its container reads
+an archive of that commit, including the profile, scripts, package manifest, and
+Cargo lockfile; its embedded Git bundle contains the same commit on an installable
+`main` branch. Staged, unstaged, untracked, and ignored checkout files are excluded.
+Commit the revision you intend to test before building it. Temporary source
+snapshots are removed after the build; downloaded package/toolchain caches remain.
+
+This pins Garage's source inputs, not all upstream inputs: the container image,
+Arch repositories, ArchISO, and stable Rust toolchain still move. Release naming,
+upstream pinning/provenance, and publication qualification remain separate work.
 
 Run the boot smoke against the newest local image with:
 
@@ -55,6 +63,19 @@ device as part of the smoke.
 5. Whether bootstrap succeeds or fails, the automatic handoff is disabled. A
    failed run leaves a retry command on screen instead of creating a login
    loop.
+
+After a failed or interrupted run, remain in a real TTY login and resume with:
+
+```sh
+/usr/local/lib/garage/first-boot --retry
+```
+
+The explicit retry restores the offline environment when the payload is present
+and permits bootstrap to continue on its partially installed target. Only one
+bootstrap may run at a time. Once bootstrap succeeds, a checkpoint makes retries
+finish cleanup without rerunning it. Offline cleanup restores the online pacman
+configuration before removing its payload; failures remain retryable and never
+print a completion message.
 
 The real-login handoff is intentional. Running `bootstrap.sh` in Archinstall's
 chroot would not provide the systemd user manager that Garage validates before

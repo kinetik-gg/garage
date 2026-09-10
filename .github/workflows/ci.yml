@@ -54,12 +54,14 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          bash -n \
+          for shell_file in \
             bootstrap.sh \
             install.sh \
             install/lib.sh \
             install/[0-9][0-9]-*.sh \
             tests/install-runtime-contracts.sh \
+            tests/iso-build-contracts.sh \
+            tests/iso-first-boot-contracts.sh \
             iso/build \
             iso/container-build \
             iso/prepare-offline \
@@ -69,7 +71,9 @@ jobs:
             iso/airootfs/usr/local/bin/garage-install \
             iso/airootfs/opt/garage-installer/stage-first-boot \
             iso/airootfs/opt/garage-installer/garage-first-boot \
-            iso/airootfs/opt/garage-installer/garage-first-boot-profile.sh
+            iso/airootfs/opt/garage-installer/garage-first-boot-profile.sh; do
+            bash -n "$shell_file"
+          done
 
       - name: Check ISO installer data
         run: |

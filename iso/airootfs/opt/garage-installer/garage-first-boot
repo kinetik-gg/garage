@@ -1,57 +1,102 @@
 #!/usr/bin/env bash
-# Complete Garage from a real PAM/systemd user login on the installed system.
+# Classification: TTY/user-session choreography (STAYS SHELL). This must run
+# before the Rust backend exists; it owns the bootstrap process and its retry.
 
-set -u
+set -uo pipefail
 
 state_dir="$HOME/.local/state/garage-installer"
-pending="$state_dir/pending"
-running="$state_dir/running"
-failed="$state_dir/failed"
 repo_dir="$HOME/repositories/garage"
 offline_root=/opt/garage-offline
+profile_hook=/etc/profile.d/garage-first-boot.sh
+installer_user_file=/etc/garage-installer-user
 
-if [[ -d $offline_root ]]; then
-    export GARAGE_OFFLINE_ROOT="$offline_root"
-    export CARGO_NET_OFFLINE=true
-    export RUSTUP_DIST_SERVER=http://127.0.0.1:9
-    export RUSTUP_UPDATE_ROOT=http://127.0.0.1:9/rustup
-fi
-
-if ! mv -- "$pending" "$running" 2>/dev/null; then
-    exit 0
-fi
-
-clear
-cat <<'BANNER'
-Finishing the Garage installation
-
-Garage is now running in your real user session. Its bootstrap will install the
-desktop and ask for your sudo password when system changes are needed.
-BANNER
-
-if "$repo_dir/bootstrap.sh"; then
-    if [[ -d $offline_root ]]; then
-        if ! sudo install -m 0644 \
-            "$offline_root/pacman.conf.online" /etc/pacman.conf; then
-            printf 'Garage finished, but restoring the online pacman configuration failed.\n' >&2
-            exit 1
-        fi
-        sudo rm -rf -- "$offline_root"
+finish_installation() {
+    if [[ ! -f $state_dir/bootstrapped ]]; then
+        "$repo_dir/bootstrap.sh" || return "$?"
+        touch "$state_dir/bootstrapped" || return "$?"
     fi
-    rm -f -- "$running" "$failed"
-    sudo rm -f -- /etc/profile.d/garage-first-boot.sh /etc/garage-installer-user
-    printf '\nGarage installation is complete. Reboot to enter the desktop:\n\n'
-printf '    sudo reboot\n\n'
-else
-    status=$?
-    mv -- "$running" "$failed"
-    cat >&2 <<FAILURE
 
-Garage bootstrap stopped with status $status. Automatic startup has been
-disabled so you can inspect the error without a login loop. Retry with:
+    # Keep the success checkpoint until every cleanup step succeeds. In
+    # particular, a failed restore must not make a retry rerun bootstrap.
+    if [[ -d $offline_root ]]; then
+        if [[ ! -f $state_dir/online-restored ]]; then
+            sudo install -m 0644 "$offline_root/pacman.conf.online" /etc/pacman.conf || return "$?"
+            touch "$state_dir/online-restored" || return "$?"
+        fi
+        # A failed recursive removal can already have removed the backup file.
+        # The restore checkpoint makes retry finish that partial deletion.
+        sudo rm -rf -- "$offline_root" || return "$?"
+    fi
+    sudo rm -f -- "$profile_hook" "$installer_user_file" || return "$?"
+    rm -f -- "$state_dir/running" "$state_dir/failed" || return "$?"
+}
 
-    $repo_dir/bootstrap.sh
+first_boot() {
+    local mode=${1-} claim status
+    if (($# > 1)) || [[ -n $mode && $mode != --retry ]]; then
+        printf 'Usage: %s [--retry]\n' "${0##*/}" >&2
+        return 2
+    fi
 
-FAILURE
-    exit "$status"
+    # A normal login can claim only the original pending run. A failure or an
+    # interrupted process requires an explicit retry, never another login loop.
+    if [[ $mode == --retry ]]; then
+        if [[ -f $state_dir/failed ]]; then
+            claim=failed
+        elif [[ -f $state_dir/running ]]; then
+            claim=running
+        else
+            printf 'No interrupted Garage installation to retry.\n' >&2
+            return 1
+        fi
+    else
+        [[ -f $state_dir/pending ]] || return 0
+        claim=pending
+    fi
+
+    # Bootstrap inherits this descriptor: killing its wrapper cannot unlock a
+    # still-running child and permit a second installer to mutate the system.
+    exec 9>"$state_dir/lock" || return "$?"
+    if ! flock -n 9; then
+        printf 'Garage installation is already running.\n' >&2
+        return 1
+    fi
+    # Another invocation may have completed while this one was opening the lock.
+    [[ -f $state_dir/$claim ]] || return 0
+    if [[ $claim != running ]]; then
+        mv -- "$state_dir/$claim" "$state_dir/running" || return "$?"
+    fi
+
+    if [[ -d $offline_root ]]; then
+        export GARAGE_OFFLINE_ROOT="$offline_root"
+        export CARGO_NET_OFFLINE=true
+        export RUSTUP_DIST_SERVER=http://127.0.0.1:9
+        export RUSTUP_UPDATE_ROOT=http://127.0.0.1:9/rustup
+    fi
+    if [[ $mode == --retry ]]; then
+        # The installer has already claimed this target. A partial bootstrap
+        # can enable SDDM before Stow marks the checkout as installed.
+        export GARAGE_FORCE=1
+    fi
+
+    clear || true
+    printf 'Finishing the Garage installation\n\n'
+    printf 'Garage will ask for your sudo password when system changes are needed.\n'
+    if finish_installation; then
+        printf '\nGarage installation is complete. Reboot to enter the desktop:\n\n'
+        printf '    sudo reboot\n\n'
+    else
+        status=$?
+        mv -- "$state_dir/running" "$state_dir/failed" || return "$?"
+        printf '\nGarage installation stopped with status %s. Automatic startup is disabled.\n' "$status" >&2
+        printf 'Inspect the error, then resume from your TTY session with:\n\n' >&2
+        printf '    /usr/local/lib/garage/first-boot --retry\n\n' >&2
+        return "$status"
+    fi
+}
+
+# The contract tests source these functions with temporary payload paths; normal
+# execution always uses the installed paths above and the same entry function.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    first_boot "$@"
 fi
