@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Launch Garage's guided netinstall from the live environment.
+# Classification: live-service and TTY/process choreography (STAYS SHELL).
 
 set -u
 
@@ -12,11 +13,22 @@ archinstall_args=(
 if [[ $variant == offline ]]; then
     title='Garage offline installer'
     connection_note='Everything needed for installation is on this image. A network connection is optional.'
-    archinstall_args+=(--offline --no-pkg-lookups)
+    # Offline mode still waits for NTP and the online keyring refresh unless
+    # explicitly skipped. Pacman continues to verify the shipped signatures.
+    archinstall_args+=(--offline --no-pkg-lookups --skip-ntp --skip-wkd)
 else
     title='Garage netinstall'
     connection_note='The installation downloads current Arch and Garage dependencies. It needs a working network connection.'
 fi
+
+prepare_keyring() {
+    if [[ $variant == offline ]]; then
+        # Releng orders pacman-init after time-sync.target. On a disconnected
+        # machine the wait service never finishes, leaving the keyring empty.
+        systemctl stop systemd-time-wait-sync.service || return "$?"
+    fi
+    systemctl start pacman-init.service
+}
 
 clear
 printf '%s is ready\n\n' "$title"
@@ -35,10 +47,10 @@ while true; do
         exec zsh
     fi
 
-    archinstall "${archinstall_args[@]}"
+    prepare_keyring && archinstall "${archinstall_args[@]}"
     status=$?
 
-    printf '\nArchinstall exited with status %s.\n' "$status"
+    printf '\nInstaller exited with status %s.\n' "$status"
     printf 'Press Enter to reopen it, or type shell for a recovery shell: '
     IFS= read -r answer
     if [[ $answer == shell ]]; then

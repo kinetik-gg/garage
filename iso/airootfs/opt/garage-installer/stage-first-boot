@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Run by Archinstall inside the completed target system.
+# Classification: installer payload/user-home materialization (STAYS SHELL).
 
 set -euo pipefail
 
@@ -45,7 +46,10 @@ install -Dm0644 /opt/garage-installer/garage-first-boot-profile.sh /etc/profile.
 printf '%s\n' "$desktop_user" >/etc/garage-installer-user
 
 state_dir="$desktop_home/.local/state/garage-installer"
-install -d -o "$desktop_user" -g "$desktop_user" "$state_dir"
+# install -d assigns the requested owner only to explicit operands. Otherwise
+# its implicit .local/state parents belong to root and block the user's bootstrap.
+install -d -o "$desktop_user" -g "$desktop_user" \
+    "$desktop_home/.local" "$desktop_home/.local/state" "$state_dir"
 install -o "$desktop_user" -g "$desktop_user" -m 0644 /dev/null "$state_dir/pending"
 
 rm -f /opt/garage-installer/garage.bundle

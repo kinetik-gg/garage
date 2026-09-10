@@ -83,6 +83,13 @@ making changes.
 
 ## Offline boundary
 
+The offline launcher skips Archinstall's network time synchronization and online
+keyring refresh waits. It releases the live system's time-sync wait and completes
+local Pacman keyring initialization before starting Archinstall. Check the
+machine's clock before installing; package signature validation still uses the
+shipped keyring, and automatic time synchronization is enabled in the installed
+system.
+
 The offline image freezes the current Arch repository closure at build time and
 records its package versions inside the image. After Garage finishes, the
 installer restores the normal Arch repository configuration and removes its

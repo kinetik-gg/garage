@@ -62,6 +62,7 @@ jobs:
             tests/install-runtime-contracts.sh \
             tests/iso-build-contracts.sh \
             tests/iso-first-boot-contracts.sh \
+            tests/iso-launcher-contracts.sh \
             iso/build \
             iso/container-build \
             iso/prepare-offline \

@@ -33,6 +33,11 @@ fn iso_build_uses_only_the_selected_commit() -> TestResult {
 }
 
 #[test]
+fn offline_launcher_does_not_wait_for_online_services() -> TestResult {
+    run_contract("iso-launcher-contracts.sh")
+}
+
+#[test]
 fn first_boot_retry_preserves_offline_state_and_finishes_cleanup() -> TestResult {
     run_contract("iso-first-boot-contracts.sh")
 }
