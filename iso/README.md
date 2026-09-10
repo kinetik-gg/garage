@@ -92,7 +92,7 @@ system.
 
 The offline image freezes the current Arch repository closure at build time and
 records its package versions inside the image. After Garage finishes, the
-installer restores the normal Arch repository configuration and removes its
+installer restores the package-shipped Arch repository configuration and removes its
 temporary offline payload. Applications that fetch content at runtime still
 need a connection later; for example, `spotify-launcher` cannot fetch Spotify
 until the machine is online.

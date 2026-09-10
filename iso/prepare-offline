@@ -104,7 +104,15 @@ install -m 0644 \
 
 git clone --quiet --depth 1 --branch v4.18.0 \
     https://github.com/pure-fish/pure.git "$payload_dir/pure"
-install -m 0644 /etc/pacman.conf "$payload_dir/pacman.conf.online"
+# Restore Arch's packaged defaults, not the build container's NoExtract policy
+# (which omits locales, manuals, and even future pacman configuration updates).
+pacman_archives=("$repo_dir"/pacman-[0-9]*.pkg.tar.zst)
+if ((${#pacman_archives[@]} != 1)) || [[ ! -f ${pacman_archives[0]} ]]; then
+    printf 'Expected exactly one resolved pacman package.\n' >&2
+    exit 1
+fi
+bsdtar --extract --to-stdout --file "${pacman_archives[0]}" etc/pacman.conf \
+    >"$payload_dir/pacman.conf.online"
 install -m 0644 /garage/iso/offline/pacman.conf \
     "$profile_dir/airootfs/etc/pacman.conf"
 
