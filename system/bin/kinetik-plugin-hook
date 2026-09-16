@@ -150,7 +150,10 @@ act() {
 if [ "${HOOK_TEST:-0}" = 1 ] && [ -n "${HOOK_TEST_ABI:-}" ]; then
     abi=$HOOK_TEST_ABI
 else
-    abi=$(timeout 10 Hyprland --version 2>/dev/null |
+    # Hyprland checks this variable before parsing even --version. Pacman's
+    # root environment normally omits it. The version-only query never opens
+    # a display or writes runtime files, so /run is sufficient for this probe.
+    abi=$(XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run} timeout 10 Hyprland --version 2>/dev/null |
         awk -F': ' '/Version ABI string:/ { print $2; exit }')
 fi
 

@@ -126,14 +126,15 @@ not after the user presses the key.
 ## 6. Plugin lifecycle
 
 Plugins are ABI-locked to the exact Hyprland commit + library versions they were built against.
-`hyprland.lua`'s `load_plugin()` (`hyprland.lua:10`) wraps `hl.plugin.load` in `pcall`: a
-stale-ABI `.so` throwing mid-`dlopen` must not abort the whole chunk and take
-`binds`/`autostart`/window rules with it. Every consumer already degrades on `GLASS_AVAILABLE` /
-`HYPREXPO_AVAILABLE` being false. Failures collect into `fragment_errors` and surface once at the
-end of the chunk via `error(...)` into `hyprctl configerrors` (`hyprland.lua:90`) — on screen
-instead of a silently missing setting. `load_override()` (`hyprland.lua:67`) applies the identical
-pattern to the two generated fragments: `dofile` on a bad fragment must not take window rules and
-workspace assignments with it.
+`hyprland.lua`'s `load_plugin()` queues the path through `hl.plugin.load`, then checks
+`hl.get_loaded_plugins()` before enabling `GLASS_AVAILABLE` / `HYPREXPO_AVAILABLE`.
+Hyprland performs queued loads after config parsing and reloads the config when plugins change.
+A successful `pcall` around the queue operation does not prove a plugin loaded: an ABI mismatch
+is discovered later. Guarding settings on the loaded list prevents unknown plugin-key errors on
+the first pass and after a failed load. Synchronous registration failures still collect into
+`fragment_errors` and surface at the end of the chunk through `error(...)`.
+`load_override()` applies the same deferred-reporting pattern to the generated fragments:
+`dofile` on a bad fragment must not take window rules and workspace assignments with it.
 
 `kinetik-plugin-hook`'s design-A rationale (`system/bin/kinetik-plugin-hook` header) is the same
 instinct at system level: on a Hyprland ABI bump the hook **removes**, rather than rebuilds, a

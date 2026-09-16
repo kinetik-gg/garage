@@ -40,7 +40,8 @@ pins_installed="/usr/lib/kinetik/plugin-pins"
 marker="/var/lib/kinetik/plugins-stale"
 cache_root="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-abi=$(Hyprland --version 2>/dev/null | awk -F ': ' '/Version ABI string:/ { print $2 }')
+abi=$(XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run} timeout 10 Hyprland --version 2>/dev/null |
+    awk -F ': ' '/Version ABI string:/ { print $2 }')
 if [ -z "$abi" ]; then
     # --check runs unattended from a systemd user unit at every login. With no
     # ABI to compare against there is nothing it can usefully say, and failing
@@ -215,7 +216,7 @@ hyprexpo_repo="$cache_root/hyprland-plugin-src/hyprexpo"
 
 # Deploy builds never write into the first-party working tree; its own build/
 # directory belongs to the developer's iteration loop.
-glass_build="$cache_root/hyprland-plugin-build/glass"
+glass_build="$cache_root/hyprland-plugin-build/$abi/glass"
 
 require_clean() {
     repo=$1
@@ -285,7 +286,9 @@ if [ ! -e "$glass_target" ]; then
 fi
 
 if [ ! -e "$expo_target" ]; then
-    make -C "$hyprexpo_repo" all
+    # Its Makefile tracks sources but not Hyprland's installed headers. Force
+    # a rebuild when deploying a new ABI, even if the source pin is unchanged.
+    make -B -C "$hyprexpo_repo" all
     sudo install -m 0755 "$hyprexpo_repo/hyprexpo.so" "$expo_target"
 fi
 
@@ -299,4 +302,4 @@ sudo ln -sfn "$expo_target" "$plugin_root/hyprexpo.so"
 sudo rm -f "$marker"
 
 printf 'Plugins deployed for Hyprland ABI %s\n' "$abi"
-printf 'Reload Hyprland to activate newly deployed builds.\n'
+printf 'Log out and back in to activate newly deployed builds.\n'
