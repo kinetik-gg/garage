@@ -15,18 +15,10 @@ local function load_plugin(name)
     end
     file:close()
 
-    -- A routine `pacman -Syu` can bump Hyprland's plugin ABI before the
-    -- rebuild script has re-linked this .so against it. The file still
-    -- exists on disk (it passes the check above), but hl.plugin.load then
-    -- throws deep inside the loader on the ABI mismatch. Without this pcall
-    -- that error would propagate out of load_plugin and abort this entire
-    -- chunk, taking every require() below (binds, autostart, window rules,
-    -- ...) down with it — a stale plugin should never cost the whole
-    -- desktop. Catch it, leave the plugin disabled (every consumer already
-    -- degrades correctly on GLASS_AVAILABLE/HYPREXPO_AVAILABLE == false),
-    -- and surface it the same way load_override's fragment errors are
-    -- surfaced below, so it lands in `hyprctl configerrors` instead of
-    -- vanishing silently.
+    -- This only queues a load for the end of config parsing. A successful
+    -- pcall does not prove the plugin loaded: an ABI mismatch is detected
+    -- later, outside this call. Hyprland reloads the config after successful
+    -- loading, so only enable plugin consumers once the loaded list agrees.
     local ok, err = pcall(hl.plugin.load, path)
     if not ok then
         fragment_errors[#fragment_errors + 1] = name
@@ -35,7 +27,12 @@ local function load_plugin(name)
             .. " — run garage-rebuild-plugins"
         return false
     end
-    return true
+    for _, plugin in ipairs(hl.get_loaded_plugins()) do
+        if plugin.name == name then
+            return true
+        end
+    end
+    return false
 end
 
 -- Plugins are optional during the first login. The rebuild script installs
