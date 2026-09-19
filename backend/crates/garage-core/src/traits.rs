@@ -120,6 +120,52 @@ pub trait MonitorSource {
     fn monitors(&self) -> Result<Vec<Monitor>, MonitorError>;
 }
 
+/// Why the compositor's display-event stream could not be read.
+///
+/// The event-stream counterpart to [`MonitorError`]: where that names a failed question,
+/// this names a failed subscription. A stream that merely went quiet is `Ok(None)`, not an
+/// error -- only a stream that is *gone* -- the socket closed, the compositor restarted,
+/// the environment naming no socket -- lands here.
+#[derive(Debug, Error)]
+#[error("{detail}")]
+pub struct EventError {
+    /// What went wrong, in whatever terms the implementation has.
+    pub detail: String,
+}
+
+/// One display arriving or leaving, as the compositor reports it.
+///
+/// The payload is the connector name (`DP-2`, `eDP-1`), which is what a watcher needs to
+/// know only in order to log; the recovery it drives re-reads the saved layout and never
+/// names a connector itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MonitorEvent {
+    /// A display became available.
+    Added(String),
+    /// A display went away.
+    Removed(String),
+}
+
+/// Follow the compositor's display events.
+///
+/// The apply side's long-lived counterpart to [`MonitorSource`]: where that answers a
+/// one-shot question a render may ask, this yields the events a running watcher waits on.
+/// An implementation blocks up to `timeout` for the next event, and `Ok(None)` means the
+/// wait elapsed with nothing to report -- which is the quiet edge of a hotplug burst, and
+/// exactly the signal a debouncing watcher is waiting for.
+///
+/// Not reachable from `garage-render`: the trait lives here so the watcher's decision logic
+/// can be handed a fake, while only the process half (`garage-proc`) knows how to open a
+/// socket.
+pub trait MonitorEvents {
+    /// The next display event, waiting at most `timeout`.
+    ///
+    /// # Errors
+    ///
+    /// [`EventError`] when the stream itself is gone. A wait that times out is `Ok(None)`.
+    fn next_event(&mut self, timeout: Duration) -> Result<Option<MonitorEvent>, EventError>;
+}
+
 /// What a finished subprocess left behind.
 ///
 /// `subprocess.CompletedProcess` minus the fields nothing reads: the Python's callers

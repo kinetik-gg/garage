@@ -9,6 +9,11 @@
 //! `hyprctl monitors all -j` all arrive as JSON, while the value everything here works on is
 //! [`garage_render::displays::LayoutValue`].
 //!
+//! [`recover`] is the hotplug-recovery half: put the saved layout back, and [`watch`] is
+//! the debounced loop that decides when to. Neither is a [`Route`](garage_core::schema::routes::Route)
+//! step either; `display-recover` is a top-level command and `_display-watch` is the
+//! unattended daemon a systemd user unit runs.
+//!
 //! None of the four is a [`Route`](garage_core::schema::routes::Route) step: display testing
 //! is its own top-level command trio -- `display-test`, `display-confirm`, `display-revert`,
 //! plus the watchdog's unlisted re-entry point -- so nothing here appears in
@@ -30,5 +35,7 @@
 
 pub mod apply;
 pub mod config;
+pub mod recover;
 pub mod transaction;
+pub mod watch;
 pub(crate) mod wire;

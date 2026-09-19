@@ -15,10 +15,12 @@
 //! and the `workspace_shape` cargo integration test fails the build if the edge ever appears.
 #![forbid(unsafe_code)]
 
+pub mod events;
 pub mod lua;
 pub mod monitors;
 pub mod run;
 
+pub use events::HyprEvents;
 pub use lua::Luac;
 pub use monitors::Hyprctl;
 pub use run::{which, System};

@@ -230,3 +230,25 @@ across horizontal and vertical bars while preserving compatibility IPC shims for
 AI quota state and microphone privacy are separate first-party extensions, so each can be placed,
 ordered, or disabled independently. The System extension owns machine telemetry, containers, and
 SMB state; it does not aggregate unrelated extension identities.
+
+## 11. The display recovery watcher
+
+A monitor powered off and on again can come back black while Hyprland still reports the output
+enabled with DPMS on -- the physical link never re-trained, and nothing in userspace says so. The
+recovery pair exists for that: `display_recover()` (`garage display-recover`, and a keybind) puts
+the saved layout back through `apply_display_layout()`, then power-cycles every enabled output at
+the sink; `_display-watch` runs `watch()` over `garage-proc`'s `HyprEvents`, which turns
+Hyprland's socket2 into the `MonitorEvents` capability, and calls `recover_display_layout()` when
+the hotplug stream stays quiet for one window. Neither writes `displays.toml`: the two-writer
+rule in §1 is untouched, and recovery can never lose a user's layout. Recovery takes
+`DisplayLock` and stands down entirely while a `display_test()` transaction is pending.
+
+The shape is deliberately defensive, and the reason is measured rather than assumed. A panel that
+holds HPD asserted while powered off emits **no** event at all -- no `monitoradded`, no
+connector-status change on `/sys/class/drm`, nothing on socket2, only a vendor kernel log line.
+On the machine this was built for, the two Dell U2422H panels behaved that way across a
+two-minute power-off, and only the P2721Q dropped HPD. So `watch()` is best-effort: it fires when
+*some* display in a power cycle emits, and cannot see a cycle where none does. `garage
+display-recover` is the guarantee, and the watcher is a convenience on top of it. That limit is
+recorded on `watch()`'s own rustdoc; it is not a gap a better event source would close, because
+userspace offers no other one.

@@ -14,17 +14,23 @@
 use std::thread;
 use std::time::Duration;
 
+use garage_apply::displays::recover::{recover_display_layout, Recovery};
 use garage_apply::displays::transaction::{self, CONFIRM_WINDOW};
+use garage_apply::displays::watch::watch;
 use garage_apply::SessionCx;
 use garage_core::paths::Paths;
 use garage_core::traits::Runner;
 use garage_prefs::load_preferences;
 use garage_proc::run::enter_new_session;
-use garage_proc::{Hyprctl, Luac};
+use garage_proc::{HyprEvents, Hyprctl, Luac};
 use garage_render::cx::RenderCx;
 use serde_json::Value;
 
 use crate::error::CliError;
+
+/// How long the watcher waits between attempts to reach a compositor that is not listening
+/// yet -- at session start, or across a Hyprland restart.
+const WATCH_RETRY: Duration = Duration::from_secs(2);
 
 /// `display-test JSON`: `response({"token": display_test(json.loads(argv[2]))})`.
 ///
@@ -110,4 +116,60 @@ pub(crate) fn watchdog(paths: &Paths, proc: &dyn Runner, argv: &[String]) {
 /// `os.environ.get("HYPR_PRIMARY_MONITOR", "")`, read at call time.
 fn primary_from_environment() -> String {
     std::env::var("HYPR_PRIMARY_MONITOR").unwrap_or_default()
+}
+
+/// `display-recover`: put the saved layout back and re-lock every enabled output.
+///
+/// The guaranteed half of the hotplug story. The watcher below is best-effort -- a monitor
+/// that holds HPD asserted while switched off emits nothing to trigger it -- so this is the
+/// command a person runs, by hand or through a keybind, when a panel comes back black.
+///
+/// # Errors
+///
+/// Whatever [`recover_display_layout`] refuses, and any failure loading the preferences
+/// needed to build the context.
+pub(crate) fn display_recover(paths: &Paths, proc: &dyn Runner) -> Result<Value, CliError> {
+    let config = load_preferences(paths, None)?;
+    let monitors = Hyprctl::new(proc);
+    let lua = Luac::new(proc);
+    let cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
+    let outcome = recover_display_layout(&cx)?;
+    Ok(match outcome {
+        Recovery::NoLayout => serde_json::json!({
+            "recovered": false,
+            "reason": "no saved display layout",
+        }),
+        Recovery::SkippedPending => serde_json::json!({
+            "recovered": false,
+            "reason": "a display test is in flight",
+        }),
+        Recovery::Recovered { outputs } => serde_json::json!({
+            "recovered": true,
+            "outputs": outputs,
+        }),
+    })
+}
+
+/// `_display-watch`: run [`watch`] against the compositor's event socket, forever.
+///
+/// Reconnects rather than exits when the socket is missing or the compositor restarts, so
+/// the unit may start before Hyprland is listening and needs no restart policy to survive
+/// one. Prints nothing: it is an unattended daemon, and its one-line reports go to stderr,
+/// which the user unit collects into the journal.
+pub(crate) fn display_watch(paths: &Paths, proc: &dyn Runner) {
+    loop {
+        let Ok(mut events) = HyprEvents::connect() else {
+            thread::sleep(WATCH_RETRY);
+            continue;
+        };
+        let Ok(config) = load_preferences(paths, None) else {
+            thread::sleep(WATCH_RETRY);
+            continue;
+        };
+        let monitors = Hyprctl::new(proc);
+        let lua = Luac::new(proc);
+        let cx = SessionCx::new(RenderCx::new(&config, paths, &monitors, &lua), proc);
+        drop(watch(&cx, &mut events));
+        thread::sleep(WATCH_RETRY);
+    }
 }
