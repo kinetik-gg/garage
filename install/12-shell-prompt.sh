@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2154 # sourced by bootstrap.sh, which owns dry_run
 # INSTALL.md row 12: install the pinned Pure Fish prompt when needed.
 
 # ---------------------------------------------------------------------------
@@ -17,6 +18,12 @@ if ((dry_run)) || fish -c 'type -q fisher'; then
     # on a machine where the prompt is in fact installed.
     if grep -qF 'pure-fish/pure' "$HOME/.config/fish/fish_plugins" 2>/dev/null; then
         info "the Pure prompt is already installed."
+    elif [[ -n ${GARAGE_OFFLINE_ROOT:-} && -d $GARAGE_OFFLINE_ROOT/pure ]]; then
+        run fish -c "fisher install $GARAGE_OFFLINE_ROOT/pure"
+        write_file "$HOME/.config/fish/fish_plugins" <<'PLUGINS'
+pure-fish/pure
+PLUGINS
+        record "installed the Pure prompt ($pure_pin) from the offline payload"
     else
         run fish -c "fisher install $pure_pin"
         record "installed the Pure prompt ($pure_pin)"

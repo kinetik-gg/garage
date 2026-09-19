@@ -387,6 +387,12 @@ bind(mainMod .. " + Escape",       "Open the session menu",              "qs ipc
 -- Click-outside dismissal of every transient surface, the session menu included,
 -- is the shell's own DismissCatcher; no compositor mouse binds take part anymore.
 
+-- A monitor switched back on can come back black while the compositor still reports
+-- it enabled: a panel that holds HPD asserted while powered off emits no hotplug
+-- event, so nothing above can catch it. This re-applies the saved layout and
+-- power-cycles every output at the sink, which is the same fix as the power button.
+bind(mainMod .. " + SHIFT + R", "Recover the display layout", (os.getenv("HOME") or "") .. "/.local/bin/garage display-recover")
+
 -- The Wallpaper pane, not the standalone picker script: the wallpaper is now a
 -- preference per appearance, and the script wrote the `current` symlink behind
 -- preferences.toml's back -- so the next light/dark switch reverted whatever it

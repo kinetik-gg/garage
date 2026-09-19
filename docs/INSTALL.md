@@ -5,11 +5,11 @@
 Garage installs a whole desktop onto a machine that has none — Hyprland, display
 manager, session, bar, shell, toolchains — driven from a bare TTY. The target is a
 **freshly installed, minimal Arch system with no desktop environment**: the state
-right after `pacstrap`, a bootloader, and `useradd`. Prerequisites, in full:
+right after `pacstrap`, a bootloader, and `useradd`. Garage's netinstall image can
+create that base system, or you can provide it yourself. Prerequisites, in full:
 
-- A booting, minimal Arch install. Installing Arch stays your job — Garage is not a
-  distribution and ships no ISO.
-- A working network connection.
+- The Garage netinstall image, or a booting minimal Arch installation.
+- A working network connection, unless you are using the offline image.
 - A normal user account that can use `sudo`. Do not run the bootstrap as root.
 - **No** desktop environment, display manager, or AUR helper already set up.
 
@@ -42,6 +42,23 @@ packages and enabled services are not reverted.
 
 ## Installing
 
+### From the netinstall image
+
+Boot either Garage image and follow the guided installer. Netinstall downloads
+the current package set; the larger offline image carries the frozen package
+closure and build inputs on the installation medium. Both use Archinstall for
+the disk, locale, bootloader, and account choices, then embed the matching
+Garage source revision into the new system. Create exactly one administrator
+account.
+
+After Archinstall finishes, reboot without the installation medium and log in
+on `tty1`. Garage's bootstrap starts in that real user session and asks for your
+sudo password as needed. This second stage is deliberate: a chroot has no
+systemd user manager, while Garage validates that user-session boundary before
+changing the machine.
+
+Local image build and VM smoke instructions are in [`iso/README.md`](../iso/README.md).
+
 ### From a clone
 
 Clone the public repository and run the bootstrap from a bare TTY:
@@ -73,8 +90,8 @@ without stopping on it, and checks package names against the current sync databa
 | # | Step | File |
 | --- | --- | --- |
 | 1 | **Refuses to continue** unless the machine is fresh (above) or `GARAGE_FORCE=1`. | `install/01-freshness-gate.sh` |
-| 2 | **Upgrades the system** (`pacman -Syu`), then checks its whole package list against the repositories, reporting every missing name at once rather than failing partway through an install. | `install/02-package-database.sh` |
-| 3 | **Installs the package set**: Hyprland and its portals, Quickshell, Kitty, Fish, PipeWire, brightness control, clipboard history, Thunar and its file integrations, the GNOME utility apps it uses, fonts, and the Node/Rust/C++ toolchains — plus NVIDIA packages when NVIDIA hardware is detected. | `install/03-packages.sh` |
+| 2 | **Upgrades the system**, selects a deterministic Vulkan provider from the PCI inventory (Intel, AMD, NVIDIA, or a software fallback), then checks the whole package list against the repositories, reporting every missing name at once rather than failing partway through an install. | `install/02-package-database.sh` |
+| 3 | **Installs the package set**: Hyprland and its portals, Quickshell, Kitty, Fish, PipeWire, brightness control, clipboard history, Thunar and its file integrations, the GNOME utility apps it uses, fonts, the selected GPU runtime, and the Node/Rust/C++ toolchains. | `install/03-packages.sh` |
 | 4 | **Installs the sign-in surface, then enables system services.** The complete root-owned SDDM theme is staged and atomically published before NetworkManager, Bluetooth, Docker, and SDDM are enabled, so the reboot lands in the Garage login screen. Sets `fish` as your login shell. | `install/04-system-services.sh` |
 | 5 | **Creates the home directory layout** (`~/Documents`, `~/repositories`, the rest of the XDG set). | `install/05-home-layout.sh` |
 | 6 | **Clears the way, then links the configuration.** It moves pre-existing real files at the paths `stow` will claim to `~/.garage-backup/<timestamp>/`, deletes stale links from a checkout that has since moved, then runs `stow --restow --no-folding desktop`; a remaining conflict stops the run with the list rather than leaving your home half-linked. The linked wallpaper set is the 4K production output under `desktop/Wallpaper/`; originals and provenance stay outside Stow under `assets/wallpapers/`. `fc-cache` follows, so the bundled fonts (Phosphor, Plus Jakarta Sans, Geist Mono, linked into `~/.local/share/fonts` by the same pass) are ready at first login. It seeds Hyprlock's all-monitor fallback and builds the Thunar-only GTK module. | `install/06-link-config.sh` |

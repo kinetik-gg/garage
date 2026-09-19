@@ -1,0 +1,19 @@
+{
+    "custom_commands": [
+        "/opt/garage-installer/stage-first-boot"
+    ],
+    "hostname": "garage",
+    "kernels": [
+        "linux"
+    ],
+    "network_config": {
+        "type": "nm"
+    },
+    "ntp": true,
+    "packages": [
+        "git"
+    ],
+    "services": [
+        "NetworkManager"
+    ]
+}

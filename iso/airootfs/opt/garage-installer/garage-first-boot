@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Complete Garage from a real PAM/systemd user login on the installed system.
+
+set -u
+
+state_dir="$HOME/.local/state/garage-installer"
+pending="$state_dir/pending"
+running="$state_dir/running"
+failed="$state_dir/failed"
+repo_dir="$HOME/repositories/garage"
+offline_root=/opt/garage-offline
+
+if [[ -d $offline_root ]]; then
+    export GARAGE_OFFLINE_ROOT="$offline_root"
+    export CARGO_NET_OFFLINE=true
+    export RUSTUP_DIST_SERVER=http://127.0.0.1:9
+    export RUSTUP_UPDATE_ROOT=http://127.0.0.1:9/rustup
+fi
+
+if ! mv -- "$pending" "$running" 2>/dev/null; then
+    exit 0
+fi
+
+clear
+cat <<'BANNER'
+Finishing the Garage installation
+
+Garage is now running in your real user session. Its bootstrap will install the
+desktop and ask for your sudo password when system changes are needed.
+BANNER
+
+if "$repo_dir/bootstrap.sh"; then
+    if [[ -d $offline_root ]]; then
+        if ! sudo install -m 0644 \
+            "$offline_root/pacman.conf.online" /etc/pacman.conf; then
+            printf 'Garage finished, but restoring the online pacman configuration failed.\n' >&2
+            exit 1
+        fi
+        sudo rm -rf -- "$offline_root"
+    fi
+    rm -f -- "$running" "$failed"
+    sudo rm -f -- /etc/profile.d/garage-first-boot.sh /etc/garage-installer-user
+    printf '\nGarage installation is complete. Reboot to enter the desktop:\n\n'
+printf '    sudo reboot\n\n'
+else
+    status=$?
+    mv -- "$running" "$failed"
+    cat >&2 <<FAILURE
+
+Garage bootstrap stopped with status $status. Automatic startup has been
+disabled so you can inspect the error without a login loop. Retry with:
+
+    $repo_dir/bootstrap.sh
+
+FAILURE
+    exit "$status"
+fi

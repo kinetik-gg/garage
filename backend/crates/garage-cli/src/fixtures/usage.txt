@@ -22,5 +22,6 @@ Settings backend (each prints one JSON object: {"ok","data","error"}):
   display-test JSON       apply a display layout for 15s, pending confirmation
   display-confirm TOKEN   keep the layout under test
   display-revert TOKEN    put the previous layout back
+  display-recover         re-apply the saved layout and re-lock every display
   theme-sync              switch light/dark if the schedule says so (timer)
   night-shift-sync        re-evaluate the night shift window (timer)

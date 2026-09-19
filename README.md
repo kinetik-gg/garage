@@ -3,8 +3,8 @@
 [![CI](https://github.com/kinetik-gg/garage/actions/workflows/ci.yml/badge.svg)](https://github.com/kinetik-gg/garage/actions/workflows/ci.yml)
 
 Garage is an opinionated Arch + Hyprland desktop from
-[Kinetik](https://github.com/kinetik-gg). The promise is simple: install minimal
-Arch, run Garage's bootstrap from the TTY, reboot into a fully set up
+[Kinetik](https://github.com/kinetik-gg). Install it from Garage's netinstall
+image or run its bootstrap on minimal Arch, then reboot into a fully set up
 workstation with minimal tinkering afterward.
 
 Where dotfiles frameworks hand you a menu of choices to assemble yourself,
@@ -19,13 +19,19 @@ Garage is **not**:
 
 - A dotfiles framework with a choice matrix to configure — the opinions are
   the product.
-- A Linux distribution or ISO — installing Arch stays your job.
 - A Hyprland fork.
 - A plugin suite (Glass is its own project; Garage consumes it).
 
 ![Garage desktop with the bar, media controls, file manager, About window, and Appearance settings](assets/screenshots/garage-desktop.png)
 
-## Install
+## Install from the netinstall image
+
+Garage's netinstall and offline images handle the base Arch installation, then
+run the same Garage bootstrap on the first real TTY login. Disk layout, locale,
+bootloader, and the administrator account remain explicit choices. Build and
+VM instructions live in [`iso/README.md`](iso/README.md).
+
+## Install on minimal Arch
 
 Prerequisites: a freshly installed **minimal Arch system with no desktop
 environment**, a network connection, and a normal user with `sudo`. You do not

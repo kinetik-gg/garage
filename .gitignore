@@ -47,3 +47,7 @@ desktop/.config/garage/displays.toml
 
 # Rust build artifacts. Cargo.lock is committed; the target/ output is not.
 backend/target/
+
+# Local ArchISO work trees and finished images.
+.cache/iso/
+out/iso/

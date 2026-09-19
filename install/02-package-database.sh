@@ -30,16 +30,18 @@ if ((${#packages[@]} == 0)); then
     exit 1
 fi
 
-# The one part of the package set that is a fact about the machine rather than
-# about Garage, so it stays logic here instead of becoming a flag in the file.
-# pciutils is in the `base` group, so lspci is there on a minimal install and
-# this check works before the package phase. It is named in packages.list
-# anyway: two decisions now depend on it -- the NVIDIA driver set here and the
-# window material gate further down -- and neither should quietly fall back to
-# "cannot tell" because something removed it.
-if command -v lspci >/dev/null && lspci | grep -qi nvidia; then
-    packages+=(nvidia-open nvidia-utils egl-wayland libva-nvidia-driver)
+# GPU providers are a fact about the machine rather than Garage, so they stay
+# outside the static manifest. pciutils is named in packages.list because both
+# this decision and the later window-material gate need it. Passing an empty
+# inventory deliberately selects vulkan-swrast rather than letting pacman
+# resolve `vulkan-driver` to its first (NVIDIA) provider.
+pci_inventory=
+if command -v lspci >/dev/null; then
+    pci_inventory=$(lspci -nn)
 fi
+mapfile -t gpu_packages < <(gpu_packages_for "$pci_inventory")
+packages+=("${gpu_packages[@]}")
+info "selected GPU packages: ${gpu_packages[*]}"
 
 step "Refreshing the package database and upgrading the system"
 # A full upgrade with no targets first, so the name check below reads a synced

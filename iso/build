@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# Classification: process/container choreography (STAYS SHELL). The decisions
+# live in the profile and installer payload; this file materializes ArchISO,
+# embeds one committed Garage revision, and invokes mkarchiso.
+
+set -euo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+variant="${1:-netinstall}"
+cache_dir="${GARAGE_ISO_CACHE_DIR:-$repo_dir/.cache/iso}"
+pacman_cache="${GARAGE_ISO_PACMAN_CACHE:-$cache_dir/pacman}"
+offline_package_cache="${GARAGE_ISO_OFFLINE_PACKAGE_CACHE:-$cache_dir/offline-packages}"
+offline_toolchain_cache="${GARAGE_ISO_OFFLINE_TOOLCHAIN_CACHE:-$cache_dir/offline-toolchain}"
+work_dir="${GARAGE_ISO_WORK_DIR:-$cache_dir/work}"
+out_dir="${GARAGE_ISO_OUT_DIR:-$repo_dir/out/iso}"
+container_image="${GARAGE_ISO_CONTAINER_IMAGE:-archlinux:latest}"
+bundle_dir="$cache_dir/payload"
+bundle_path="$bundle_dir/garage.bundle"
+next_bundle_path="$bundle_path.next.$BASHPID"
+source_commit="$(git -C "$repo_dir" rev-parse --verify HEAD)"
+
+case "$variant" in
+    netinstall | offline) ;;
+    *)
+        printf 'Usage: %s [netinstall|offline]\n' "${0##*/}" >&2
+        exit 2
+        ;;
+esac
+
+if ! command -v docker >/dev/null 2>&1; then
+    printf 'Garage ISO build requires Docker.\n' >&2
+    exit 1
+fi
+
+if [[ $(git -C "$repo_dir" branch --show-current) != main ]]; then
+    printf 'Garage ISO builds currently require the main branch.\n' >&2
+    exit 1
+fi
+
+mkdir -p -- \
+    "$pacman_cache" \
+    "$offline_package_cache" \
+    "$offline_toolchain_cache" \
+    "$work_dir" \
+    "$out_dir" \
+    "$bundle_dir"
+
+printf 'Building Garage %s from committed revision %s\n' "$variant" "$source_commit"
+git -C "$repo_dir" bundle create --quiet "$next_bundle_path" HEAD main
+mv -f -- "$next_bundle_path" "$bundle_path"
+printf '%s\n' "$source_commit" >"$bundle_dir/source-commit"
+
+docker run --rm --privileged \
+    --env HOST_UID="$(id -u)" \
+    --env HOST_GID="$(id -g)" \
+    --env GARAGE_ISO_VARIANT="$variant" \
+    --env SOURCE_DATE_EPOCH="$(git -C "$repo_dir" show -s --format=%ct HEAD)" \
+    --volume "$repo_dir:/garage:ro" \
+    --volume "$pacman_cache:/var/cache/pacman/pkg" \
+    --volume "$offline_package_cache:/offline-cache" \
+    --volume "$offline_toolchain_cache:/offline-toolchain" \
+    --volume "$work_dir:/build" \
+    --volume "$out_dir:/out" \
+    --volume "$bundle_dir:/bundle:ro" \
+    "$container_image" \
+    bash /garage/iso/container-build
+
+latest_iso="$(find "$out_dir" -maxdepth 1 -type f -name "garage-$variant-*.iso" -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
+if [[ -z $latest_iso ]]; then
+    printf 'mkarchiso returned without a Garage ISO in %s\n' "$out_dir" >&2
+    exit 1
+fi
+
+sha256sum "$latest_iso" >"$latest_iso.sha256"
+printf '\nBuilt %s\n' "$latest_iso"
+printf 'SHA-256: '
+cut -d' ' -f1 <"$latest_iso.sha256"

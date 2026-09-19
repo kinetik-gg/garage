@@ -19,11 +19,12 @@
 //! either one arriving first at the old config layout would write a fresh file at the new
 //! path while the user's own sat at the old one.
 //!
-//! Fifteen command names in the settings-backend table: `snapshot`, `render`, `render-idle`,
-//! `render-wallpaper`, `apply`, `set`, `action`, `display-test`,
-//! `display-confirm`, `display-revert`, `_display-watchdog` (unlisted in `USAGE`, since it is
-//! the watchdog's own re-entry point and not something a person types), `theme-sync` and
-//! `night-shift-sync`.
+//! Seventeen command names in the settings-backend table: `snapshot`, `render`,
+//! `render-idle`, `render-wallpaper`, `apply`, `set`, `action`, `display-test`,
+//! `display-confirm`, `display-revert`, `display-recover`, `_display-watchdog` and
+//! `_display-watch` (both unlisted in `USAGE`: the first is the watchdog's own re-entry
+//! point and the second is an unattended daemon, neither something a person types),
+//! `theme-sync` and `night-shift-sync`.
 //!
 //! # Where each name lands
 //!
@@ -60,7 +61,7 @@ use garage_render::cx::RenderCx;
 use garage_render::dispatch::run_render;
 use serde_json::Value;
 
-use crate::displays::{display_finish, display_test, watchdog};
+use crate::displays::{display_finish, display_recover, display_test, display_watch, watchdog};
 use crate::error::CliError;
 use crate::response::{emit, USAGE};
 use crate::session::{acted, applied, synced_night_shift, synced_theme};
@@ -75,9 +76,9 @@ const PLAIN_COMMANDS: [&str; 4] = ["doctor", "migrate", "repair", "update"];
 
 /// What a settings-backend command left for [`emit`] to print.
 ///
-/// Two shapes, because `_display-watchdog` is the one command in the table that prints
-/// nothing at all: it runs unattended, fifteen seconds after the process that started it has
-/// already answered, and there is nobody left to read an envelope.
+/// Two shapes, because `_display-watchdog` and `_display-watch` are the two commands in the
+/// table that print nothing at all: they run unattended, and there is nobody left to read
+/// an envelope.
 pub(crate) enum Emitted {
     /// Print this payload with an empty `error`.
     Envelope(Value),
@@ -183,8 +184,14 @@ fn settings(
         "display-test" => display_test(paths, proc, argv).map(Emitted::Envelope),
         "display-confirm" => display_finish(paths, proc, argv, true).map(Emitted::Envelope),
         "display-revert" => display_finish(paths, proc, argv, false).map(Emitted::Envelope),
+        "display-recover" => display_recover(paths, proc).map(Emitted::Envelope),
         "_display-watchdog" => {
             watchdog(paths, proc, argv);
+            Ok(Emitted::Silent)
+        }
+        // Unlike the watchdog, this one never returns: it is the daemon a user unit runs.
+        "_display-watch" => {
+            display_watch(paths, proc);
             Ok(Emitted::Silent)
         }
         "theme-sync" => synced_theme(paths, proc),
@@ -269,9 +276,9 @@ mod tests {
     }
 
     /// The whole of USAGE's settings backend, plus the name that is not in it: the default
-    /// when no subcommand is given. The watchdog is deliberately absent -- it sleeps fifteen
-    /// seconds by design.
-    const COMMANDS: [&str; 11] = [
+    /// when no subcommand is given. The two unattended commands are deliberately absent --
+    /// the watchdog sleeps fifteen seconds and the watcher never returns.
+    const COMMANDS: [&str; 12] = [
         "snapshot",
         "render",
         "render-idle",
@@ -281,6 +288,7 @@ mod tests {
         "display-test",
         "display-confirm",
         "display-revert",
+        "display-recover",
         "theme-sync",
         "night-shift-sync",
     ];
@@ -365,10 +373,10 @@ mod tests {
     }
 
     #[test]
-    fn the_watchdog_is_the_only_command_that_prints_nothing() {
-        // Not run -- it sleeps fifteen seconds by design. What is checked is that it is the
-        // only arm that can produce a silent outcome, which is the property the exit-status
-        // handling in `run()` depends on.
+    fn the_two_unattended_commands_are_the_only_silent_ones() {
+        // `_display-watchdog` sleeps fifteen seconds and `_display-watch` never returns, so
+        // neither is run here. What is checked is that the silent outcome exists at all,
+        // which is the property the exit-status handling in `run()` depends on.
         let silent = matches!(Emitted::Silent, Emitted::Silent);
         assert!(silent);
     }

@@ -22,8 +22,9 @@
 //! person to read. It is split into two groups matching the two kinds of command this binary
 //! has: the human commands (`doctor`, `migrate`, `repair`, `update`, `reconcile`, `help`) and the
 //! settings backend, which always prints exactly one JSON object. Reconcile is the documented
-//! hybrid. `_display-watchdog` is deliberately absent from it -- it is the watchdog's
-//! own re-entry point, not something a person types.
+//! hybrid. `_display-watchdog` and `_display-watch` are deliberately absent from it -- the
+//! first is the watchdog's own re-entry point, the second an unattended daemon, and neither
+//! is something a person types.
 
 use serde_json::Value;
 
@@ -53,6 +54,7 @@ Settings backend (each prints one JSON object: {"ok","data","error"}):
   display-test JSON       apply a display layout for 15s, pending confirmation
   display-confirm TOKEN   keep the layout under test
   display-revert TOKEN    put the previous layout back
+  display-recover         re-apply the saved layout and re-lock every display
   theme-sync              switch light/dark if the schedule says so (timer)
   night-shift-sync        re-evaluate the night shift window (timer)
 "#;

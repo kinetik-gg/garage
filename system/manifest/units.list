@@ -27,3 +27,4 @@ garage-night-shift.timer     running
 garage-reconcile.path        running   # an active path watcher is a running schedule
 garage-reconcile-stamp.path  running   # likewise: inactive would miss pacman stamps
 garage-reconcile.service     oneshot   # exits after each path-triggered convergence
+garage-display-watch.service running   # re-asserts the saved display layout on hotplug

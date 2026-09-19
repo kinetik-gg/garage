@@ -61,3 +61,31 @@ points_into_repo() {
     [[ "$(readlink -m -- "$target")" == "$repo_dir/desktop/"* ]] && return 0
     return 1
 }
+
+# Print the packages that satisfy GPU-specific runtime requirements for an
+# `lspci -nn` inventory. Match numeric PCI class and vendor ids rather than
+# translated device names, and install every detected hardware provider so a
+# hybrid laptop can use either GPU. An unrecognised or virtual adapter gets
+# Mesa's software Vulkan implementation: it is slower, but it is deterministic
+# and avoids pacman choosing NVIDIA as the first provider of `vulkan-driver`.
+gpu_packages_for() {
+    local pci_inventory=${1-} gpu_inventory found_provider=0
+    gpu_inventory=$(grep -E '\[(0300|0302|0380)\]' <<<"$pci_inventory" || true)
+
+    if grep -qi '\[8086:' <<<"$gpu_inventory"; then
+        printf '%s\n' vulkan-intel
+        found_provider=1
+    fi
+    if grep -qi '\[1002:' <<<"$gpu_inventory"; then
+        printf '%s\n' vulkan-radeon
+        found_provider=1
+    fi
+    if grep -qi '\[10de:' <<<"$gpu_inventory"; then
+        printf '%s\n' nvidia-open nvidia-utils egl-wayland libva-nvidia-driver
+        found_provider=1
+    fi
+
+    if ((found_provider == 0)); then
+        printf '%s\n' vulkan-swrast
+    fi
+}
